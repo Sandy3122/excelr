@@ -1,0 +1,6 @@
+!.env.example
+.DS_Store
+.env
+.env.*
+.temp
+tsconfig.tsbuildinfo

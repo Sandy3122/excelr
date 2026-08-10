@@ -52,7 +52,7 @@ export default function RegHero() {
             </div>
 
             {/* FREE badge */}
-            <div className="mt-8">
+            <div className="mt-8 mb-12">
               <FreeBadge className="h-auto w-[210px] drop-shadow-[0_0_20px_rgba(59,130,246,0.35)] md:w-[240px]" />
             </div>
           </div>
