@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { registrationSchema, type RegistrationInput } from "@/lib/reg-schema";
 import { EVENT, QUALIFICATION_OPTIONS } from "@/lib/reg-content";
 
-type Status = "idle" | "submitting" | "success" | "error";
+type Status = "idle" | "submitting" | "error";
 
 export default function RegistrationForm({
   className = "",
@@ -17,13 +18,13 @@ export default function RegistrationForm({
   /** Render without the card chrome (bg/rounded/shadow/padding) — e.g. inside the mobile modal, which supplies its own card. */
   bare?: boolean;
 }) {
+  const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    reset,
     formState: { errors },
   } = useForm<RegistrationInput>({
     resolver: zodResolver(registrationSchema),
@@ -46,43 +47,13 @@ export default function RegistrationForm({
       if (!res.ok || !data.ok) {
         throw new Error(data.error || "Something went wrong. Please try again.");
       }
-      setStatus("success");
-      reset();
+      const params = new URLSearchParams({ name: values.fullName });
+      router.push(`/reg/thank-you?${params.toString()}`);
     } catch (err) {
       setStatus("error");
       setServerError(err instanceof Error ? err.message : "Registration failed.");
     }
   };
-
-  if (status === "success") {
-    return (
-      <div
-        className={
-          bare
-            ? className
-            : `rounded-4xl bg-white p-8 shadow-card-lg md:p-10 ${className}`
-        }
-      >
-        <div className="flex flex-col items-center py-6 text-center">
-          <CheckCircle2 className="h-14 w-14 text-brand-blue" strokeWidth={1.75} />
-          <h2 className="mt-4 font-heading text-[24px] font-semibold text-ink">
-            You&apos;re registered!
-          </h2>
-          <p className="mt-2 max-w-sm font-body text-[15px] leading-relaxed text-muted">
-            Thanks for signing up for ExcelR&apos;s Placement Drive. A confirmation
-            email with the venue and reporting time is on its way to your inbox.
-          </p>
-          <button
-            type="button"
-            onClick={() => setStatus("idle")}
-            className="mt-6 font-body text-[14px] font-semibold text-brand-blue hover:underline"
-          >
-            Register another candidate
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div

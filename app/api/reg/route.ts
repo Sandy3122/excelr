@@ -8,7 +8,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  // 1. Parse + validate the body with the same schema as the client.
   let body: unknown;
   try {
     body = await req.json();
@@ -23,33 +22,45 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+
   const data = parsed.data;
   const timestamp = new Date().toISOString();
 
-  // 2 + 3. Persist to Sheets and send emails. Run both but don't let one silent
-  // failure hide the other; surface a 500 only if the primary (Sheets) fails.
-  const results = await Promise.allSettled([
-    appendToSheet(data, timestamp),
-    sendEmails(data, timestamp),
-  ]);
-
-  const sheetResult = results[0];
-  const emailResult = results[1];
-
-  if (sheetResult.status === "rejected") {
-    console.error("[reg] Google Sheets append failed:", sheetResult.reason);
+  // Email is required on every successful registration.
+  try {
+    await sendEmails(data, timestamp);
+  } catch (err) {
+    console.error("[reg] Nodemailer send failed:", err);
     return NextResponse.json(
-      { ok: false, error: "We couldn't save your registration. Please try again." },
+      {
+        ok: false,
+        error:
+          "We couldn't send the confirmation email. Please try again in a moment.",
+      },
       { status: 500 },
     );
   }
 
-  if (emailResult.status === "rejected") {
-    // Registration is saved; email is best-effort. Log but still return success.
-    console.error("[reg] Email notification failed:", emailResult.reason);
+  // Sheets is optional — skip quietly when credentials aren't configured.
+  if (hasSheetsConfig()) {
+    try {
+      await appendToSheet(data, timestamp);
+    } catch (err) {
+      console.error("[reg] Google Sheets append failed:", err);
+      // Registration email already sent; don't fail the request.
+    }
   }
 
   return NextResponse.json({ ok: true });
+}
+
+function hasSheetsConfig() {
+  return Boolean(
+    process.env.GOOGLE_SHEETS_SPREADSHEET_ID &&
+      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
+      process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY &&
+      !process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.includes("..."),
+  );
 }
 
 /** Append a row: [timestamp, fullName, email, phone, college, qualification]. */
@@ -79,14 +90,16 @@ async function appendToSheet(data: RegistrationInput, timestamp: string) {
   });
 }
 
-/** Admin notification + optional applicant confirmation via SMTP. */
+/** Admin notification + applicant confirmation via Nodemailer SMTP. */
 async function sendEmails(data: RegistrationInput, timestamp: string) {
   const host = requireEnv("SMTP_HOST");
   const port = Number(process.env.SMTP_PORT || 587);
   const user = requireEnv("SMTP_USER");
   const pass = requireEnv("SMTP_PASS");
-  const from = process.env.SMTP_FROM || user;
-  const notifyTo = requireEnv("REG_NOTIFY_TO");
+  const from = process.env.SMTP_FROM || `ExcelR Placement Drive <${user}>`;
+  const notifyTo = process.env.REG_NOTIFY_TO || user;
+  const sendApplicantConfirmation =
+    (process.env.REG_SEND_APPLICANT_CONFIRMATION || "true").toLowerCase() === "true";
 
   const transporter = nodemailer.createTransport({
     host,
@@ -96,28 +109,28 @@ async function sendEmails(data: RegistrationInput, timestamp: string) {
   });
 
   // (a) Admin notification
-  const adminEmail = transporter.sendMail({
-    from,
-    to: notifyTo,
-    replyTo: data.email,
-    subject: `New Placement Drive registration — ${data.fullName}`,
-    text: [
-      "New registration for ExcelR's Java Full Stack Placement Drive:",
-      "",
-      `Name:          ${data.fullName}`,
-      `Email:         ${data.email}`,
-      `Phone:         ${data.phone}`,
-      `College:       ${data.college}`,
-      `Qualification: ${data.qualification}`,
-      `Submitted:     ${timestamp}`,
-    ].join("\n"),
-    html: adminHtml(data, timestamp),
-  });
+  const sends: Promise<unknown>[] = [
+    transporter.sendMail({
+      from,
+      to: notifyTo,
+      replyTo: data.email,
+      subject: `New Placement Drive registration — ${data.fullName}`,
+      text: [
+        "New registration for ExcelR's Java Full Stack Placement Drive:",
+        "",
+        `Name:          ${data.fullName}`,
+        `Email:         ${data.email}`,
+        `Phone:         ${data.phone}`,
+        `College:       ${data.college}`,
+        `Qualification: ${data.qualification}`,
+        `Submitted:     ${timestamp}`,
+      ].join("\n"),
+      html: adminHtml(data, timestamp),
+    }),
+  ];
 
-  const sends: Promise<unknown>[] = [adminEmail];
-
-  // (b) Optional confirmation to the applicant
-  if (process.env.REG_SEND_APPLICANT_CONFIRMATION === "true") {
+  // (b) Confirmation to the applicant (on by default)
+  if (sendApplicantConfirmation) {
     sends.push(
       transporter.sendMail({
         from,
@@ -168,7 +181,7 @@ function adminHtml(data: RegistrationInput, timestamp: string) {
 function applicantHtml(data: RegistrationInput) {
   return `
   <div style="font-family:Arial,sans-serif;color:#0F172B;line-height:1.6">
-    <h2 style="margin:0 0 8px">You're registered! 🎉</h2>
+    <h2 style="margin:0 0 8px">You're registered!</h2>
     <p>Hi ${escapeHtml(data.fullName)}, thanks for registering for ExcelR's
     Java Full Stack Placement Drive.</p>
     <p style="margin:16px 0">
