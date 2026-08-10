@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import nodemailer from "nodemailer";
 import { registrationSchema, type RegistrationInput } from "@/lib/reg-schema";
+import { APPLICANT_EMAIL, renderApplicantEmailHtml } from "@/lib/reg-email";
 
 // Sheets + nodemailer need the Node runtime (not Edge).
 export const runtime = "nodejs";
@@ -47,7 +48,6 @@ export async function POST(req: Request) {
       await appendToSheet(data, timestamp);
     } catch (err) {
       console.error("[reg] Google Sheets append failed:", err);
-      // Registration email already sent; don't fail the request.
     }
   }
 
@@ -90,13 +90,14 @@ async function appendToSheet(data: RegistrationInput, timestamp: string) {
   });
 }
 
-/** Admin notification + applicant confirmation via Nodemailer SMTP. */
+/** Admin notification + applicant confirmation (HTML from public/reg/index.html). */
 async function sendEmails(data: RegistrationInput, timestamp: string) {
   const host = requireEnv("SMTP_HOST");
   const port = Number(process.env.SMTP_PORT || 587);
   const user = requireEnv("SMTP_USER");
   const pass = requireEnv("SMTP_PASS");
-  const from = process.env.SMTP_FROM || `ExcelR Placement Drive <${user}>`;
+  const from =
+    process.env.SMTP_FROM || `${APPLICANT_EMAIL.fromName} <${user}>`;
   const notifyTo = process.env.REG_NOTIFY_TO || user;
   const sendApplicantConfirmation =
     (process.env.REG_SEND_APPLICANT_CONFIRMATION || "true").toLowerCase() === "true";
@@ -104,11 +105,11 @@ async function sendEmails(data: RegistrationInput, timestamp: string) {
   const transporter = nodemailer.createTransport({
     host,
     port,
-    secure: port === 465, // 465 = implicit TLS; 587 = STARTTLS
+    secure: port === 465,
     auth: { user, pass },
   });
 
-  // (a) Admin notification
+  // (a) Admin notification (plain operational email)
   const sends: Promise<unknown>[] = [
     transporter.sendMail({
       from,
@@ -129,30 +130,29 @@ async function sendEmails(data: RegistrationInput, timestamp: string) {
     }),
   ];
 
-  // (b) Confirmation to the applicant (on by default)
+  // (b) Applicant confirmation — exact HTML template from public/reg/index.html
   if (sendApplicantConfirmation) {
+    const html = await renderApplicantEmailHtml(data.fullName);
     sends.push(
       transporter.sendMail({
         from,
         to: data.email,
-        subject: "You're registered — ExcelR's Java Full Stack Placement Drive",
+        replyTo: APPLICANT_EMAIL.replyTo,
+        subject: APPLICANT_EMAIL.subject,
         text: [
-          `Hi ${data.fullName},`,
+          `Hi ${data.fullName.split(/\s+/)[0] || "there"},`,
           "",
-          "Thanks for registering for ExcelR's Java Full Stack Placement Drive.",
+          "Your seat is confirmed for the Java Full Stack Placement Drive.",
           "",
-          "Date:  22nd August 2026",
-          "Time:  9:00 AM Onwards",
-          "Venue: ExcelR Marathahalli Campus, T-2 4th Floor, Raja Ikon,",
-          "       Sarjapur Outer Ring Rd, Marathahalli, Bengaluru 560037",
+          "Date:  Saturday, 22nd August 2026",
+          "Time:  9:00 AM onwards (registration 8:45 – 9:00 AM)",
+          "Venue: ExcelR — Marathahalli Campus, Bengaluru 560037",
           "",
-          "Please bring your own laptop for the technical round, copies of your",
-          "resume, and a valid photo ID.",
+          "Please bring your resume copies, photo ID, and laptop (mandatory).",
           "",
-          "See you there!",
-          "— Team ExcelR",
+          "— Team ExcelR, Placement & Career Services",
         ].join("\n"),
-        html: applicantHtml(data),
+        html,
       }),
     );
   }
@@ -175,24 +175,6 @@ function adminHtml(data: RegistrationInput, timestamp: string) {
       ${row("Qualification", data.qualification)}
       ${row("Submitted", timestamp)}
     </table>
-  </div>`;
-}
-
-function applicantHtml(data: RegistrationInput) {
-  return `
-  <div style="font-family:Arial,sans-serif;color:#0F172B;line-height:1.6">
-    <h2 style="margin:0 0 8px">You're registered!</h2>
-    <p>Hi ${escapeHtml(data.fullName)}, thanks for registering for ExcelR's
-    Java Full Stack Placement Drive.</p>
-    <p style="margin:16px 0">
-      <strong>Date:</strong> 22nd August 2026<br/>
-      <strong>Time:</strong> 9:00 AM Onwards<br/>
-      <strong>Venue:</strong> ExcelR Marathahalli Campus, T-2 4th Floor, Raja Ikon,
-      Sarjapur Outer Ring Rd, Marathahalli, Bengaluru 560037
-    </p>
-    <p>Please bring your own laptop for the technical round, copies of your resume,
-    and a valid photo ID.</p>
-    <p>See you there!<br/>— Team ExcelR</p>
   </div>`;
 }
 
