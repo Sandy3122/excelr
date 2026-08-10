@@ -13,7 +13,7 @@ import { EVENT_DETAILS } from "@/lib/reg-content";
  */
 export default function EventDetails() {
   return (
-    <section id="register" className="scroll-mt-20 bg-page py-14 md:py-20">
+    <section id="register" className="scroll-mt-20 bg-gradient-to-b from-[#EEF2FF] via-page to-[#F0F4FF] py-14 md:py-20">
       <div className="mx-auto max-w-content px-5 md:px-6">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:items-start md:gap-12 lg:gap-16">
           {/* LEFT — event detail cards */}
@@ -48,8 +48,8 @@ export default function EventDetails() {
             <MobileRegisterTriggers />
           </div>
 
-          {/* RIGHT — registration form card (desktop only), overlaps hero */}
-          <div className="relative z-20 hidden md:block md:-mt-36 lg:-mt-44">
+          {/* RIGHT — registration form card (desktop only), top-aligned with Event Details */}
+          <div className="relative z-20 hidden md:block">
             <RegistrationForm />
           </div>
         </div>

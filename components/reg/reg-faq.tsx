@@ -9,7 +9,7 @@ export default function RegFaq() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section className="bg-page py-16 md:py-20">
+    <section className="bg-gradient-to-b from-page to-[#E8EDFF]/60 py-16 md:py-20">
       <div className="mx-auto max-w-faq px-6">
         <div className="text-center">
           <h2 className="font-heading text-[30px] font-bold leading-tight text-ink md:text-[36px]">

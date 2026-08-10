@@ -34,10 +34,10 @@ export function MobileHeroRegisterButton() {
 
   return (
     <>
-      <div className="mt-8 flex justify-center md:hidden">
+      <div className="mt-8 flex justify-start md:hidden">
         <GradientButton
-          variant="ice"
-          className="min-w-[220px] px-8 py-3.5 text-[16px]"
+          variant="white"
+          className="pl-7 pr-3.5 py-2.5 text-[16px]"
           onClick={() => setOpen(true)}
         >
           Register Now

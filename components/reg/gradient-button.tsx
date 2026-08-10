@@ -42,7 +42,15 @@ export default function GradientButton(props: LinkProps | ButtonProps) {
   const content = (
     <>
       <span>{children}</span>
-      {withArrow && <ArrowRight className="h-5 w-5" strokeWidth={2.5} />}
+      {withArrow &&
+        (variant === "white" ? (
+          // dark circular arrow badge (mobile hero CTA)
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-navy-900 text-white">
+            <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
+          </span>
+        ) : (
+          <ArrowRight className="h-5 w-5" strokeWidth={2.5} />
+        ))}
     </>
   );
 
