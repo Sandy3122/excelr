@@ -9,7 +9,14 @@ import { EVENT, QUALIFICATION_OPTIONS } from "@/lib/reg-content";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
-export default function RegistrationForm({ className = "" }: { className?: string }) {
+export default function RegistrationForm({
+  className = "",
+  bare = false,
+}: {
+  className?: string;
+  /** Render without the card chrome (bg/rounded/shadow/padding) — e.g. inside the mobile modal, which supplies its own card. */
+  bare?: boolean;
+}) {
   const [status, setStatus] = useState<Status>("idle");
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -49,7 +56,13 @@ export default function RegistrationForm({ className = "" }: { className?: strin
 
   if (status === "success") {
     return (
-      <div className={`rounded-4xl bg-white p-8 shadow-card-lg md:p-10 ${className}`}>
+      <div
+        className={
+          bare
+            ? className
+            : `rounded-4xl bg-white p-8 shadow-card-lg md:p-10 ${className}`
+        }
+      >
         <div className="flex flex-col items-center py-6 text-center">
           <CheckCircle2 className="h-14 w-14 text-brand-blue" strokeWidth={1.75} />
           <h2 className="mt-4 font-heading text-[24px] font-semibold text-ink">
@@ -72,7 +85,13 @@ export default function RegistrationForm({ className = "" }: { className?: strin
   }
 
   return (
-    <div className={`rounded-4xl bg-white p-6 shadow-card-lg md:p-10 ${className}`}>
+    <div
+      className={
+        bare
+          ? className
+          : `rounded-4xl bg-white p-6 shadow-card-lg md:p-10 ${className}`
+      }
+    >
       <div className="mb-6">
         <h2 className="font-heading text-[24px] font-semibold text-ink">Register Now</h2>
         <p className="mt-1 font-body text-[15px] text-muted">To Secure Your Career</p>

@@ -5,38 +5,41 @@ import { MobileHeroRegisterButton } from "./mobile-register";
 import { EVENT } from "@/lib/reg-content";
 
 /**
- * Hero / banner — matches Figma Desktop (8:889) + Mobile (1:508):
- * - Desktop: 2-col, left-aligned copy, student photo right. No CTA (form is inline).
- * - Mobile: stacked, center-aligned; ice-gradient "Register Now" + note + FREE badge.
+ * Hero — matches the Figma desktop hero screenshot:
+ * white nav above, navy/royal gradient + thin circle décor,
+ * left copy (lavender "Drive", blue role badge, glow underline, FREE badge),
+ * right student cutout. Mobile keeps ice CTA + note.
  */
 export default function RegHero() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-[#0A0F27] via-navy-900 to-[#1A1A4A] text-white">
+    <section className="relative overflow-hidden bg-[radial-gradient(1200px_640px_at_30%_28%,#1E3F91_0%,#0E1B49_46%,#080D28_100%)] text-white">
       <GlowBlobs />
 
-      <div className="relative mx-auto max-w-content px-6 py-12 md:py-16 lg:py-20">
-        <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-12">
-          {/* LEFT — copy (left-aligned on both breakpoints, per design) */}
-          <div className="animate-fade-up">
-            <h1 className="font-heading font-bold leading-[1.05] tracking-[-1px] text-[40px] md:text-[56px] md:tracking-[-1.5px] lg:text-[68px]">
+      <div className="relative mx-auto max-w-content px-4 pb-0 pt-14 md:pb-0 md:pt-16 lg:pb-0 lg:pt-16">
+        <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-8 lg:gap-12">
+          {/* LEFT — copy */}
+          <div className="relative z-10 animate-fade-up">
+            <h1 className="font-heading font-semibold leading-[1.02] tracking-[-1px] text-[42px] md:text-[56px] md:tracking-[-1.6px] lg:text-[72px]">
               <span className="block text-white">ExcelR&apos;s</span>
               <span className="block">
                 <span className="text-white">Placement </span>
-                <span className="text-[#A5B4FC]">Drive</span>
+                <span className="bg-gradient-to-r from-[#B4C2FF] to-[#8B9CF7] bg-clip-text text-transparent">
+                  Drive
+                </span>
               </span>
             </h1>
 
-            {/* "For Java Full Stack" — solid blue pill */}
-            <div className="mt-5 inline-block rounded-xl border border-white/20 bg-[#2545D1] px-5 py-2.5 shadow-lg shadow-black/25">
-              <span className="font-heading font-bold text-white text-[22px] md:text-[30px] lg:text-[34px]">
+            {/* "For Java Full Stack" — indigo badge with subtle border + soft glow */}
+            <div className="mt-5 inline-block rounded-[10px] border border-white/15 bg-gradient-to-b from-[#28499B] to-[#1B346F] px-6 py-2.5 shadow-[0_0_26px_rgba(37,66,148,0.5)] md:mt-6 md:rounded-xl md:px-8 md:py-3">
+              <span className="font-heading text-[22px] font-bold text-white md:text-[32px] lg:text-[40px]">
                 {EVENT.role}
               </span>
             </div>
 
-            {/* accent underline bar */}
-            <div className="mt-5 h-1 w-[200px] rounded-full bg-gradient-to-r from-brand-blue to-brand-indigo md:w-[240px]" />
+            {/* Accent underline — bright left → fade right, with glow */}
+            <div className="mt-4 h-[3px] w-[180px] rounded-full bg-gradient-to-r from-[#7DD3FC] via-[#3B82F6] to-[#7DD3FC] md:mt-5 md:w-[220px]" />
 
-            <p className="mt-6 max-w-md font-body text-[16px] leading-[1.65] text-slate-200 md:text-[17px]">
+            <p className="mt-6 max-w-[420px] font-body text-[15px] leading-[1.7] text-white/90 md:text-[17px] md:leading-[1.65]">
               {EVENT.tagline}
             </p>
 
@@ -49,24 +52,24 @@ export default function RegHero() {
             </div>
 
             {/* FREE badge */}
-            <div className="mt-8 flex justify-start">
-              <FreeBadge className="h-auto w-[200px] drop-shadow-xl md:w-[220px]" />
+            <div className="mt-8">
+              <FreeBadge className="h-auto w-[210px] drop-shadow-[0_0_20px_rgba(59,130,246,0.35)] md:w-[240px]" />
             </div>
           </div>
 
           {/* RIGHT — student photo (desktop only) */}
-          <div className="relative mx-auto hidden w-full max-w-[540px] md:block">
+          <div className="relative mx-auto hidden w-full max-w-[560px] md:block self-end">
             <div
               aria-hidden
-              className="absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-blue/25 blur-3xl"
+              className="absolute left-1/2 top-[40%] h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#3B82F6]/30 blur-3xl"
             />
             <Image
               src="/reg/hero-student.png"
               alt="Student ready for the placement drive"
-              width={540}
-              height={580}
+              width={580}
+              height={640}
               priority
-              className="relative z-10 mx-auto h-auto w-full max-w-[500px]"
+              className="relative z-10 mx-auto h-auto w-full max-w-[580px] object-contain object-bottom"
             />
           </div>
         </div>

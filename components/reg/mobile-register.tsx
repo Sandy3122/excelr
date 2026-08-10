@@ -78,28 +78,30 @@ function MobileRegisterModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-navy-900/60 p-0 backdrop-blur-sm sm:items-center sm:p-6 md:hidden"
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-navy-900/70 backdrop-blur-sm sm:items-center sm:p-6 md:hidden"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
       onClick={onClose}
     >
       <div
-        className="relative max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-page p-4 shadow-card-lg sm:max-w-lg sm:rounded-3xl sm:p-5"
+        className="relative flex max-h-[92dvh] w-full min-w-0 max-w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-card-lg animate-fade-up sm:max-w-md sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={onClose}
           aria-label="Close registration form"
-          className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-ink shadow-card"
+          className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-ink transition-colors hover:bg-slate-200"
         >
           <X className="h-5 w-5" strokeWidth={2.25} />
         </button>
         <span id={titleId} className="sr-only">
           Register for ExcelR Placement Drive
         </span>
-        <RegistrationForm />
+        <div className="overflow-y-auto px-5 py-6 sm:px-6">
+          <RegistrationForm bare />
+        </div>
       </div>
     </div>,
     document.body,

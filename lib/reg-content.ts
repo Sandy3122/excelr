@@ -9,7 +9,7 @@ export const EVENT = {
   title: "ExcelR's Placement Drive",
   role: "For Java Full Stack",
   tagline:
-    "Connect with top tech companies, ace your interviews, and launch your career — all in one day at ExcelR's Marathahalli Campus.",
+    "Connect with top tech companies, ace your interviews, and launch your career — all in one day at ExcelR's Marathalli Campus.",
   laptopNote:
     "Note: Candidates are requested to bring their own laptops to complete the technical round.",
   date: "22nd August 2026",
@@ -66,9 +66,7 @@ export const QUALIFICATION_OPTIONS = [
 export type FaqItem = { q: string; a: string };
 
 /**
- * FAQ copy. NOTE: only partial text was readable from the Figma render (spec §3.4).
- * Questions are taken from the mobile render; answers are placeholders written to
- * match the drive's context — confirm the real copy with the design owner.
+ * FAQ copy — matches the Figma FAQ frame (6 items; first expanded by default).
  */
 export const FAQS: FaqItem[] = [
   {
@@ -94,14 +92,6 @@ export const FAQS: FaqItem[] = [
   {
     q: "What should I bring on the day?",
     a: "Please bring your own laptop for the technical round, multiple copies of your updated resume, and a valid photo ID for verification.",
-  },
-  {
-    q: "How will I receive the confirmation after registering?",
-    a: "Once you register, you will receive a confirmation email with the venue details and reporting time. Keep an eye on your inbox (and spam folder) for updates.",
-  },
-  {
-    q: "Can I attend if I am currently employed?",
-    a: "Yes. Experienced professionals looking to switch into a Java Full Stack role are welcome to attend alongside freshers.",
   },
 ];
 

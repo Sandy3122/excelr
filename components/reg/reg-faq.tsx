@@ -4,12 +4,12 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { FAQS } from "@/lib/reg-content";
 
-/** Accordion (spec §3.4). First item expanded by default. */
+/** FAQ accordion — matches Figma FAQ frame (first item open by default). */
 export default function RegFaq() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section className="bg-gradient-to-b from-page to-[#E8EDFF]/60 py-16 md:py-20">
+    <section className="bg-[#F0F3FF] py-16 md:py-20">
       <div className="mx-auto max-w-faq px-6">
         <div className="text-center">
           <h2 className="font-heading text-[30px] font-bold leading-tight text-ink md:text-[36px]">
@@ -20,27 +20,28 @@ export default function RegFaq() {
           </p>
         </div>
 
-        <div className="mt-10 space-y-4">
+        <div className="mt-10 space-y-4 md:space-y-5">
           {FAQS.map((item, i) => {
             const isOpen = open === i;
             return (
               <div
                 key={item.q}
-                className="overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-slate-100"
+                className="overflow-hidden rounded-2xl bg-white shadow-[0_8px_24px_rgba(15,23,43,0.06)]"
               >
                 <button
                   type="button"
                   aria-expanded={isOpen}
                   onClick={() => setOpen(isOpen ? null : i)}
-                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left md:px-6 md:py-5"
+                  className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left md:px-7 md:py-6"
                 >
-                  <span className="font-heading text-[16px] font-semibold text-ink md:text-[17px]">
+                  <span className="font-heading text-[15px] font-semibold leading-snug text-ink md:text-[17px]">
                     {item.q}
                   </span>
-                  {/* chevron inside a circle — filled blue when open, faint when closed */}
                   <span
-                    className={`flex h-8 w-8 flex-none items-center justify-center rounded-full transition-colors ${
-                      isOpen ? "bg-brand-blue text-white" : "bg-tint2 text-brand-blue"
+                    className={`flex h-8 w-8 flex-none items-center justify-center rounded-full transition-colors md:h-9 md:w-9 ${
+                      isOpen
+                        ? "bg-[#3B82F6] text-white"
+                        : "bg-[#EEF2FF] text-[#3B82F6]"
                     }`}
                   >
                     <ChevronDown
@@ -51,13 +52,14 @@ export default function RegFaq() {
                     />
                   </span>
                 </button>
+
                 <div
                   className={`grid transition-all duration-300 ease-out ${
                     isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
                   }`}
                 >
                   <div className="overflow-hidden">
-                    <p className="bg-[#EEF2FF]/80 px-5 pb-5 pt-1 font-body text-[15px] leading-[1.65] text-muted md:px-6">
+                    <p className="px-5 pb-6 font-body text-[14px] leading-[1.7] text-muted md:px-7 md:pb-7 md:text-[15px]">
                       {item.a}
                     </p>
                   </div>
