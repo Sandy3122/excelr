@@ -16,12 +16,12 @@ export const registrationSchema = z.object({
     .trim()
     .min(1, "Email is required")
     .email("Enter a valid email address"),
+  // 10-digit Indian mobile number. The UI prepends +91 before sending to
+  // Infobip; the stored/validated value here is the local 10-digit number.
   phone: z
     .string()
     .trim()
-    .min(7, "Enter a valid phone number")
-    .max(20, "Phone number is too long")
-    .regex(/^[+\d][\d\s-]{6,}$/, "Enter a valid phone number"),
+    .regex(/^\d{10}$/, "Enter a 10-digit mobile number"),
   college: z
     .string()
     .trim()

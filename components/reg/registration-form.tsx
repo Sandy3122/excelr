@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { registrationSchema, type RegistrationInput } from "@/lib/reg-schema";
 import { EVENT, QUALIFICATION_OPTIONS } from "@/lib/reg-content";
+import WhatsAppOtpField from "./whatsapp-otp-field";
 
 type Status = "idle" | "submitting" | "error";
 
@@ -21,17 +22,26 @@ export default function RegistrationForm({
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
   const [serverError, setServerError] = useState<string | null>(null);
+  const [phoneVerified, setPhoneVerified] = useState(false);
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<RegistrationInput>({
     resolver: zodResolver(registrationSchema),
     mode: "onTouched",
   });
 
+  const phoneValue = watch("phone") || "";
+
   const onSubmit = async (values: RegistrationInput) => {
+    if (!phoneVerified) {
+      setStatus("error");
+      setServerError("Please verify your WhatsApp number to continue.");
+      return;
+    }
     setStatus("submitting");
     setServerError(null);
     try {
@@ -91,16 +101,13 @@ export default function RegistrationForm({
           />
         </Field>
 
-        <Field label="Phone Number" htmlFor="phone" error={errors.phone?.message}>
-          <input
-            id="phone"
-            type="tel"
-            autoComplete="tel"
-            placeholder="+91 00000 00000"
-            className="field-input"
-            {...register("phone")}
-          />
-        </Field>
+        <WhatsAppOtpField
+          value={phoneValue}
+          registerProps={register("phone")}
+          error={errors.phone?.message}
+          verified={phoneVerified}
+          onVerifiedChange={(v) => setPhoneVerified(v)}
+        />
 
         <Field
           label="College / University"
@@ -151,7 +158,7 @@ export default function RegistrationForm({
 
         <button
           type="submit"
-          disabled={status === "submitting"}
+          disabled={status === "submitting" || !phoneVerified}
           className="btn-gradient w-full px-6 py-4 text-[16px] disabled:cursor-not-allowed disabled:opacity-70"
         >
           {status === "submitting" ? (
@@ -166,6 +173,12 @@ export default function RegistrationForm({
             </>
           )}
         </button>
+
+        {!phoneVerified && (
+          <p className="font-body text-[13px] text-faint">
+            Verify your WhatsApp number above to enable registration.
+          </p>
+        )}
 
         <p className="pt-1 font-body text-[13px] leading-[1.5] text-faint">
           {EVENT.laptopNote}

@@ -3,6 +3,10 @@ import { google } from "googleapis";
 import nodemailer from "nodemailer";
 import { registrationSchema, type RegistrationInput } from "@/lib/reg-schema";
 import { APPLICANT_EMAIL, renderApplicantEmailHtml } from "@/lib/reg-email";
+import {
+  consumePhoneVerification,
+  isPhoneVerified,
+} from "@/lib/whatsapp-otp/service";
 
 // Sheets + nodemailer need the Node runtime (not Edge).
 export const runtime = "nodejs";
@@ -27,6 +31,23 @@ export async function POST(req: Request) {
   const data = parsed.data;
   const timestamp = new Date().toISOString();
 
+  // The WhatsApp number must have been verified via OTP before we accept the
+  // registration. We peek here (non-destructive) and only consume the marker
+  // after the emails go out, so a transient email failure lets the user retry
+  // without re-verifying.
+  const { verified, phone } = await isPhoneVerified(data.phone);
+  if (!verified) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Please verify your WhatsApp number before registering.",
+      },
+      { status: 403 },
+    );
+  }
+  // Use the normalized E.164 number everywhere downstream.
+  if (phone) data.phone = phone.e164;
+
   // Email is required on every successful registration.
   try {
     await sendEmails(data, timestamp);
@@ -40,6 +61,14 @@ export async function POST(req: Request) {
       },
       { status: 500 },
     );
+  }
+
+  // Emails delivered — burn the one-time verification marker so it can't be
+  // reused for another registration.
+  try {
+    await consumePhoneVerification(data.phone);
+  } catch (err) {
+    console.error("[reg] Failed to consume phone verification marker:", err);
   }
 
   // Sheets is optional — skip quietly when credentials aren't configured.
@@ -63,7 +92,10 @@ function hasSheetsConfig() {
   );
 }
 
-/** Append a row: [timestamp, fullName, email, phone, college, qualification]. */
+/**
+ * Append a row:
+ * [timestamp, fullName, email, phone, college, qualification, whatsappVerified].
+ */
 async function appendToSheet(data: RegistrationInput, timestamp: string) {
   const spreadsheetId = requireEnv("GOOGLE_SHEETS_SPREADSHEET_ID");
   const clientEmail = requireEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
@@ -79,12 +111,20 @@ async function appendToSheet(data: RegistrationInput, timestamp: string) {
   const sheets = google.sheets({ version: "v4", auth });
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${sheetName}!A:F`,
+    range: `${sheetName}!A:G`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: {
       values: [
-        [timestamp, data.fullName, data.email, data.phone, data.college, data.qualification],
+        [
+          timestamp,
+          data.fullName,
+          data.email,
+          data.phone,
+          data.college,
+          data.qualification,
+          "WhatsApp verified",
+        ],
       ],
     },
   });
