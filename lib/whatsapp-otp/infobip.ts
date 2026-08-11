@@ -5,27 +5,6 @@ import { getInfobipConfig, type InfobipConfig } from "./config";
  *
  * Endpoint:  POST {baseUrl}/whatsapp/1/message/template
  * Auth:      Authorization: App <INFOBIP_API_KEY>
- *
- * Payload matches the approved template `fsd_website_otp_11082026`
- * (template ID 884804994387290):
- *
- * {
- *   "messages": [{
- *     "from": "918050162541",
- *     "to": "<digits, no +>",
- *     "content": {
- *       "templateName": "fsd_website_otp_11082026",
- *       "templateData": {
- *         "body": { "placeholders": ["<otp>"] },
- *         "buttons": [{ "type": "URL", "parameter": "<otp>" }]
- *       },
- *       "language": "en_IN"
- *     }
- *   }]
- * }
- *
- * The URL button is always included. INFOBIP_TEMPLATE_URL_BUTTON_PARAM defaults
- * to the OTP; set a literal only if the approved suffix is not the code.
  */
 
 export type InfobipTemplatePayload = {
@@ -36,7 +15,7 @@ export type InfobipTemplatePayload = {
       templateName: string;
       templateData: {
         body: { placeholders: string[] };
-        buttons: Array<{ type: "URL"; parameter: string }>;
+        buttons?: Array<{ type: "URL"; parameter: string }>;
       };
       language: string;
     };
@@ -47,7 +26,7 @@ export type SendResult =
   | { ok: true; providerMessageId?: string }
   | { ok: false; error: string };
 
-/** Build the exact JSON payload Infobip expects for the OTP template. */
+/** OTP template `fsd_website_otp_11082026` — body placeholder + URL button. */
 export function buildTemplatePayload(
   cfg: InfobipConfig,
   toInfobip: string,
@@ -75,15 +54,56 @@ export function buildTemplatePayload(
 }
 
 /**
- * Send the OTP via Infobip. Returns a safe result; the OTP is never logged and
- * raw provider error bodies are never propagated to callers/clients.
+ * Confirmation template `fsd_placement_drive_confirmation_message_a`
+ * (template ID 2283037602514705) — body placeholder only, no buttons.
  */
+export function buildConfirmationPayload(
+  cfg: InfobipConfig,
+  toInfobip: string,
+  firstName: string,
+): InfobipTemplatePayload {
+  return {
+    messages: [
+      {
+        from: cfg.sender,
+        to: toInfobip,
+        content: {
+          templateName: cfg.confirmationTemplateName,
+          templateData: {
+            body: { placeholders: [firstName] },
+          },
+          language: cfg.language,
+        },
+      },
+    ],
+  };
+}
+
 export async function sendWhatsAppOtp(
   toInfobip: string,
   otp: string,
 ): Promise<SendResult> {
   const cfg = getInfobipConfig();
-  const payload = buildTemplatePayload(cfg, toInfobip, otp);
+  return postTemplate(cfg, buildTemplatePayload(cfg, toInfobip, otp), "otp");
+}
+
+export async function sendRegistrationConfirmationWhatsApp(
+  toInfobip: string,
+  firstName: string,
+): Promise<SendResult> {
+  const cfg = getInfobipConfig();
+  return postTemplate(
+    cfg,
+    buildConfirmationPayload(cfg, toInfobip, firstName),
+    "confirmation",
+  );
+}
+
+async function postTemplate(
+  cfg: InfobipConfig,
+  payload: InfobipTemplatePayload,
+  kind: "otp" | "confirmation",
+): Promise<SendResult> {
   const endpoint = `${cfg.baseUrl}/whatsapp/1/message/template`;
 
   let res: Response;
@@ -113,17 +133,14 @@ export async function sendWhatsAppOtp(
       /* ignore body parse errors */
     }
     console.error(
-      `[whatsapp-otp] Infobip send failed: HTTP ${res.status}` +
+      `[whatsapp-${kind}] Infobip send failed: HTTP ${res.status}` +
         (providerStatus ? ` (${providerStatus})` : ""),
     );
     return { ok: false, error: "WHATSAPP_SEND_FAILED" };
   }
 
   // HTTP 200 only means Infobip ACCEPTED the request — the per-message status
-  // can still be REJECTED/UNDELIVERABLE. Fail those so the UI never claims
-  // "OTP sent" when it wasn't.
-  //  groupId 2 = UNDELIVERABLE, 5 = REJECTED  → failure
-  //  groupId 1 = PENDING, 3 = DELIVERED       → success
+  // can still be REJECTED/UNDELIVERABLE.
   try {
     const data = (await res.json()) as {
       messages?: Array<{
@@ -140,7 +157,7 @@ export async function sendWhatsAppOtp(
     const status = msg?.status;
     if (status && (status.groupId === 2 || status.groupId === 5)) {
       console.error(
-        `[whatsapp-otp] Infobip rejected message: ${status.groupName}/${status.name} — ${status.description}`,
+        `[whatsapp-${kind}] Infobip rejected message: ${status.groupName}/${status.name} — ${status.description}`,
       );
       return { ok: false, error: "WHATSAPP_SEND_FAILED" };
     }

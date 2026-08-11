@@ -7,6 +7,8 @@ import {
   consumePhoneVerification,
   isPhoneVerified,
 } from "@/lib/whatsapp-otp/service";
+import { sendRegistrationConfirmationWhatsApp } from "@/lib/whatsapp-otp/infobip";
+import { hasInfobipConfig } from "@/lib/whatsapp-otp/config";
 
 // Sheets + nodemailer need the Node runtime (not Edge).
 export const runtime = "nodejs";
@@ -69,6 +71,19 @@ export async function POST(req: Request) {
     await consumePhoneVerification(data.phone);
   } catch (err) {
     console.error("[reg] Failed to consume phone verification marker:", err);
+  }
+
+  // WhatsApp confirmation is best-effort: registration already succeeded.
+  if (hasInfobipConfig() && phone) {
+    const firstName = data.fullName.trim().split(/\s+/)[0] || "there";
+    try {
+      const wa = await sendRegistrationConfirmationWhatsApp(phone.infobip, firstName);
+      if (!wa.ok) {
+        console.error("[reg] WhatsApp confirmation send failed");
+      }
+    } catch (err) {
+      console.error("[reg] WhatsApp confirmation send failed:", err);
+    }
   }
 
   // Sheets is optional — skip quietly when credentials aren't configured.
@@ -145,7 +160,8 @@ async function sendEmails(data: RegistrationInput, timestamp: string) {
   const transporter = nodemailer.createTransport({
     host,
     port,
-    secure: port === 465,
+    secure: port === 465, // 465 = implicit TLS; 587/2525 = STARTTLS
+    requireTLS: port !== 465,
     auth: { user, pass },
   });
 

@@ -58,6 +58,7 @@ export type InfobipConfig = {
   apiKey: string;
   sender: string;
   templateName: string;
+  confirmationTemplateName: string;
   language: string;
   /**
    * Dynamic URL-button suffix for `fsd_website_otp_11082026`.
@@ -96,6 +97,9 @@ export function getInfobipConfig(): InfobipConfig {
     sender: process.env.INFOBIP_WHATSAPP_SENDER || "918050162541",
     templateName:
       process.env.INFOBIP_TEMPLATE_NAME || "fsd_website_otp_11082026",
+    confirmationTemplateName:
+      process.env.INFOBIP_CONFIRMATION_TEMPLATE_NAME ||
+      "fsd_placement_drive_confirmation_message_a",
     language: process.env.INFOBIP_TEMPLATE_LANGUAGE || "en_IN",
     urlButtonParam: buttonParamRaw === "" ? "otp" : buttonParamRaw,
   };

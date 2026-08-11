@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildTemplatePayload, sendWhatsAppOtp } from "./infobip";
+import {
+  buildConfirmationPayload,
+  buildTemplatePayload,
+  sendRegistrationConfirmationWhatsApp,
+  sendWhatsAppOtp,
+} from "./infobip";
 import type { InfobipConfig } from "./config";
 
 const baseCfg: InfobipConfig = {
@@ -7,6 +12,7 @@ const baseCfg: InfobipConfig = {
   apiKey: "test-api-key",
   sender: "918050162541",
   templateName: "fsd_website_otp_11082026",
+  confirmationTemplateName: "fsd_placement_drive_confirmation_message_a",
   language: "en_IN",
   urlButtonParam: "otp",
 };
@@ -38,6 +44,27 @@ describe("buildTemplatePayload", () => {
     expect(payload.messages[0].content.templateData.buttons).toEqual([
       { type: "URL", parameter: "verify" },
     ]);
+  });
+});
+
+describe("buildConfirmationPayload", () => {
+  it("matches fsd_placement_drive_confirmation_message_a: name placeholder, no buttons", () => {
+    const payload = buildConfirmationPayload(baseCfg, "919876543210", "Sandeep");
+    expect(payload).toEqual({
+      messages: [
+        {
+          from: "918050162541",
+          to: "919876543210",
+          content: {
+            templateName: "fsd_placement_drive_confirmation_message_a",
+            templateData: {
+              body: { placeholders: ["Sandeep"] },
+            },
+            language: "en_IN",
+          },
+        },
+      ],
+    });
   });
 });
 
@@ -116,5 +143,30 @@ describe("sendWhatsAppOtp", () => {
     const res = await sendWhatsAppOtp("919876543210", "483921");
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe("WHATSAPP_SEND_FAILED");
+  });
+
+  it("sends confirmation template without buttons", async () => {
+    process.env.INFOBIP_API_KEY = "secret-key";
+    process.env.INFOBIP_BASE_URL = "https://example.api.infobip.com";
+    process.env.INFOBIP_WHATSAPP_SENDER = "918050162541";
+    process.env.INFOBIP_CONFIRMATION_TEMPLATE_NAME =
+      "fsd_placement_drive_confirmation_message_a";
+
+    const fetchMock = vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ messages: [{ messageId: "conf-1" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const res = await sendRegistrationConfirmationWhatsApp("919876543210", "Sandeep");
+    expect(res.ok).toBe(true);
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.messages[0].content.templateName).toBe(
+      "fsd_placement_drive_confirmation_message_a",
+    );
+    expect(body.messages[0].content.templateData.body.placeholders).toEqual(["Sandeep"]);
+    expect(body.messages[0].content.templateData.buttons).toBeUndefined();
   });
 });
