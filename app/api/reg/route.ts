@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { registrationSchema, type RegistrationInput } from "@/lib/reg-schema";
 import { APPLICANT_EMAIL, renderApplicantEmailHtml } from "@/lib/reg-email";
 import {
@@ -13,10 +14,82 @@ import {
 } from "@/lib/whatsapp-otp/service";
 import { sendRegistrationConfirmationWhatsApp } from "@/lib/whatsapp-otp/infobip";
 import { hasInfobipConfig } from "@/lib/whatsapp-otp/config";
+import { isRegAdminAuthorized } from "@/lib/firebase/admin-auth";
+import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
+import {
+  DuplicateRegistrationError,
+  getRegistrationById,
+  listRegistrations,
+  saveRegistration,
+} from "@/lib/firebase/registrations";
 
-// Nodemailer needs the Node runtime (not Edge).
+// Nodemailer + Firestore Admin need the Node runtime (not Edge).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const listQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.string().trim().min(1).max(256).optional(),
+  id: z.string().trim().min(1).max(256).optional(),
+});
+
+/**
+ * Admin-only listing/read of stored registrations.
+ * Header: `Authorization: Bearer <REG_ADMIN_API_KEY>` or `x-admin-key`.
+ */
+export async function GET(req: Request) {
+  if (!isRegAdminAuthorized(req)) {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized." },
+      { status: 401 },
+    );
+  }
+
+  if (!hasFirebaseAdminConfig()) {
+    return NextResponse.json(
+      { ok: false, error: "Registration storage is not configured." },
+      { status: 503 },
+    );
+  }
+
+  const url = new URL(req.url);
+  const parsed = listQuerySchema.safeParse({
+    limit: url.searchParams.get("limit") ?? undefined,
+    cursor: url.searchParams.get("cursor") ?? undefined,
+    id: url.searchParams.get("id") ?? undefined,
+  });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid query parameters." },
+      { status: 400 },
+    );
+  }
+
+  try {
+    if (parsed.data.id) {
+      const registration = await getRegistrationById(parsed.data.id);
+      if (!registration) {
+        return NextResponse.json(
+          { ok: false, error: "Registration not found." },
+          { status: 404 },
+        );
+      }
+      return NextResponse.json({ ok: true, registration });
+    }
+
+    const result = await listRegistrations({
+      limit: parsed.data.limit ?? 50,
+      cursor: parsed.data.cursor,
+    });
+    return NextResponse.json({ ok: true, ...result });
+  } catch (err) {
+    console.error("[reg] Firestore read failed:", err);
+    return NextResponse.json(
+      { ok: false, error: "Could not load registrations." },
+      { status: 500 },
+    );
+  }
+}
 
 export async function POST(req: Request) {
   let body: unknown;
@@ -53,6 +126,39 @@ export async function POST(req: Request) {
   }
   // Use the normalized E.164 number everywhere downstream.
   if (phone) data.phone = phone.e164;
+
+  try {
+    await saveRegistration(data, timestamp);
+  } catch (err) {
+    if (err instanceof DuplicateRegistrationError) {
+      return NextResponse.json(
+        { ok: false, error: err.message },
+        { status: 409 },
+      );
+    }
+    console.error("[reg] Firestore save failed:", err);
+    await notifyAdminOfFailure({
+      step: "firestore_save",
+      reason:
+        err instanceof Error
+          ? err.message
+          : "Failed to save registration to Firestore.",
+      details: {
+        Name: data.fullName,
+        Email: data.email,
+        Phone: data.phone,
+        "Page URL": data.pageUrl,
+      },
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "We couldn't save your registration. Please try again in a moment.",
+      },
+      { status: 500 },
+    );
+  }
 
   // Email is required on every successful registration.
   try {

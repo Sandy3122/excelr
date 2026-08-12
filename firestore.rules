@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Client SDKs (firebaseConfig) cannot read or write any document.
+// Registration POST/GET goes through Next.js + the Admin SDK, which
+// authenticates with the service account and bypasses these rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

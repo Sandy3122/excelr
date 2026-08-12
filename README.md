@@ -2,8 +2,8 @@
 
 A standalone, public registration page for **ExcelR's Java Full Stack Placement Drive**,
 built from `FIGMA_REG_PAGE_SPEC.md`. Next.js (App Router) + TypeScript + Tailwind CSS.
-Form submissions verify WhatsApp OTP, send email via Nodemailer, and optionally
-send a WhatsApp confirmation.
+Form submissions verify WhatsApp OTP, persist to **Firestore**, send email via
+Nodemailer, and optionally send a WhatsApp confirmation.
 
 ## Stack
 
@@ -12,6 +12,7 @@ send a WhatsApp confirmation.
 - **react-hook-form + zod** — client validation, re-validated server-side
 - **lucide-react** — icons
 - **nodemailer** — server route (`app/api/reg/route.ts`)
+- **Firebase Admin / Firestore** — registration storage
 - **Infobip WhatsApp** — OTP + registration confirmation
 
 ## Routes
@@ -20,7 +21,8 @@ send a WhatsApp confirmation.
 |---|---|
 | `/reg` | The public registration page (no app chrome). |
 | `/` | Redirects to `/reg`. |
-| `/api/reg` (POST) | Validates → requires WhatsApp verify → sends emails. |
+| `/api/reg` (POST) | Validates → WhatsApp verify → **Firestore save** → emails. |
+| `/api/reg` (GET) | Admin-only list/read of registrations (`Authorization: Bearer <REG_ADMIN_API_KEY>`). |
 
 ## Getting started
 
@@ -45,6 +47,31 @@ Copy `.env.example` → `.env.local` and fill in:
 Email delivery is required for a successful registration response. WhatsApp
 confirmation is best-effort and does not block the thank-you page.
 
+### Firebase / Firestore
+- `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` — Admin SDK
+  (or place `serviceAccountKey.json` in the project root for local dev; it is gitignored).
+- `REG_ADMIN_API_KEY` — required to call **GET** `/api/reg`.
+- Optional `NEXT_PUBLIC_FIREBASE_*` — public `firebaseConfig` from the Firebase console.
+  Client SDKs still cannot read or write data; `firestore.rules` denies all client access.
+
+Deploy rules after creating the Firestore database:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+GET examples:
+
+```bash
+# List (newest first)
+curl -H "Authorization: Bearer $REG_ADMIN_API_KEY" \
+  "http://localhost:3000/api/reg?limit=50"
+
+# Single record (document id = phone without leading +)
+curl -H "Authorization: Bearer $REG_ADMIN_API_KEY" \
+  "http://localhost:3000/api/reg?id=9198XXXXXXXXXX"
+```
+
 ## Project structure
 
 ```
@@ -52,13 +79,14 @@ app/
   layout.tsx            # fonts + root html
   page.tsx              # redirect → /reg
   reg/page.tsx          # route entry (public, no chrome)
-  api/reg/route.ts      # Nodemailer + WhatsApp confirmation POST handler
+  api/reg/route.ts      # Firestore + Nodemailer + WhatsApp confirmation
 components/reg/
   reg-landing.tsx       # composes all sections
   reg-navbar.tsx  reg-hero.tsx  glow-blobs.tsx  free-badge.tsx
   gradient-button.tsx   event-details.tsx  event-detail-item.tsx
   registration-form.tsx reg-faq.tsx  reg-footer.tsx
 lib/
+  firebase/             # Admin SDK, Firestore save/list, GET auth
   reg-content.ts        # single source of copy (event details, FAQ, options)
   reg-schema.ts         # shared zod schema (client + server)
 public/reg/             # logo, hero photo, FREE badge

@@ -23,8 +23,13 @@ yarn-error.log*
 .env
 .env*.local
 
+# Firebase Admin credentials — never commit
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 .temp
 .vercel
+serviceAccountKey.json
