@@ -2,10 +2,9 @@ import { z } from "zod";
 import { QUALIFICATION_OPTIONS } from "./reg-content";
 
 /**
- * Shared validation schema — used by the client form (react-hook-form)
- * AND re-validated on the server route so bad payloads never reach email/WhatsApp.
+ * Client form fields — used by react-hook-form.
  */
-export const registrationSchema = z.object({
+export const registrationFormSchema = z.object({
   fullName: z
     .string()
     .trim()
@@ -30,6 +29,21 @@ export const registrationSchema = z.object({
   qualification: z.enum(QUALIFICATION_OPTIONS, {
     errorMap: () => ({ message: "Please select your highest qualification" }),
   }),
+});
+
+export type RegistrationFormInput = z.infer<typeof registrationFormSchema>;
+
+/**
+ * Full registration payload — form fields + the page URL (with query params)
+ * where the user submitted. Re-validated on the server.
+ */
+export const registrationSchema = registrationFormSchema.extend({
+  pageUrl: z
+    .string()
+    .trim()
+    .min(1, "Page URL is required")
+    .max(2048, "Page URL is too long")
+    .url("Invalid page URL"),
 });
 
 export type RegistrationInput = z.infer<typeof registrationSchema>;

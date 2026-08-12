@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { registrationSchema, type RegistrationInput } from "@/lib/reg-schema";
+import { registrationFormSchema, type RegistrationFormInput, type RegistrationInput } from "@/lib/reg-schema";
 import { EVENT, QUALIFICATION_OPTIONS } from "@/lib/reg-content";
 import WhatsAppPhoneField from "./whatsapp-phone-field";
 import OtpVerificationModal from "./otp-verification-modal";
 
 type Status = "idle" | "awaiting-otp" | "submitting" | "error";
+
+function currentPageUrl(): string {
+  if (typeof window === "undefined") return "";
+  return window.location.href;
+}
 
 export default function RegistrationForm({
   className = "",
@@ -24,7 +29,7 @@ export default function RegistrationForm({
   const [status, setStatus] = useState<Status>("idle");
   const [serverError, setServerError] = useState<string | null>(null);
   const [otpOpen, setOtpOpen] = useState(false);
-  const [pendingValues, setPendingValues] = useState<RegistrationInput | null>(
+  const [pendingValues, setPendingValues] = useState<RegistrationFormInput | null>(
     null,
   );
   const [phoneVerified, setPhoneVerified] = useState(false);
@@ -36,22 +41,26 @@ export default function RegistrationForm({
     watch,
     getValues,
     formState: { errors },
-  } = useForm<RegistrationInput>({
-    resolver: zodResolver(registrationSchema),
+  } = useForm<RegistrationFormInput>({
+    resolver: zodResolver(registrationFormSchema),
     mode: "onTouched",
   });
 
   const phoneValue = watch("phone") || "";
 
   const registerUser = useCallback(
-    async (values: RegistrationInput, { keepModal = false } = {}) => {
+    async (values: RegistrationFormInput, { keepModal = false } = {}) => {
       setStatus("submitting");
       setServerError(null);
+      const payload: RegistrationInput = {
+        ...values,
+        pageUrl: currentPageUrl(),
+      };
       try {
         const res = await fetch("/api/reg", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values),
+          body: JSON.stringify(payload),
         });
         const data = (await res.json().catch(() => ({}))) as {
           ok?: boolean;
@@ -73,7 +82,7 @@ export default function RegistrationForm({
     [router],
   );
 
-  const onSubmit = async (values: RegistrationInput) => {
+  const onSubmit = async (values: RegistrationFormInput) => {
     setServerError(null);
 
     // If this number was already verified (e.g. register failed after OTP),
@@ -94,7 +103,7 @@ export default function RegistrationForm({
       setPhoneVerified(true);
       setValue("phone", verifiedPhone, { shouldValidate: true });
 
-      const values: RegistrationInput = {
+      const values: RegistrationFormInput = {
         ...(pendingValues ?? getValues()),
         phone: verifiedPhone,
       };

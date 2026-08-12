@@ -143,6 +143,7 @@ async function sendEmails(data: RegistrationInput, timestamp: string) {
       `Phone:         ${data.phone}`,
       `College:       ${data.college}`,
       `Qualification: ${data.qualification}`,
+      `Page URL:      ${data.pageUrl}`,
       `Submitted:     ${timestamp}`,
     ].join("\n"),
     html: adminHtml(data, timestamp),
@@ -178,8 +179,8 @@ async function sendEmails(data: RegistrationInput, timestamp: string) {
 
 function adminHtml(data: RegistrationInput, timestamp: string) {
   const row = (k: string, v: string) =>
-    `<tr><td style="padding:6px 12px;color:#62748E;font:600 13px Arial">${k}</td>` +
-    `<td style="padding:6px 12px;color:#0F172B;font:14px Arial">${escapeHtml(v)}</td></tr>`;
+    `<tr><td style="padding:6px 12px;color:#62748E;font:600 13px Arial;vertical-align:top">${k}</td>` +
+    `<td style="padding:6px 12px;color:#0F172B;font:14px Arial;word-break:break-all">${escapeHtml(v)}</td></tr>`;
   return `
   <div style="font-family:Arial,sans-serif;color:#0F172B">
     <h2 style="margin:0 0 12px">New Placement Drive registration</h2>
@@ -189,6 +190,7 @@ function adminHtml(data: RegistrationInput, timestamp: string) {
       ${row("Phone", data.phone)}
       ${row("College", data.college)}
       ${row("Qualification", data.qualification)}
+      ${row("Page URL", data.pageUrl)}
       ${row("Submitted", timestamp)}
     </table>
   </div>`;
