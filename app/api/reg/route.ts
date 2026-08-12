@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 import { registrationSchema, type RegistrationInput } from "@/lib/reg-schema";
 import { APPLICANT_EMAIL, renderApplicantEmailHtml } from "@/lib/reg-email";
+import {
+  getRegistrationMailTransporter,
+  notifyAdminOfFailure,
+  registrationMailFrom,
+  registrationNotifyTo,
+} from "@/lib/reg-admin-alert";
 import {
   consumePhoneVerification,
   isPhoneVerified,
@@ -54,6 +59,19 @@ export async function POST(req: Request) {
     await sendEmails(data, timestamp);
   } catch (err) {
     console.error("[reg] Nodemailer send failed:", err);
+    await notifyAdminOfFailure({
+      step: "registration_email",
+      reason:
+        err instanceof Error
+          ? err.message
+          : "Nodemailer failed while sending registration emails.",
+      details: {
+        Name: data.fullName,
+        Email: data.email,
+        Phone: data.phone,
+        "Page URL": data.pageUrl,
+      },
+    });
     return NextResponse.json(
       {
         ok: false,
@@ -68,9 +86,25 @@ export async function POST(req: Request) {
   // reused for another registration. Send the WhatsApp welcome in parallel so
   // we still await it (required on serverless — a bare `void` is killed when
   // the response returns) without stacking the latency.
-  const consumePromise = consumePhoneVerification(data.phone).catch((err) => {
-    console.error("[reg] Failed to consume phone verification marker:", err);
-  });
+  const consumePromise = (async () => {
+    try {
+      await consumePhoneVerification(data.phone);
+    } catch (err) {
+      console.error("[reg] Failed to consume phone verification marker:", err);
+      await notifyAdminOfFailure({
+        step: "consume_phone_verification",
+        reason:
+          err instanceof Error
+            ? err.message
+            : "Failed to consume WhatsApp verification marker.",
+        details: {
+          Name: data.fullName,
+          Email: data.email,
+          Phone: data.phone,
+        },
+      });
+    }
+  })();
   const whatsappPromise = sendWhatsAppConfirmation(data, phone);
 
   await Promise.all([consumePromise, whatsappPromise]);
@@ -82,16 +116,33 @@ async function sendWhatsAppConfirmation(
   data: RegistrationInput,
   phone: Awaited<ReturnType<typeof isPhoneVerified>>["phone"],
 ) {
+  const alertDetails = {
+    Name: data.fullName,
+    Email: data.email,
+    Phone: phone?.masked || data.phone,
+    "Page URL": data.pageUrl,
+  };
+
   if (!hasInfobipConfig()) {
     console.error(
       "[reg] WhatsApp confirmation skipped: Infobip is not configured.",
     );
+    await notifyAdminOfFailure({
+      step: "whatsapp_confirmation",
+      reason: "Infobip is not configured (missing API key or base URL).",
+      details: alertDetails,
+    });
     return;
   }
   if (!phone) {
     console.error(
       "[reg] WhatsApp confirmation skipped: normalized phone missing.",
     );
+    await notifyAdminOfFailure({
+      step: "whatsapp_confirmation",
+      reason: "Normalized phone was missing after verification.",
+      details: alertDetails,
+    });
     return;
   }
 
@@ -106,6 +157,11 @@ async function sendWhatsAppConfirmation(
         "[reg] WhatsApp confirmation send failed for",
         phone.masked,
       );
+      await notifyAdminOfFailure({
+        step: "whatsapp_confirmation",
+        reason: "Infobip rejected or failed the welcome WhatsApp template send.",
+        details: { ...alertDetails, "First name": firstName },
+      });
       return;
     }
     console.info(
@@ -115,43 +171,25 @@ async function sendWhatsAppConfirmation(
     );
   } catch (err) {
     console.error("[reg] WhatsApp confirmation send failed:", err);
+    await notifyAdminOfFailure({
+      step: "whatsapp_confirmation",
+      reason:
+        err instanceof Error
+          ? err.message
+          : "Unexpected error sending welcome WhatsApp message.",
+      details: { ...alertDetails, "First name": firstName },
+    });
   }
 }
 
-/** Admin notification + applicant confirmation (HTML from public/reg/index.html). */
-let cachedTransporter: nodemailer.Transporter | null = null;
-
-function getMailTransporter() {
-  if (cachedTransporter) return cachedTransporter;
-
-  const host = requireEnv("SMTP_HOST");
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = requireEnv("SMTP_USER");
-  const pass = requireEnv("SMTP_PASS");
-
-  cachedTransporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465, // 465 = implicit TLS; 587/2525 = STARTTLS
-    requireTLS: port !== 465,
-    auth: { user, pass },
-    // Reuse connections across registrations in the same warm instance.
-    pool: true,
-    maxConnections: 2,
-    maxMessages: 50,
-  });
-  return cachedTransporter;
-}
-
 async function sendEmails(data: RegistrationInput, timestamp: string) {
-  const user = requireEnv("SMTP_USER");
-  const from =
-    process.env.SMTP_FROM || `${APPLICANT_EMAIL.fromName} <${user}>`;
-  const notifyTo = process.env.REG_NOTIFY_TO || user;
+  const from = registrationMailFrom();
+  const notifyTo = registrationNotifyTo();
   const sendApplicantConfirmation =
-    (process.env.REG_SEND_APPLICANT_CONFIRMATION || "true").toLowerCase() === "true";
+    (process.env.REG_SEND_APPLICANT_CONFIRMATION || "true").toLowerCase() ===
+    "true";
 
-  const transporter = getMailTransporter();
+  const transporter = getRegistrationMailTransporter();
 
   const adminSend = transporter.sendMail({
     from,
@@ -197,7 +235,34 @@ async function sendEmails(data: RegistrationInput, timestamp: string) {
       )
     : Promise.resolve();
 
-  await Promise.all([adminSend, applicantSend]);
+  const results = await Promise.allSettled([adminSend, applicantSend]);
+  const adminResult = results[0];
+  const applicantResult = results[1];
+
+  if (adminResult.status === "rejected") {
+    throw adminResult.reason instanceof Error
+      ? adminResult.reason
+      : new Error("Admin notification email failed.");
+  }
+
+  if (applicantResult.status === "rejected") {
+    const reason =
+      applicantResult.reason instanceof Error
+        ? applicantResult.reason.message
+        : "Applicant confirmation email failed.";
+    // Admin mail already went out — also send an explicit failure alert.
+    await notifyAdminOfFailure({
+      step: "applicant_confirmation_email",
+      reason,
+      details: {
+        Name: data.fullName,
+        Email: data.email,
+        Phone: data.phone,
+        "Page URL": data.pageUrl,
+      },
+    });
+    throw new Error(reason);
+  }
 }
 
 function adminHtml(data: RegistrationInput, timestamp: string) {
@@ -234,10 +299,4 @@ function escapeHtml(s: string) {
         return "&#39;";
     }
   });
-}
-
-function requireEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing required env var: ${name}`);
-  return v;
 }

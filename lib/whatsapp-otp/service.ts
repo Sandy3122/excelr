@@ -11,6 +11,7 @@ import { generateOtp, hashOtp, isValidOtpFormat, verifyOtp } from "./otp";
 import { normalizePhone, type NormalizedPhone } from "./phone";
 import { getOtpStore } from "./store";
 import { sendWhatsAppOtp } from "./infobip";
+import { notifyAdminOfFailure } from "@/lib/reg-admin-alert";
 
 /**
  * Business logic for the send/verify endpoints. Route handlers stay thin and
@@ -70,6 +71,11 @@ export async function requestOtp(
   if (!phone) return { ok: false, code: "INVALID_PHONE" };
 
   if (!hasInfobipConfig()) {
+    await notifyAdminOfFailure({
+      step: "whatsapp_otp_send",
+      reason: "Infobip is not configured (missing API key or base URL).",
+      details: { Phone: phone.masked },
+    });
     return { ok: false, code: "NOT_CONFIGURED", phone };
   }
 
@@ -119,6 +125,11 @@ export async function requestOtp(
   if (!sent.ok) {
     // Roll back the stored record so the user can retry immediately.
     await store.deleteRecord(phone.e164);
+    await notifyAdminOfFailure({
+      step: "whatsapp_otp_send",
+      reason: "Infobip failed to send the WhatsApp OTP template.",
+      details: { Phone: phone.masked },
+    });
     return { ok: false, code: "SEND_FAILED", phone };
   }
 
