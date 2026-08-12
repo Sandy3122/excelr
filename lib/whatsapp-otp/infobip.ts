@@ -123,18 +123,36 @@ async function postTemplate(
   }
 
   if (!res.ok) {
-    let providerStatus: string | undefined;
+    let providerDetail = "";
     try {
       const data = (await res.json()) as {
-        requestError?: { serviceException?: { messageId?: string } };
+        requestError?: {
+          serviceException?: {
+            messageId?: string;
+            text?: string;
+            message?: string;
+          };
+        };
+        messages?: Array<{
+          status?: { groupName?: string; name?: string; description?: string };
+        }>;
       };
-      providerStatus = data?.requestError?.serviceException?.messageId;
+      const ex = data?.requestError?.serviceException;
+      const status = data?.messages?.[0]?.status;
+      providerDetail =
+        (ex &&
+          [ex.messageId, ex.text || ex.message].filter(Boolean).join(" — ")) ||
+        (status &&
+          [status.groupName, status.name, status.description]
+            .filter(Boolean)
+            .join(" / ")) ||
+        "";
     } catch {
       /* ignore body parse errors */
     }
     console.error(
       `[whatsapp-${kind}] Infobip send failed: HTTP ${res.status}` +
-        (providerStatus ? ` (${providerStatus})` : ""),
+        (providerDetail ? ` (${providerDetail})` : ""),
     );
     return { ok: false, error: "WHATSAPP_SEND_FAILED" };
   }

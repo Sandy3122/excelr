@@ -65,15 +65,15 @@ export async function POST(req: Request) {
   }
 
   // Emails delivered — burn the one-time verification marker so it can't be
-  // reused for another registration.
-  try {
-    await consumePhoneVerification(data.phone);
-  } catch (err) {
+  // reused for another registration. Send the WhatsApp welcome in parallel so
+  // we still await it (required on serverless — a bare `void` is killed when
+  // the response returns) without stacking the latency.
+  const consumePromise = consumePhoneVerification(data.phone).catch((err) => {
     console.error("[reg] Failed to consume phone verification marker:", err);
-  }
+  });
+  const whatsappPromise = sendWhatsAppConfirmation(data, phone);
 
-  // Best-effort WhatsApp confirmation — do not block the thank-you redirect.
-  void sendWhatsAppConfirmation(data, phone);
+  await Promise.all([consumePromise, whatsappPromise]);
 
   return NextResponse.json({ ok: true });
 }
@@ -82,14 +82,37 @@ async function sendWhatsAppConfirmation(
   data: RegistrationInput,
   phone: Awaited<ReturnType<typeof isPhoneVerified>>["phone"],
 ) {
-  if (!hasInfobipConfig() || !phone) return;
+  if (!hasInfobipConfig()) {
+    console.error(
+      "[reg] WhatsApp confirmation skipped: Infobip is not configured.",
+    );
+    return;
+  }
+  if (!phone) {
+    console.error(
+      "[reg] WhatsApp confirmation skipped: normalized phone missing.",
+    );
+    return;
+  }
+
   const firstName = data.fullName.trim().split(/\s+/)[0] || "there";
   try {
     const wa = await sendRegistrationConfirmationWhatsApp(
       phone.infobip,
       firstName,
     );
-    if (!wa.ok) console.error("[reg] WhatsApp confirmation send failed");
+    if (!wa.ok) {
+      console.error(
+        "[reg] WhatsApp confirmation send failed for",
+        phone.masked,
+      );
+      return;
+    }
+    console.info(
+      "[reg] WhatsApp confirmation accepted by Infobip for",
+      phone.masked,
+      wa.providerMessageId ? `(id=${wa.providerMessageId})` : "",
+    );
   } catch (err) {
     console.error("[reg] WhatsApp confirmation send failed:", err);
   }
