@@ -15,7 +15,7 @@ Everything needed to build the page lives in this document + `public/reg/`.
 **Confirmed build decisions:**
 1. **Pixel-match** the ExcelR design (blue/indigo palette, Poppins + Inter, navy hero). Standalone — does not reuse any other product's theme.
 2. Route **`/reg`**, **public** and **no app chrome** (no nav/sidebar, no auth gate).
-3. Form submit → **append row to Google Sheets** + **send email via Nodemailer** (server-side route handler).
+3. Form submit → **WhatsApp OTP verify** + **send email via Nodemailer** (server-side route handler).
 4. **Mobile hides the inline form card** and shows a "Register Now" CTA instead (per Figma). Desktop shows the inline 2-column form.
 
 ---
@@ -26,9 +26,9 @@ Everything needed to build the page lives in this document + `public/reg/`.
 - **Tailwind CSS** for styling
 - **react-hook-form + zod** for the form
 - **lucide-react** for icons (calendar, clock, map-pin, users, arrow-right); ₹ is a text glyph
-- Server route handler `app/api/reg/route.ts` using **googleapis** (Sheets) + **nodemailer** (email)
+- Server route handler `app/api/reg/route.ts` using **nodemailer** (email) + Infobip WhatsApp OTP
 
-> If Excelr is a fresh project: `npx create-next-app@latest` (TS + Tailwind + App Router), then add `react-hook-form zod @hookform/resolvers lucide-react googleapis nodemailer @types/nodemailer`.
+> If Excelr is a fresh project: `npx create-next-app@latest` (TS + Tailwind + App Router), then add `react-hook-form zod @hookform/resolvers lucide-react nodemailer @types/nodemailer`.
 
 ---
 
@@ -162,7 +162,7 @@ components/reg/reg-faq.tsx           # accordion
 components/reg/reg-footer.tsx
 components/reg/reg-landing.tsx       # composes all sections
 app/reg/page.tsx                     # route entry
-app/api/reg/route.ts                 # Sheets + nodemailer
+app/api/reg/route.ts                 # Nodemailer + WhatsApp confirmation
 lib/reg-content.ts                   # event details, FAQ, qualification options (single source of copy)
 ```
 
@@ -189,15 +189,13 @@ Glow blobs, underline bar, icon chips = pure CSS (no assets). Icons = lucide-rea
 
 POST handler (Node runtime), server-only:
 1. Validate body with the same zod schema as the client.
-2. **Append to Google Sheet** via `googleapis` (service account): row = `[ISO timestamp, fullName, email, phone, college, qualification]`.
+2. Require WhatsApp OTP verification marker for the phone number.
 3. **Send email** via `nodemailer`: (a) admin notification to `REG_NOTIFY_TO`; (b) optional confirmation to applicant.
-4. Return `{ ok: true }` → client shows success toast/state.
+4. Optionally send WhatsApp registration confirmation (best-effort).
+5. Return `{ ok: true }` → client redirects to thank-you.
 
 **Required env (server-only):**
 ```
-GOOGLE_SHEETS_SPREADSHEET_ID=
-GOOGLE_SERVICE_ACCOUNT_EMAIL=
-GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=   # keep \n escaped; replace at runtime
 SMTP_HOST=
 SMTP_PORT=
 SMTP_USER=
@@ -205,7 +203,7 @@ SMTP_PASS=
 SMTP_FROM=
 REG_NOTIFY_TO=
 ```
-Setup: create a Google Cloud service account, enable Sheets API, **share the target sheet with the service-account email as Editor**. Never import these on the client.
+Plus Infobip / WhatsApp OTP vars (see `.env.example`). Never import these on the client.
 
 ---
 

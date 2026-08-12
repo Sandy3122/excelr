@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { registrationSchema, type RegistrationInput } from "@/lib/reg-schema";
 import { EVENT, QUALIFICATION_OPTIONS } from "@/lib/reg-content";
-import WhatsAppOtpField from "./whatsapp-otp-field";
+import WhatsAppPhoneField from "./whatsapp-phone-field";
+import OtpVerificationModal from "./otp-verification-modal";
 
-type Status = "idle" | "submitting" | "error";
+type Status = "idle" | "awaiting-otp" | "submitting" | "error";
 
 export default function RegistrationForm({
   className = "",
@@ -22,12 +23,18 @@ export default function RegistrationForm({
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
   const [serverError, setServerError] = useState<string | null>(null);
+  const [otpOpen, setOtpOpen] = useState(false);
+  const [pendingValues, setPendingValues] = useState<RegistrationInput | null>(
+    null,
+  );
   const [phoneVerified, setPhoneVerified] = useState(false);
 
   const {
     register,
     handleSubmit,
+    setValue,
     watch,
+    getValues,
     formState: { errors },
   } = useForm<RegistrationInput>({
     resolver: zodResolver(registrationSchema),
@@ -36,34 +43,85 @@ export default function RegistrationForm({
 
   const phoneValue = watch("phone") || "";
 
+  const registerUser = useCallback(
+    async (values: RegistrationInput, { keepModal = false } = {}) => {
+      setStatus("submitting");
+      setServerError(null);
+      try {
+        const res = await fetch("/api/reg", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+        };
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || "Something went wrong. Please try again.");
+        }
+        const params = new URLSearchParams({ name: values.fullName });
+        router.replace(`/reg/thank-you?${params.toString()}`);
+      } catch (err) {
+        if (keepModal) setOtpOpen(false);
+        setStatus("error");
+        setServerError(
+          err instanceof Error ? err.message : "Registration failed.",
+        );
+      }
+    },
+    [router],
+  );
+
   const onSubmit = async (values: RegistrationInput) => {
-    if (!phoneVerified) {
-      setStatus("error");
-      setServerError("Please verify your WhatsApp number to continue.");
+    setServerError(null);
+
+    // If this number was already verified (e.g. register failed after OTP),
+    // skip the OTP step and submit directly.
+    if (phoneVerified) {
+      setPendingValues(values);
+      await registerUser(values);
       return;
     }
-    setStatus("submitting");
-    setServerError(null);
-    try {
-      const res = await fetch("/api/reg", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        error?: string;
-      };
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Something went wrong. Please try again.");
-      }
-      const params = new URLSearchParams({ name: values.fullName });
-      router.push(`/reg/thank-you?${params.toString()}`);
-    } catch (err) {
-      setStatus("error");
-      setServerError(err instanceof Error ? err.message : "Registration failed.");
-    }
+
+    setPendingValues(values);
+    setStatus("awaiting-otp");
+    setOtpOpen(true);
   };
+
+  const handleOtpVerified = useCallback(
+    async (verifiedPhone: string) => {
+      setPhoneVerified(true);
+      setValue("phone", verifiedPhone, { shouldValidate: true });
+
+      const values: RegistrationInput = {
+        ...(pendingValues ?? getValues()),
+        phone: verifiedPhone,
+      };
+      setPendingValues(values);
+      // Keep the OTP modal open with a registering state — do not flash the form.
+      await registerUser(values, { keepModal: true });
+    },
+    [pendingValues, getValues, setValue, registerUser],
+  );
+
+  const handlePhoneChangeFromModal = useCallback(
+    (phone: string) => {
+      setPhoneVerified(false);
+      setValue("phone", phone, { shouldValidate: true, shouldDirty: true });
+      setPendingValues((prev) => (prev ? { ...prev, phone } : prev));
+    },
+    [setValue],
+  );
+
+  const handleCloseOtp = useCallback(() => {
+    // Don't dismiss while registration is in flight after OTP success.
+    if (status === "submitting") return;
+    setOtpOpen(false);
+    setStatus("idle");
+  }, [status]);
+
+  const isBusy = status === "awaiting-otp" || status === "submitting";
 
   return (
     <div
@@ -74,8 +132,12 @@ export default function RegistrationForm({
       }
     >
       <div className="mb-6">
-        <h2 className="font-heading text-[24px] font-semibold text-ink">Register Now</h2>
-        <p className="mt-1 font-body text-[15px] text-muted">To Secure Your Career</p>
+        <h2 className="font-heading text-[24px] font-semibold text-ink">
+          Register Now
+        </h2>
+        <p className="mt-1 font-body text-[15px] text-muted">
+          To Secure Your Career
+        </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
@@ -101,12 +163,14 @@ export default function RegistrationForm({
           />
         </Field>
 
-        <WhatsAppOtpField
-          value={phoneValue}
-          registerProps={register("phone")}
+        <WhatsAppPhoneField
+          registerProps={register("phone", {
+            onChange: () => {
+              // Editing the form phone after a prior verify invalidates it.
+              setPhoneVerified(false);
+            },
+          })}
           error={errors.phone?.message}
-          verified={phoneVerified}
-          onVerifiedChange={(v) => setPhoneVerified(v)}
         />
 
         <Field
@@ -135,7 +199,7 @@ export default function RegistrationForm({
             className="field-input appearance-none bg-[length:1.25rem] bg-[right_0.75rem_center] bg-no-repeat pr-10"
             style={{
               backgroundImage:
-                "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2362748E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>\")",
+                'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'20\' height=\'20\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2362748E\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'></polyline></svg>")',
             }}
             {...register("qualification")}
           >
@@ -158,13 +222,18 @@ export default function RegistrationForm({
 
         <button
           type="submit"
-          disabled={status === "submitting" || !phoneVerified}
+          disabled={isBusy}
           className="btn-gradient w-full px-6 py-4 text-[16px] disabled:cursor-not-allowed disabled:opacity-70"
         >
           {status === "submitting" ? (
             <>
               <Loader2 className="h-5 w-5 animate-spin" />
               <span>Registering…</span>
+            </>
+          ) : status === "awaiting-otp" ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Verify to continue…</span>
             </>
           ) : (
             <>
@@ -174,16 +243,19 @@ export default function RegistrationForm({
           )}
         </button>
 
-        {!phoneVerified && (
-          <p className="font-body text-[13px] text-faint">
-            Verify your WhatsApp number above to enable registration.
-          </p>
-        )}
-
         <p className="pt-1 font-body text-[13px] leading-[1.5] text-faint">
           {EVENT.laptopNote}
         </p>
       </form>
+
+      <OtpVerificationModal
+        open={otpOpen}
+        initialPhone={pendingValues?.phone || phoneValue}
+        registering={status === "submitting"}
+        onClose={handleCloseOtp}
+        onVerified={handleOtpVerified}
+        onPhoneChange={handlePhoneChangeFromModal}
+      />
     </div>
   );
 }

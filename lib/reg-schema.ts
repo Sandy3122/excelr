@@ -3,7 +3,7 @@ import { QUALIFICATION_OPTIONS } from "./reg-content";
 
 /**
  * Shared validation schema — used by the client form (react-hook-form)
- * AND re-validated on the server route so bad payloads never reach Sheets/email.
+ * AND re-validated on the server route so bad payloads never reach email/WhatsApp.
  */
 export const registrationSchema = z.object({
   fullName: z

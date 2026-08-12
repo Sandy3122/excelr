@@ -3,6 +3,15 @@ import path from "path";
 
 const TEMPLATE_PATH = path.join(process.cwd(), "public", "reg", "index.html");
 
+/** Cached HTML template — avoid a disk read on every registration. */
+let cachedTemplate: string | null = null;
+
+async function loadTemplate(): Promise<string> {
+  if (cachedTemplate) return cachedTemplate;
+  cachedTemplate = await readFile(TEMPLATE_PATH, "utf8");
+  return cachedTemplate;
+}
+
 /** Event window for the "Add to calendar" CTA (IST → UTC for Google Calendar). */
 const CALENDAR = {
   title: "ExcelR Java Full Stack Placement Drive",
@@ -26,7 +35,7 @@ export const APPLICANT_EMAIL = {
  * Tokens: {{first_name}}, {{calendar_link}}, we_wk_unsubscribe_link
  */
 export async function renderApplicantEmailHtml(fullName: string): Promise<string> {
-  const template = await readFile(TEMPLATE_PATH, "utf8");
+  const template = await loadTemplate();
   const firstName = escapeHtml(firstNameFrom(fullName));
   const calendarLink = buildGoogleCalendarLink();
   const unsubscribe = `mailto:${APPLICANT_EMAIL.replyTo}?subject=${encodeURIComponent(

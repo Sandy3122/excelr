@@ -2,7 +2,8 @@
 
 A standalone, public registration page for **ExcelR's Java Full Stack Placement Drive**,
 built from `FIGMA_REG_PAGE_SPEC.md`. Next.js (App Router) + TypeScript + Tailwind CSS.
-Form submissions append a row to Google Sheets and send email via Nodemailer.
+Form submissions verify WhatsApp OTP, send email via Nodemailer, and optionally
+send a WhatsApp confirmation.
 
 ## Stack
 
@@ -10,7 +11,8 @@ Form submissions append a row to Google Sheets and send email via Nodemailer.
 - **Tailwind CSS 3** — design tokens in `tailwind.config.ts`, `Poppins` + `Inter` via `next/font`
 - **react-hook-form + zod** — client validation, re-validated server-side
 - **lucide-react** — icons
-- **googleapis + nodemailer** — server route (`app/api/reg/route.ts`)
+- **nodemailer** — server route (`app/api/reg/route.ts`)
+- **Infobip WhatsApp** — OTP + registration confirmation
 
 ## Routes
 
@@ -18,7 +20,7 @@ Form submissions append a row to Google Sheets and send email via Nodemailer.
 |---|---|
 | `/reg` | The public registration page (no app chrome). |
 | `/` | Redirects to `/reg`. |
-| `/api/reg` (POST) | Validates → appends to Google Sheets → sends emails. |
+| `/api/reg` (POST) | Validates → requires WhatsApp verify → sends emails. |
 
 ## Getting started
 
@@ -28,24 +30,11 @@ cp .env.example .env.local   # then fill in the values (see below)
 npm run dev                  # http://localhost:3000/reg
 ```
 
-The **UI works without any env vars** — only the form's submit (Sheets + email) needs them.
+The **UI works without any env vars** — only form submit (email + WhatsApp OTP) needs them.
 
 ## Environment variables
 
 Copy `.env.example` → `.env.local` and fill in:
-
-### Google Sheets (service account)
-1. Create a Google Cloud project → **enable the Google Sheets API**.
-2. Create a **service account**, generate a **JSON key**.
-3. **Share the target spreadsheet** with the service account's email (`GOOGLE_SERVICE_ACCOUNT_EMAIL`) as **Editor**.
-4. Set:
-   - `GOOGLE_SHEETS_SPREADSHEET_ID` — the ID from the sheet URL.
-   - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
-   - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` — paste the full key; keep `\n` escaped (converted at runtime).
-   - `GOOGLE_SHEETS_SHEET_NAME` — tab name (defaults to `Registrations`).
-
-The appended row is: `[ISO timestamp, fullName, email, phone, college, qualification]`.
-Add a header row to the sheet if you like — new rows are appended after existing content.
 
 ### SMTP (Nodemailer)
 - `SMTP_HOST`, `SMTP_PORT` (587 STARTTLS / 465 TLS), `SMTP_USER`, `SMTP_PASS`
@@ -53,8 +42,8 @@ Add a header row to the sheet if you like — new rows are appended after existi
 - `REG_NOTIFY_TO` — inbox that receives the admin notification per registration.
 - `REG_SEND_APPLICANT_CONFIRMATION=true` — also emails a confirmation to the applicant.
 
-> Sheets append is treated as the source of truth: if it fails the API returns 500.
-> Email is best-effort — a mail failure is logged but still returns success (the row is saved).
+Email delivery is required for a successful registration response. WhatsApp
+confirmation is best-effort and does not block the thank-you page.
 
 ## Project structure
 
@@ -63,7 +52,7 @@ app/
   layout.tsx            # fonts + root html
   page.tsx              # redirect → /reg
   reg/page.tsx          # route entry (public, no chrome)
-  api/reg/route.ts      # Sheets + nodemailer POST handler
+  api/reg/route.ts      # Nodemailer + WhatsApp confirmation POST handler
 components/reg/
   reg-landing.tsx       # composes all sections
   reg-navbar.tsx  reg-hero.tsx  glow-blobs.tsx  free-badge.tsx

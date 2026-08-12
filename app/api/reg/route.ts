@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { google } from "googleapis";
 import nodemailer from "nodemailer";
 import { registrationSchema, type RegistrationInput } from "@/lib/reg-schema";
 import { APPLICANT_EMAIL, renderApplicantEmailHtml } from "@/lib/reg-email";
@@ -10,7 +9,7 @@ import {
 import { sendRegistrationConfirmationWhatsApp } from "@/lib/whatsapp-otp/infobip";
 import { hasInfobipConfig } from "@/lib/whatsapp-otp/config";
 
-// Sheets + nodemailer need the Node runtime (not Edge).
+// Nodemailer needs the Node runtime (not Edge).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -73,147 +72,108 @@ export async function POST(req: Request) {
     console.error("[reg] Failed to consume phone verification marker:", err);
   }
 
-  // WhatsApp confirmation is best-effort: registration already succeeded.
-  if (hasInfobipConfig() && phone) {
-    const firstName = data.fullName.trim().split(/\s+/)[0] || "there";
-    try {
-      const wa = await sendRegistrationConfirmationWhatsApp(phone.infobip, firstName);
-      if (!wa.ok) {
-        console.error("[reg] WhatsApp confirmation send failed");
-      }
-    } catch (err) {
-      console.error("[reg] WhatsApp confirmation send failed:", err);
-    }
-  }
-
-  // Sheets is optional — skip quietly when credentials aren't configured.
-  if (hasSheetsConfig()) {
-    try {
-      await appendToSheet(data, timestamp);
-    } catch (err) {
-      console.error("[reg] Google Sheets append failed:", err);
-    }
-  }
+  // Best-effort WhatsApp confirmation — do not block the thank-you redirect.
+  void sendWhatsAppConfirmation(data, phone);
 
   return NextResponse.json({ ok: true });
 }
 
-function hasSheetsConfig() {
-  return Boolean(
-    process.env.GOOGLE_SHEETS_SPREADSHEET_ID &&
-      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
-      process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY &&
-      !process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.includes("..."),
-  );
-}
-
-/**
- * Append a row:
- * [timestamp, fullName, email, phone, college, qualification, whatsappVerified].
- */
-async function appendToSheet(data: RegistrationInput, timestamp: string) {
-  const spreadsheetId = requireEnv("GOOGLE_SHEETS_SPREADSHEET_ID");
-  const clientEmail = requireEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
-  const privateKey = requireEnv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n");
-  const sheetName = process.env.GOOGLE_SHEETS_SHEET_NAME || "Registrations";
-
-  const auth = new google.auth.JWT({
-    email: clientEmail,
-    key: privateKey,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-
-  const sheets = google.sheets({ version: "v4", auth });
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `${sheetName}!A:G`,
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: {
-      values: [
-        [
-          timestamp,
-          data.fullName,
-          data.email,
-          data.phone,
-          data.college,
-          data.qualification,
-          "WhatsApp verified",
-        ],
-      ],
-    },
-  });
+async function sendWhatsAppConfirmation(
+  data: RegistrationInput,
+  phone: Awaited<ReturnType<typeof isPhoneVerified>>["phone"],
+) {
+  if (!hasInfobipConfig() || !phone) return;
+  const firstName = data.fullName.trim().split(/\s+/)[0] || "there";
+  try {
+    const wa = await sendRegistrationConfirmationWhatsApp(
+      phone.infobip,
+      firstName,
+    );
+    if (!wa.ok) console.error("[reg] WhatsApp confirmation send failed");
+  } catch (err) {
+    console.error("[reg] WhatsApp confirmation send failed:", err);
+  }
 }
 
 /** Admin notification + applicant confirmation (HTML from public/reg/index.html). */
-async function sendEmails(data: RegistrationInput, timestamp: string) {
+let cachedTransporter: nodemailer.Transporter | null = null;
+
+function getMailTransporter() {
+  if (cachedTransporter) return cachedTransporter;
+
   const host = requireEnv("SMTP_HOST");
   const port = Number(process.env.SMTP_PORT || 587);
   const user = requireEnv("SMTP_USER");
   const pass = requireEnv("SMTP_PASS");
+
+  cachedTransporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465, // 465 = implicit TLS; 587/2525 = STARTTLS
+    requireTLS: port !== 465,
+    auth: { user, pass },
+    // Reuse connections across registrations in the same warm instance.
+    pool: true,
+    maxConnections: 2,
+    maxMessages: 50,
+  });
+  return cachedTransporter;
+}
+
+async function sendEmails(data: RegistrationInput, timestamp: string) {
+  const user = requireEnv("SMTP_USER");
   const from =
     process.env.SMTP_FROM || `${APPLICANT_EMAIL.fromName} <${user}>`;
   const notifyTo = process.env.REG_NOTIFY_TO || user;
   const sendApplicantConfirmation =
     (process.env.REG_SEND_APPLICANT_CONFIRMATION || "true").toLowerCase() === "true";
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465, // 465 = implicit TLS; 587/2525 = STARTTLS
-    requireTLS: port !== 465,
-    auth: { user, pass },
+  const transporter = getMailTransporter();
+
+  const adminSend = transporter.sendMail({
+    from,
+    to: notifyTo,
+    replyTo: data.email,
+    subject: `New Placement Drive registration — ${data.fullName}`,
+    text: [
+      "New registration for ExcelR's Java Full Stack Placement Drive:",
+      "",
+      `Name:          ${data.fullName}`,
+      `Email:         ${data.email}`,
+      `Phone:         ${data.phone}`,
+      `College:       ${data.college}`,
+      `Qualification: ${data.qualification}`,
+      `Submitted:     ${timestamp}`,
+    ].join("\n"),
+    html: adminHtml(data, timestamp),
   });
 
-  // (a) Admin notification (plain operational email)
-  const sends: Promise<unknown>[] = [
-    transporter.sendMail({
-      from,
-      to: notifyTo,
-      replyTo: data.email,
-      subject: `New Placement Drive registration — ${data.fullName}`,
-      text: [
-        "New registration for ExcelR's Java Full Stack Placement Drive:",
-        "",
-        `Name:          ${data.fullName}`,
-        `Email:         ${data.email}`,
-        `Phone:         ${data.phone}`,
-        `College:       ${data.college}`,
-        `Qualification: ${data.qualification}`,
-        `Submitted:     ${timestamp}`,
-      ].join("\n"),
-      html: adminHtml(data, timestamp),
-    }),
-  ];
+  const applicantSend = sendApplicantConfirmation
+    ? renderApplicantEmailHtml(data.fullName).then((html) =>
+        transporter.sendMail({
+          from,
+          to: data.email,
+          replyTo: APPLICANT_EMAIL.replyTo,
+          subject: APPLICANT_EMAIL.subject,
+          text: [
+            `Hi ${data.fullName.split(/\s+/)[0] || "there"},`,
+            "",
+            "Your seat is confirmed for the Java Full Stack Placement Drive.",
+            "",
+            "Date:  Saturday, 22nd August 2026",
+            "Time:  9:00 AM onwards (registration 8:45 – 9:00 AM)",
+            "Venue: ExcelR — Marathahalli Campus, Bengaluru 560037",
+            "",
+            "Please bring your resume copies, photo ID, and laptop (mandatory).",
+            "",
+            "— Team ExcelR, Placement & Career Services",
+          ].join("\n"),
+          html,
+        }),
+      )
+    : Promise.resolve();
 
-  // (b) Applicant confirmation — exact HTML template from public/reg/index.html
-  if (sendApplicantConfirmation) {
-    const html = await renderApplicantEmailHtml(data.fullName);
-    sends.push(
-      transporter.sendMail({
-        from,
-        to: data.email,
-        replyTo: APPLICANT_EMAIL.replyTo,
-        subject: APPLICANT_EMAIL.subject,
-        text: [
-          `Hi ${data.fullName.split(/\s+/)[0] || "there"},`,
-          "",
-          "Your seat is confirmed for the Java Full Stack Placement Drive.",
-          "",
-          "Date:  Saturday, 22nd August 2026",
-          "Time:  9:00 AM onwards (registration 8:45 – 9:00 AM)",
-          "Venue: ExcelR — Marathahalli Campus, Bengaluru 560037",
-          "",
-          "Please bring your resume copies, photo ID, and laptop (mandatory).",
-          "",
-          "— Team ExcelR, Placement & Career Services",
-        ].join("\n"),
-        html,
-      }),
-    );
-  }
-
-  await Promise.all(sends);
+  await Promise.all([adminSend, applicantSend]);
 }
 
 function adminHtml(data: RegistrationInput, timestamp: string) {
