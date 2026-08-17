@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthorized } from "@/lib/admin/authorize";
 import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
-import { computeAutomationOverview } from "@/lib/automations/overview";
+import { getAutomationOverview } from "@/lib/automations/overview";
 import { listRecentRuns } from "@/lib/automations/store";
 
 export const runtime = "nodejs";
@@ -20,8 +20,11 @@ export async function GET(req: Request) {
   }
 
   try {
-    const overview = await computeAutomationOverview();
-    const recentRuns = await listRecentRuns(undefined, 12);
+    const fresh = new URL(req.url).searchParams.get("fresh") === "1";
+    const [overview, recentRuns] = await Promise.all([
+      getAutomationOverview({ fresh }),
+      listRecentRuns(undefined, 12),
+    ]);
     return NextResponse.json({ ok: true, ...overview, recentRuns });
   } catch (err) {
     console.error("[admin/automations] failed:", err);

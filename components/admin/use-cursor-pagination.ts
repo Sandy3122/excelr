@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export interface CursorPage<T> {
   items: T[];
   nextCursor: string | null;
-  total: number;
+  total?: number;
 }
 
 /**
@@ -55,9 +55,10 @@ export function useCursorPagination<T>(
           }
         }
         if (!last) return;
-        setItems(last.items);
-        setTotal(last.total);
-        setNextCursor(last.nextCursor);
+        const pageData = last;
+        setItems(pageData.items);
+        setTotal((prev) => pageData.total ?? prev);
+        setNextCursor(pageData.nextCursor);
         setPage(targetPage);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not load this page.");

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { isAdminAuthorized } from "@/lib/admin/authorize";
 import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
 import { isAutomationKind, getAutomation } from "@/lib/automations/catalog";
-import { computeAutomationOverview } from "@/lib/automations/overview";
+import { getAutomationOverview, invalidateOverviewCache } from "@/lib/automations/overview";
 import { listRecentRuns } from "@/lib/automations/store";
 import { runAutomation } from "@/lib/automations/runner";
 
@@ -35,10 +35,13 @@ export async function GET(
   }
 
   try {
-    const overview = await computeAutomationOverview();
+    const fresh = new URL(req.url).searchParams.get("fresh") === "1";
+    const [overview, recentRuns] = await Promise.all([
+      getAutomationOverview({ fresh }),
+      listRecentRuns(params.kind, 8),
+    ]);
     const automation = overview.automations.find((a) => a.kind === params.kind);
     const def = getAutomation(params.kind);
-    const recentRuns = await listRecentRuns(params.kind, 8);
     return NextResponse.json({
       ok: true,
       automation,
@@ -91,6 +94,7 @@ export async function POST(
       retryFailed: parsed.data.action === "retry_failed" || parsed.data.force,
       registrationId: parsed.data.registrationId,
     });
+    invalidateOverviewCache();
     return NextResponse.json({ ok: true, run });
   } catch (err) {
     console.error("[admin/automations/kind] POST failed:", err);

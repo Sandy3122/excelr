@@ -36,7 +36,7 @@ async function fetchLeadsPage(cursor: string | undefined, pageSize: number) {
   return {
     items: json.registrations,
     nextCursor: json.nextCursor,
-    total: json.total ?? json.registrations.length,
+    total: json.total,
   };
 }
 

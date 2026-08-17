@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AutomationOverview } from "@/lib/automations/types";
 import { AutomationsIndexSkeleton } from "@/components/admin/skeleton";
+import { fetchAdminJson } from "@/components/admin/fetch-json";
 
 interface OverviewResponse {
   ok: boolean;
@@ -20,9 +21,8 @@ export default function AutomationsIndexPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/admin/automations");
-        const json = (await res.json()) as OverviewResponse;
-        if (!res.ok || !json.ok) {
+        const json = await fetchAdminJson<OverviewResponse>("/api/admin/automations");
+        if (!json.ok) {
           if (!cancelled) setError(json.error || "Could not load automations.");
           return;
         }

@@ -10,6 +10,7 @@ import {
   TableRowSkeleton,
 } from "@/components/admin/skeleton";
 import { useCursorPagination } from "@/components/admin/use-cursor-pagination";
+import { clearAdminFetchCache, fetchAdminJson } from "@/components/admin/fetch-json";
 import type {
   AutomationKind,
   AutomationOverview,
@@ -44,7 +45,7 @@ async function fetchLeadsPage(cursor: string | undefined, pageSize: number) {
   return {
     items: json.registrations,
     nextCursor: json.nextCursor,
-    total: json.total ?? json.registrations.length,
+    total: json.total,
   };
 }
 
@@ -57,11 +58,13 @@ export default function AutomationDetailPage() {
   const [notice, setNotice] = useState("");
   const pager = useCursorPagination<StoredRegistration>(fetchLeadsPage, 25);
 
-  const loadMeta = useCallback(async () => {
+  const loadMeta = useCallback(async (fresh = false) => {
     setMetaError("");
-    const res = await fetch(`/api/admin/automations/${kind}`);
-    const json = (await res.json()) as KindResponse;
-    if (!res.ok || !json.ok) {
+    const url = fresh
+      ? `/api/admin/automations/${kind}?fresh=1`
+      : `/api/admin/automations/${kind}`;
+    const json = await fetchAdminJson<KindResponse>(url, { fresh });
+    if (!json.ok) {
       setMetaError(json.error || "Could not load this automation.");
       return;
     }
@@ -111,7 +114,8 @@ export default function AutomationDetailPage() {
         keepGoing = json.run.status === "running" && !opts.registrationId;
       }
       setNotice(lastNotice);
-      await Promise.all([loadMeta(), Promise.resolve(pager.reload())]);
+      clearAdminFetchCache("/api/admin/automations");
+      await Promise.all([loadMeta(true), Promise.resolve(pager.reload())]);
     } catch {
       setMetaError("Send failed.");
     } finally {

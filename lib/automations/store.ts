@@ -93,7 +93,8 @@ export async function listRecentRuns(
   kind?: AutomationKind,
   limit = 8,
 ): Promise<AutomationRun[]> {
-  const snap = await runsCol().orderBy("startedAt", "desc").limit(40).get();
+  const fetchLimit = kind ? Math.max(limit * 3, 24) : limit;
+  const snap = await runsCol().orderBy("startedAt", "desc").limit(fetchLimit).get();
   const runs = snap.docs.map((doc) => serializeRun(doc.id, doc.data() || {}));
   const filtered = kind ? runs.filter((r) => r.kind === kind) : runs;
   return filtered.slice(0, limit);

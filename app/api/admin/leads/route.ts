@@ -53,14 +53,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, registration });
     }
 
-    const [result, total] = await Promise.all([
-      listRegistrations({
-        limit: parsed.data.limit ?? 50,
-        cursor: parsed.data.cursor,
-      }),
-      countRegistrations(),
-    ]);
-    return NextResponse.json({ ok: true, total, ...result });
+    const result = await listRegistrations({
+      limit: parsed.data.limit ?? 50,
+      cursor: parsed.data.cursor,
+    });
+    const total = parsed.data.cursor ? undefined : await countRegistrations();
+    return NextResponse.json({
+      ok: true,
+      ...result,
+      ...(typeof total === "number" ? { total } : {}),
+    });
   } catch (err) {
     console.error("[admin/leads] read failed:", err);
     return NextResponse.json(
