@@ -12,11 +12,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Vercel Cron: every 5 minutes.
+ * Automation tick. Vercel Hobby cannot run this every 5 minutes, so
+ * vercel.json has no Vercel Cron. Call this URL from an external scheduler
+ * (or send from /admin) with Authorization: Bearer $CRON_SECRET.
+ *
  * - Sends due "things to carry" WhatsApps
  * - After the IST send-at time, batches the day-before and event-day reminders
- *
- * Auth: Authorization: Bearer $CRON_SECRET  (or admin session / API key)
  */
 export async function GET(req: Request) {
   if (!isAdminAuthorized(req, { allowCron: true })) {
