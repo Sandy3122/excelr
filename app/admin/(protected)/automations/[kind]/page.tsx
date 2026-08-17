@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { Download, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { Download, Play, RefreshCw, RotateCcw, Users } from "lucide-react";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { AdminPagination } from "@/components/admin/pagination";
 import {
@@ -226,6 +226,10 @@ export default function AutomationDetailPage() {
   const pendingCount = idsFor("pending").length;
   const failedCount = idsFor("failed").length;
   const allCount = idsFor("all").length;
+  const allLeadIds = leads.map((r) => r.id);
+  const allPendingCount = leads.filter((r) =>
+    kindMatchesStatus(r, kind, "pending"),
+  ).length;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -283,6 +287,22 @@ export default function AutomationDetailPage() {
           </button>
           <button
             type="button"
+            disabled={busy || allLeadIds.length === 0}
+            onClick={() =>
+              void runSend({
+                action: "run",
+                ids: allLeadIds,
+                title: `Sending ${item.title} to all leads`,
+                confirm: `Send “${item.title}” to all ${allLeadIds.length} registered lead${allLeadIds.length === 1 ? "" : "s"}? This ignores filters and checkboxes. ${allPendingCount} ${allPendingCount === 1 ? "is" : "are"} still pending; people who already received it will be skipped. Messages go out in batches of 40.`,
+              })
+            }
+            className="btn-gradient px-5 py-2 text-sm disabled:opacity-60 sm:col-span-2 lg:col-span-1"
+          >
+            <Users className="h-4 w-4" />
+            {busy ? "Sending…" : `Send to all (${allLeadIds.length})`}
+          </button>
+          <button
+            type="button"
             disabled={busy || (usingSelection ? selected.size === 0 : pendingCount === 0)}
             onClick={() =>
               void runSend({
@@ -294,7 +314,7 @@ export default function AutomationDetailPage() {
                   : `Send to ${pendingCount} pending lead${pendingCount === 1 ? "" : "s"} matching the current filters? Messages go out in batches of 40.`,
               })
             }
-            className="btn-gradient px-5 py-2 text-sm disabled:opacity-60 sm:col-span-2 lg:col-span-1"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-60"
           >
             <Play className="h-4 w-4" />
             {busy ? "Sending…" : usingSelection ? "Send selected" : "Send pending"}
