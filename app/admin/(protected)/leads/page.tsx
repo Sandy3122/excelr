@@ -19,6 +19,7 @@ import { AUTOMATION_KINDS } from "@/lib/automations/types";
 import type { StoredRegistration } from "@/lib/firebase/registration-types";
 
 const TABLE_HEADERS = [
+  "S.No",
   "Name",
   "Email",
   "Phone",
@@ -110,7 +111,13 @@ export default function AdminLeadsPage() {
           ? Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="h-40 animate-pulse rounded-2xl bg-white shadow-card" />
             ))
-          : pageItems.map((r) => <LeadMobileCard key={r.id} lead={r} />)}
+          : pageItems.map((r, i) => (
+              <LeadMobileCard
+                key={r.id}
+                lead={r}
+                serial={(safePage - 1) * pageSize + i + 1}
+              />
+            ))}
         {!loading && filtered.length === 0 ? (
           <p className="rounded-2xl bg-white p-4 text-sm text-muted shadow-card">
             No leads match these filters.
@@ -144,10 +151,13 @@ export default function AdminLeadsPage() {
             <tbody>
               {loading
                 ? Array.from({ length: Math.min(pageSize, 25) }).map((_, i) => (
-                    <TableRowSkeleton key={i} cols={10} />
+                    <TableRowSkeleton key={i} cols={11} />
                   ))
-                : pageItems.map((r) => (
+                : pageItems.map((r, i) => (
                     <tr key={r.id} className="border-t border-slate-100">
+                      <td className="whitespace-nowrap px-4 py-3 tabular-nums text-muted">
+                        {(safePage - 1) * pageSize + i + 1}
+                      </td>
                       <td className="px-4 py-3 font-medium">{r.fullName}</td>
                       <td className="px-4 py-3">{r.email}</td>
                       <td className="whitespace-nowrap px-4 py-3">{r.phone}</td>
@@ -190,10 +200,19 @@ export default function AdminLeadsPage() {
   );
 }
 
-function LeadMobileCard({ lead }: { lead: StoredRegistration }) {
+function LeadMobileCard({
+  lead,
+  serial,
+}: {
+  lead: StoredRegistration;
+  serial: number;
+}) {
   return (
     <article className="rounded-2xl bg-white p-4 shadow-card">
-      <h2 className="font-heading text-base font-bold text-navy-900">{lead.fullName}</h2>
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 text-sm tabular-nums text-muted">{serial}.</span>
+        <h2 className="font-heading text-base font-bold text-navy-900">{lead.fullName}</h2>
+      </div>
       <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
         <div>
           <dt className="text-xs uppercase tracking-wide text-faint">Email</dt>

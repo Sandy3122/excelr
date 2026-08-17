@@ -169,10 +169,13 @@ export default function AdminOverviewPage() {
           ) : (
             <>
               <div className="space-y-3 p-4 md:hidden">
-                {data.recentRuns.map((run) => (
+                {data.recentRuns.map((run, i) => (
                   <div key={run.id} className="rounded-xl bg-slate-50 p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium">{run.kind}</span>
+                      <span className="font-medium">
+                        <span className="mr-1.5 tabular-nums text-muted">{i + 1}.</span>
+                        {run.kind}
+                      </span>
                       <StatusBadge status={run.status === "completed" ? "sent" : "sending"} />
                     </div>
                     <div className="mt-2 text-muted">
@@ -192,6 +195,7 @@ export default function AdminOverviewPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
                     <tr>
+                      <th className="whitespace-nowrap px-4 py-3">S.No</th>
                       <th className="px-4 py-3">Automation</th>
                       <th className="px-4 py-3">Trigger</th>
                       <th className="px-4 py-3">Status</th>
@@ -201,8 +205,11 @@ export default function AdminOverviewPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.recentRuns.map((run) => (
+                    {data.recentRuns.map((run, i) => (
                       <tr key={run.id} className="border-t border-slate-100">
+                        <td className="whitespace-nowrap px-4 py-3 tabular-nums text-muted">
+                          {i + 1}
+                        </td>
                         <td className="px-4 py-3 font-medium">{run.kind}</td>
                         <td className="px-4 py-3 capitalize">{run.triggeredBy}</td>
                         <td className="px-4 py-3">

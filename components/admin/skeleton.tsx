@@ -102,9 +102,9 @@ export function OverviewSkeleton() {
       <section>
         <Skeleton className="mb-3 h-7 w-36" />
         <TableSkeleton
-          cols={6}
+          cols={7}
           rows={5}
-          headers={["Automation", "Trigger", "Status", "Sent", "Failed", "When"]}
+          headers={["S.No", "Automation", "Trigger", "Status", "Sent", "Failed", "When"]}
         />
       </section>
     </div>
@@ -123,9 +123,10 @@ export function LeadsPageSkeleton() {
       </div>
       <Skeleton className="h-12 w-full rounded-xl" />
       <TableSkeleton
-        cols={10}
+        cols={11}
         rows={10}
         headers={[
+          "S.No",
           "Name",
           "Email",
           "Phone",
@@ -194,9 +195,9 @@ export function AutomationDetailSkeleton() {
         <StatCardSkeleton />
       </div>
       <TableSkeleton
-        cols={6}
+        cols={8}
         rows={8}
-        headers={["Name", "Phone", "Email", "WhatsApp", "Email status", ""]}
+        headers={["S.No", "Name", "Phone", "Email", "Qualification", "WhatsApp", "Email status", ""]}
       />
     </div>
   );

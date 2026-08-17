@@ -221,7 +221,7 @@ export default function AutomationDetailPage() {
   const wa = item.counts.whatsapp;
   const email = item.counts.email;
   const showEmail = item.channels.includes("email");
-  const colCount = showEmail ? 8 : 7;
+  const colCount = showEmail ? 9 : 8;
   const usingSelection = selected.size > 0;
   const pendingCount = idsFor("pending").length;
   const failedCount = idsFor("failed").length;
@@ -372,10 +372,11 @@ export default function AutomationDetailPage() {
           ? Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-36 animate-pulse rounded-2xl bg-white shadow-card" />
             ))
-          : pageItems.map((r) => {
+          : pageItems.map((r, i) => {
               const waStatus = leadChannelStatus(r, kind, "whatsapp");
               const emailStatus = leadChannelStatus(r, kind, "email");
               const delivered = isDelivered(waStatus);
+              const serial = (safePage - 1) * pageSize + i + 1;
               return (
                 <article key={r.id} className="rounded-2xl bg-white p-4 shadow-card">
                   <div className="flex items-start gap-3">
@@ -388,7 +389,10 @@ export default function AutomationDetailPage() {
                       className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
                     />
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-heading font-bold">{r.fullName}</h3>
+                      <h3 className="font-heading font-bold">
+                        <span className="mr-1.5 tabular-nums text-muted">{serial}.</span>
+                        {r.fullName}
+                      </h3>
                       <p className="mt-1 break-all text-sm">{r.email}</p>
                       <p className="mt-0.5 text-sm text-muted">{r.phone}</p>
                       <p className="mt-2 text-sm">
@@ -433,6 +437,7 @@ export default function AutomationDetailPage() {
           <table className="min-w-[980px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
               <tr>
+                <th className="whitespace-nowrap px-4 py-3">S.No</th>
                 <th className="w-10 px-4 py-3">
                   <input
                     ref={headerCheckboxRef}
@@ -458,12 +463,15 @@ export default function AutomationDetailPage() {
                 ? Array.from({ length: pageSize }).map((_, i) => (
                     <TableRowSkeleton key={i} cols={colCount} />
                   ))
-                : pageItems.map((r) => {
+                : pageItems.map((r, i) => {
                     const waStatus = leadChannelStatus(r, kind, "whatsapp");
                     const emailStatus = leadChannelStatus(r, kind, "email");
                     const delivered = isDelivered(waStatus);
                     return (
                       <tr key={r.id} className="border-t border-slate-100">
+                        <td className="whitespace-nowrap px-4 py-3 tabular-nums text-muted">
+                          {(safePage - 1) * pageSize + i + 1}
+                        </td>
                         <td className="px-4 py-3">
                           <input
                             type="checkbox"
@@ -611,6 +619,7 @@ export default function AutomationDetailPage() {
             <table className="min-w-[520px] w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
                 <tr>
+                  <th className="whitespace-nowrap px-4 py-3">S.No</th>
                   <th className="px-4 py-3">When</th>
                   <th className="px-4 py-3">By</th>
                   <th className="px-4 py-3">Sent</th>
@@ -619,8 +628,11 @@ export default function AutomationDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {meta.recentRuns.map((run) => (
+                {meta.recentRuns.map((run, i) => (
                   <tr key={run.id} className="border-t border-slate-100">
+                    <td className="whitespace-nowrap px-4 py-3 tabular-nums text-muted">
+                      {i + 1}
+                    </td>
                     <td className="px-4 py-3">
                       {run.startedAt
                         ? new Date(run.startedAt).toLocaleString("en-IN", {
