@@ -4,6 +4,7 @@ import type { StoredRegistration } from "@/lib/firebase/registration-types";
 import {
   listRegistrationsAscending,
   getRegistrationById,
+  getRegistrationsByIds,
   phoneToDocId,
 } from "@/lib/firebase/registrations";
 import { getAutomation } from "./catalog";
@@ -35,8 +36,12 @@ export interface RunAutomationOptions {
   triggeredBy: "cron" | "admin";
   force?: boolean;
   retryFailed?: boolean;
+  /** Re-send even if the message was already delivered. */
+  resend?: boolean;
   /** Send only this registration (admin per-row send). */
   registrationId?: string;
+  /** Send only these registrations (admin selected / filtered batch). */
+  registrationIds?: string[];
   timeBudgetMs?: number;
 }
 
@@ -95,9 +100,14 @@ export async function runAutomation(
   const def = getAutomation(kind);
   const force = Boolean(options.force);
   const retryFailed = Boolean(options.retryFailed);
+  const resend = Boolean(options.resend);
   const budget = options.timeBudgetMs ?? TIME_BUDGET_MS;
   const started = Date.now();
   const now = () => new Date();
+  const selectedIds = [
+    ...(options.registrationIds ?? []),
+    ...(options.registrationId ? [options.registrationId] : []),
+  ];
 
   const run = await createAutomationRun({
     kind,
@@ -108,11 +118,16 @@ export async function runAutomation(
   const stats = emptyRunStats();
 
   try {
-    if (options.registrationId) {
-      const reg = await getRegistrationById(options.registrationId);
-      if (reg) {
-        stats.scanned = 1;
-        await processBatch(kind, [reg], force, retryFailed, stats, now());
+    if (selectedIds.length > 0) {
+      const regs =
+        selectedIds.length === 1
+          ? [await getRegistrationById(selectedIds[0])].filter(
+              (r): r is NonNullable<typeof r> => Boolean(r),
+            )
+          : await getRegistrationsByIds(selectedIds);
+      stats.scanned = regs.length;
+      if (regs.length > 0) {
+        await processBatch(kind, regs, force, retryFailed, resend, stats, now());
       }
       await patchAutomationRun(run.id, {
         status: "completed",
@@ -141,6 +156,7 @@ export async function runAutomation(
             now: now(),
             force,
             retryFailed,
+            resend,
             dueAt: dueAtFor(reg),
             registeredAt: registeredAtFor(reg),
             snapshot: channelSnapshot(reg, kind, channel),
@@ -155,6 +171,7 @@ export async function runAutomation(
           eligible.slice(0, WHATSAPP_BATCH),
           force,
           retryFailed,
+          resend,
           stats,
           now(),
         );
@@ -210,6 +227,7 @@ async function processBatch(
   regs: StoredRegistration[],
   force: boolean,
   retryFailed: boolean,
+  resend: boolean,
   stats: AutomationRunStats,
   now: Date,
 ): Promise<void> {
@@ -231,6 +249,7 @@ async function processBatch(
         now,
         force,
         retryFailed,
+        resend,
         dueAt: dueAtFor(reg),
         registeredAt: registeredAtFor(reg),
         snapshot: channelSnapshot(reg, kind, channel),
@@ -242,10 +261,12 @@ async function processBatch(
             skippedReason: "Past the 8:45 AM IST cutoff on event day.",
           });
           bump(stats, "skipped");
+        } else if (elig.reason === "already_sent") {
+          bump(stats, "skipped");
         }
         continue;
       }
-      const ok = await claimChannel(reg.id, kind, channel, nowIso);
+      const ok = await claimChannel(reg.id, kind, channel, nowIso, { resend });
       if (ok) channels.push(channel);
     }
     if (channels.length) {

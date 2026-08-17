@@ -187,7 +187,7 @@ export async function listAllRegistrations(max = 5000): Promise<StoredRegistrati
   let cursor: string | undefined;
   while (all.length < max) {
     const page = await listRegistrations({
-      limit: Math.min(100, max - all.length),
+      limit: Math.min(500, max - all.length),
       cursor,
     });
     all.push(...page.registrations);
@@ -200,6 +200,25 @@ export async function listAllRegistrations(max = 5000): Promise<StoredRegistrati
 export async function countRegistrations(): Promise<number> {
   const snap = await registrationsCol().count().get();
   return snap.data().count;
+}
+
+export async function getRegistrationsByIds(
+  ids: string[],
+): Promise<StoredRegistration[]> {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  if (unique.length === 0) return [];
+  const db = getAdminFirestore();
+  const out: StoredRegistration[] = [];
+  for (let i = 0; i < unique.length; i += 100) {
+    const chunk = unique.slice(i, i + 100);
+    const refs = chunk.map((id) => registrationsCol().doc(id));
+    const snaps = await db.getAll(...refs);
+    for (const snap of snaps) {
+      if (!snap.exists) continue;
+      out.push(serializeRegistration(snap.id, snap.data()));
+    }
+  }
+  return out;
 }
 
 export async function updateRegistrationFields(

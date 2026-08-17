@@ -126,6 +126,7 @@ export async function claimChannel(
   kind: AutomationKind,
   channel: Channel,
   nowIso: string,
+  opts?: { resend?: boolean },
 ): Promise<boolean> {
   const ref = regsCol().doc(registrationId);
   return getAdminFirestore().runTransaction(async (tx) => {
@@ -134,8 +135,10 @@ export async function claimChannel(
     const current = snap.data()?.messages?.[kind]?.[channel]?.status as
       | MessageStatus
       | undefined;
-    if (current === "sent" || current === "skipped" || current === "legacy") {
-      return false;
+    if (!opts?.resend) {
+      if (current === "sent" || current === "skipped" || current === "legacy") {
+        return false;
+      }
     }
     if (current === "sending") {
       const claimedAt = String(

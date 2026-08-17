@@ -5,16 +5,19 @@ import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
 import {
   countRegistrations,
   getRegistrationById,
+  listAllRegistrations,
   listRegistrations,
 } from "@/lib/firebase/registrations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
   cursor: z.string().trim().min(1).max(256).optional(),
   id: z.string().trim().min(1).max(256).optional(),
+  all: z.enum(["0", "1"]).optional(),
 });
 
 export async function GET(req: Request) {
@@ -33,6 +36,7 @@ export async function GET(req: Request) {
     limit: url.searchParams.get("limit") ?? undefined,
     cursor: url.searchParams.get("cursor") ?? undefined,
     id: url.searchParams.get("id") ?? undefined,
+    all: url.searchParams.get("all") === "1" ? "1" : undefined,
   });
   if (!parsed.success) {
     return NextResponse.json(
@@ -51,6 +55,16 @@ export async function GET(req: Request) {
         );
       }
       return NextResponse.json({ ok: true, registration });
+    }
+
+    if (parsed.data.all === "1") {
+      const registrations = await listAllRegistrations();
+      return NextResponse.json({
+        ok: true,
+        registrations,
+        nextCursor: null,
+        total: registrations.length,
+      });
     }
 
     const result = await listRegistrations({

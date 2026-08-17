@@ -73,6 +73,7 @@ export interface EligibilityInput {
   now?: Date;
   force?: boolean;
   retryFailed?: boolean;
+  resend?: boolean;
   dueAt?: Date | null;
   registeredAt?: Date | null;
   snapshot?: ChannelSnapshot;
@@ -92,21 +93,25 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
   const now = input.now ?? new Date();
   const def = getAutomation(input.kind);
   const status = input.snapshot?.status;
+  const resend = Boolean(input.resend);
 
-  if (!status && input.kind === "welcome") {
-    return { ok: false, reason: "already_sent" };
-  }
-  if (status === "sent" || status === "skipped" || status === "legacy") {
-    return { ok: false, reason: "already_sent" };
-  }
   if (status === "sending" && !isClaimStale(input.snapshot?.claimedAt, now)) {
     return { ok: false, reason: "in_flight" };
   }
-  if (status === "failed" && !input.retryFailed && !input.force) {
-    return { ok: false, reason: "already_sent" };
+
+  if (!resend) {
+    if (!status && input.kind === "welcome") {
+      return { ok: false, reason: "already_sent" };
+    }
+    if (status === "sent" || status === "skipped" || status === "legacy") {
+      return { ok: false, reason: "already_sent" };
+    }
+    if (status === "failed" && !input.retryFailed && !input.force) {
+      return { ok: false, reason: "already_sent" };
+    }
   }
 
-  if (input.force) return { ok: true };
+  if (input.force || resend) return { ok: true };
 
   if (input.kind === "things_to_carry") {
     const cutoff = thingsToCarryCutoff();

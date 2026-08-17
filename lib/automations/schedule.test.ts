@@ -161,6 +161,38 @@ describe("evaluateEligibility", () => {
     expect(result).toEqual({ ok: true });
   });
 
+  it("does not resend a delivered message with force alone", () => {
+    const result = evaluateEligibility({
+      kind: "welcome",
+      channel: "whatsapp",
+      now: istWallClockToUtc("2026-08-20T10:00:00"),
+      snapshot: { status: "sent" },
+      force: true,
+    });
+    expect(result).toEqual({ ok: false, reason: "already_sent" });
+  });
+
+  it("resends a delivered message when resend is set", () => {
+    const result = evaluateEligibility({
+      kind: "welcome",
+      channel: "whatsapp",
+      now: istWallClockToUtc("2026-08-20T10:00:00"),
+      snapshot: { status: "sent" },
+      resend: true,
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("resends a legacy welcome when asked", () => {
+    const result = evaluateEligibility({
+      kind: "welcome",
+      channel: "whatsapp",
+      now: istWallClockToUtc("2026-08-20T10:00:00"),
+      resend: true,
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
   it("admin force bypasses the scheduled window", () => {
     const result = evaluateEligibility({
       kind: "reminder_day_before",
