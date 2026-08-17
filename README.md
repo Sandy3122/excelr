@@ -21,8 +21,30 @@ Nodemailer, and optionally send a WhatsApp confirmation.
 |---|---|
 | `/reg` | The public registration page (no app chrome). |
 | `/` | Redirects to `/reg`. |
-| `/api/reg` (POST) | Validates → WhatsApp verify → **Firestore save** → emails. |
+| `/admin` | Admin console (login required). Leads, automations, CSV export. |
+| `/api/reg` (POST) | Validates → WhatsApp verify → **Firestore save** → emails + welcome WhatsApp. |
 | `/api/reg` (GET) | Admin-only list/read of registrations (`Authorization: Bearer <REG_ADMIN_API_KEY>`). |
+| `/api/cron/automations` | Vercel Cron (every 5 min, IST-aware). Things-to-carry + scheduled reminders. |
+
+## Admin console & automations
+
+Sign in at `/admin` with `ADMIN_PASSWORD` (or `REG_ADMIN_API_KEY`).
+
+The console can:
+
+- List leads and **download CSV**
+- Show WhatsApp + email delivery status for each automation
+- **Send pending** (or retry failed) in batches of 40 — safe to re-run; already-sent leads are skipped
+- Download a per-automation delivery report
+
+| # | Message | When (IST) | Channel |
+|---|---------|------------|---------|
+| 1 | Welcome | On form submit | WhatsApp + Email |
+| 2 | Things to carry | 1 hour later (held 8:00 AM if overnight; stops 22 Aug 8:45 AM) | WhatsApp |
+| 3 | Reminder — day before | Fri 21 Aug 2026, 12:00 PM | WhatsApp + Email |
+| 4 | Reminder — event day | Sat 22 Aug 2026, 8:50 AM | WhatsApp |
+
+Cron (`vercel.json`) hits `/api/cron/automations` every 5 minutes. Scheduled reminders do **not** send before their IST send-at time unless an admin clicks Send. Vercel Hobby only allows daily crons — use Pro for `*/5`, or trigger from `/admin` at the scheduled time.
 
 ## Getting started
 
@@ -51,6 +73,9 @@ confirmation is best-effort and does not block the thank-you page.
 - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` — Admin SDK
   (or place `serviceAccountKey.json` in the project root for local dev; it is gitignored).
 - `REG_ADMIN_API_KEY` — required to call **GET** `/api/reg`.
+- `ADMIN_PASSWORD` — password for `/admin` (falls back to `REG_ADMIN_API_KEY`).
+- `ADMIN_SESSION_SECRET` — signs the admin cookie (falls back to `WHATSAPP_OTP_HASH_SECRET` / password).
+- `CRON_SECRET` — Vercel Cron bearer token for `/api/cron/automations`.
 - Optional `NEXT_PUBLIC_FIREBASE_*` — public `firebaseConfig` from the Firebase console.
   Client SDKs still cannot read or write data; `firestore.rules` denies all client access.
 

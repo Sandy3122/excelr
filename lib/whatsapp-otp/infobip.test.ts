@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildConfirmationPayload,
+  buildNamedTemplatePayload,
   buildTemplatePayload,
   sendRegistrationConfirmationWhatsApp,
   sendWhatsAppOtp,
@@ -44,6 +45,32 @@ describe("buildTemplatePayload", () => {
     expect(payload.messages[0].content.templateData.buttons).toEqual([
       { type: "URL", parameter: "verify" },
     ]);
+  });
+});
+
+describe("buildNamedTemplatePayload", () => {
+  it("matches reminder templates: name placeholder, no buttons", () => {
+    const payload = buildNamedTemplatePayload(
+      baseCfg,
+      "919876543210",
+      "Arjun",
+      "fsd_placement_drive_reminder_message_21aug_a",
+    );
+    expect(payload).toEqual({
+      messages: [
+        {
+          from: "918050162541",
+          to: "919876543210",
+          content: {
+            templateName: "fsd_placement_drive_reminder_message_21aug_a",
+            templateData: {
+              body: { placeholders: ["Arjun"] },
+            },
+            language: "en_IN",
+          },
+        },
+      ],
+    });
   });
 });
 

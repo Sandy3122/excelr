@@ -1,15 +1,24 @@
 import { readFile } from "fs/promises";
 import path from "path";
+import { firstNameFrom } from "@/lib/first-name";
+import { escapeHtml } from "@/lib/html-escape";
 
-const TEMPLATE_PATH = path.join(process.cwd(), "public", "reg", "index.html");
+const WELCOME_TEMPLATE_PATH = path.join(process.cwd(), "public", "reg", "index.html");
+const REMINDER_TEMPLATE_PATH = path.join(
+  process.cwd(),
+  "public",
+  "reg",
+  "email-reminder-day-before.html",
+);
 
-/** Cached HTML template — avoid a disk read on every registration. */
-let cachedTemplate: string | null = null;
+const templateCache = new Map<string, string>();
 
-async function loadTemplate(): Promise<string> {
-  if (cachedTemplate) return cachedTemplate;
-  cachedTemplate = await readFile(TEMPLATE_PATH, "utf8");
-  return cachedTemplate;
+async function loadTemplate(filePath: string): Promise<string> {
+  const cached = templateCache.get(filePath);
+  if (cached) return cached;
+  const html = await readFile(filePath, "utf8");
+  templateCache.set(filePath, html);
+  return html;
 }
 
 /** Event window for the "Add to calendar" CTA (IST → UTC for Google Calendar). */
@@ -30,12 +39,13 @@ export const APPLICANT_EMAIL = {
   replyTo: "enquiry@excelr.com",
 } as const;
 
-/**
- * Load public/reg/index.html and fill merge fields for the applicant confirmation email.
- * Tokens: {{first_name}}, {{calendar_link}}, we_wk_unsubscribe_link
- */
-export async function renderApplicantEmailHtml(fullName: string): Promise<string> {
-  const template = await loadTemplate();
+export const REMINDER_DAY_BEFORE_EMAIL = {
+  subject: "Tomorrow, 9:00 AM — your Java Full Stack Placement Drive",
+  fromName: "ExcelR Placement Team",
+  replyTo: "enquiry@excelr.com",
+} as const;
+
+function applyEmailMergeFields(template: string, fullName: string): string {
   const firstName = escapeHtml(firstNameFrom(fullName));
   const calendarLink = buildGoogleCalendarLink();
   const unsubscribe = `mailto:${APPLICANT_EMAIL.replyTo}?subject=${encodeURIComponent(
@@ -48,9 +58,20 @@ export async function renderApplicantEmailHtml(fullName: string): Promise<string
     .replaceAll("we_wk_unsubscribe_link", unsubscribe);
 }
 
-function firstNameFrom(fullName: string): string {
-  const part = fullName.trim().split(/\s+/)[0];
-  return part || "there";
+/**
+ * Load public/reg/index.html and fill merge fields for the applicant confirmation email.
+ * Tokens: {{first_name}}, {{calendar_link}}, we_wk_unsubscribe_link
+ */
+export async function renderApplicantEmailHtml(fullName: string): Promise<string> {
+  const template = await loadTemplate(WELCOME_TEMPLATE_PATH);
+  return applyEmailMergeFields(template, fullName);
+}
+
+export async function renderReminderDayBeforeEmailHtml(
+  fullName: string,
+): Promise<string> {
+  const template = await loadTemplate(REMINDER_TEMPLATE_PATH);
+  return applyEmailMergeFields(template, fullName);
 }
 
 function buildGoogleCalendarLink(): string {
@@ -62,21 +83,4 @@ function buildGoogleCalendarLink(): string {
     location: CALENDAR.location,
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
-}
-
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, (c) => {
-    switch (c) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      default:
-        return "&#39;";
-    }
-  });
 }

@@ -4,10 +4,14 @@ import {
   type Timestamp,
 } from "firebase-admin/firestore";
 import type { RegistrationInput } from "@/lib/reg-schema";
+import { firstNameFrom } from "@/lib/first-name";
+import { buildInitialMessages, parseRegistrationMessages } from "@/lib/automations/messages";
+import type { RegistrationRecord, StoredRegistration } from "./registration-types";
 import { getAdminFirestore } from "./admin";
 import { FIRESTORE_REGISTRATIONS_COLLECTION } from "./config";
 
 export const REGISTRATION_EVENT = "java-fullstack-placement-drive";
+export type { RegistrationRecord, StoredRegistration } from "./registration-types";
 
 export class DuplicateRegistrationError extends Error {
   constructor(public readonly field: "email" | "phone") {
@@ -18,25 +22,6 @@ export class DuplicateRegistrationError extends Error {
     );
     this.name = "DuplicateRegistrationError";
   }
-}
-
-export interface RegistrationRecord {
-  fullName: string;
-  email: string;
-  emailLower: string;
-  phone: string;
-  college: string;
-  qualification: string;
-  pageUrl: string;
-  submittedAtIso: string;
-  event: string;
-}
-
-export interface StoredRegistration extends RegistrationRecord {
-  id: string;
-  submittedAt: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
 }
 
 export interface ListRegistrationsResult {
@@ -55,6 +40,7 @@ export function toRegistrationRecord(
 ): RegistrationRecord {
   return {
     fullName: data.fullName,
+    firstName: firstNameFrom(data.fullName),
     email: data.email,
     emailLower: data.email.trim().toLowerCase(),
     phone: data.phone,
@@ -90,13 +76,27 @@ export async function saveRegistration(
     if (existingEmail && existingEmail !== record.emailLower) {
       throw new DuplicateRegistrationError("phone");
     }
-    await phoneRef.set(
-      {
-        ...record,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
+    const patch: Record<string, unknown> = {
+      ...record,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (!phoneSnap.data()?.messages) {
+      const submittedIso = String(phoneSnap.data()?.submittedAtIso || timestamp);
+      const { messages, thingsToCarryDueAt } = buildInitialMessages(
+        new Date(submittedIso),
+      );
+      if (messages.welcome?.whatsapp) {
+        messages.welcome.whatsapp.status = "legacy";
+      }
+      if (messages.welcome?.email) {
+        messages.welcome.email.status = "legacy";
+      }
+      patch.messages = messages;
+      patch.thingsToCarryDueAt = thingsToCarryDueAt
+        ? thingsToCarryDueAt.toISOString()
+        : null;
+    }
+    await phoneRef.set(patch, { merge: true });
     return { id, created: false };
   }
 
@@ -108,8 +108,15 @@ export async function saveRegistration(
     throw new DuplicateRegistrationError("email");
   }
 
+  const registeredAt = new Date(timestamp);
+  const { messages, thingsToCarryDueAt } = buildInitialMessages(registeredAt);
+
   await phoneRef.set({
     ...record,
+    messages,
+    thingsToCarryDueAt: thingsToCarryDueAt
+      ? thingsToCarryDueAt.toISOString()
+      : null,
     submittedAt: FieldValue.serverTimestamp(),
     createdAt: FieldValue.serverTimestamp(),
   });
@@ -149,6 +156,59 @@ export async function listRegistrations(options: {
   };
 }
 
+/** Oldest-first scan used by the batch sender so late pages still get a turn. */
+export async function listRegistrationsAscending(options: {
+  limit: number;
+  cursor?: string;
+}): Promise<ListRegistrationsResult> {
+  const col = registrationsCol();
+  const pageSize = options.limit;
+  let query = col.orderBy("submittedAt", "asc").limit(pageSize + 1);
+
+  if (options.cursor) {
+    const cursorSnap = await col.doc(options.cursor).get();
+    if (cursorSnap.exists) {
+      query = query.startAfter(cursorSnap);
+    }
+  }
+
+  const snap = await query.get();
+  const docs = snap.docs.slice(0, pageSize);
+  const hasMore = snap.docs.length > pageSize;
+
+  return {
+    registrations: docs.map((doc) => serializeRegistration(doc.id, doc.data())),
+    nextCursor: hasMore ? docs[docs.length - 1]?.id ?? null : null,
+  };
+}
+
+export async function listAllRegistrations(max = 5000): Promise<StoredRegistration[]> {
+  const all: StoredRegistration[] = [];
+  let cursor: string | undefined;
+  while (all.length < max) {
+    const page = await listRegistrations({
+      limit: Math.min(100, max - all.length),
+      cursor,
+    });
+    all.push(...page.registrations);
+    if (!page.nextCursor) break;
+    cursor = page.nextCursor;
+  }
+  return all;
+}
+
+export async function countRegistrations(): Promise<number> {
+  const snap = await registrationsCol().count().get();
+  return snap.data().count;
+}
+
+export async function updateRegistrationFields(
+  id: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  await registrationsCol().doc(id).set(fields, { merge: true });
+}
+
 function serializeRegistration(
   id: string,
   data: DocumentData | undefined,
@@ -157,6 +217,7 @@ function serializeRegistration(
   return {
     id,
     fullName: String(d.fullName || ""),
+    firstName: String(d.firstName || firstNameFrom(String(d.fullName || ""))),
     email: String(d.email || ""),
     emailLower: String(d.emailLower || ""),
     phone: String(d.phone || ""),
@@ -168,6 +229,10 @@ function serializeRegistration(
     submittedAt: timestampToIso(d.submittedAt) ?? (d.submittedAtIso || null),
     createdAt: timestampToIso(d.createdAt),
     updatedAt: timestampToIso(d.updatedAt),
+    thingsToCarryDueAt:
+      timestampToIso(d.thingsToCarryDueAt) ??
+      (typeof d.thingsToCarryDueAt === "string" ? d.thingsToCarryDueAt : null),
+    messages: parseRegistrationMessages(d.messages),
   };
 }
 

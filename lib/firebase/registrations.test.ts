@@ -33,5 +33,6 @@ describe("toRegistrationRecord", () => {
     expect(record.event).toBe(REGISTRATION_EVENT);
     expect(record.submittedAtIso).toBe("2026-08-13T00:00:00.000Z");
     expect(record.phone).toBe("+919876543210");
+    expect(record.firstName).toBe("Ada");
   });
 });

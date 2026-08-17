@@ -14,6 +14,9 @@ import { join } from "path";
 export const FIRESTORE_REGISTRATIONS_COLLECTION =
   process.env.FIRESTORE_REGISTRATIONS_COLLECTION || "registrations";
 
+export const FIRESTORE_AUTOMATION_RUNS_COLLECTION =
+  process.env.FIRESTORE_AUTOMATION_RUNS_COLLECTION || "automationRuns";
+
 export interface FirebaseServiceAccount {
   projectId: string;
   clientEmail: string;

@@ -1,0 +1,87 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import type { AutomationOverview } from "@/lib/automations/types";
+
+interface OverviewResponse {
+  ok: boolean;
+  error?: string;
+  automations: AutomationOverview[];
+}
+
+export default function AutomationsIndexPage() {
+  const [items, setItems] = useState<AutomationOverview[]>([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/automations");
+        const json = (await res.json()) as OverviewResponse;
+        if (!res.ok || !json.ok) {
+          if (!cancelled) setError(json.error || "Could not load automations.");
+          return;
+        }
+        if (!cancelled) setItems(json.automations);
+      } catch {
+        if (!cancelled) setError("Could not load automations.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (error) return <p className="text-red-600">{error}</p>;
+  if (!items.length) return <p className="text-muted">Loading automations…</p>;
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div>
+        <h1 className="font-heading text-3xl font-bold text-navy-900">Automations</h1>
+        <p className="mt-1 text-muted">
+          Send WhatsApp and email in batches, and see whether each message went out.
+        </p>
+      </div>
+      <div className="grid gap-4">
+        {items.map((item) => {
+          const wa = item.counts.whatsapp;
+          const email = item.counts.email;
+          return (
+            <Link
+              key={item.kind}
+              href={`/admin/automations/${item.kind}`}
+              className="rounded-2xl bg-white p-6 shadow-card transition hover:shadow-card-lg"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-heading text-xl font-bold">{item.title}</h2>
+                  <p className="mt-1 text-sm text-muted">{item.scheduleLabel}</p>
+                  <p className="mt-1 text-sm text-faint">
+                    {item.channels.join(" + ")}
+                  </p>
+                </div>
+                <div className="text-right text-sm">
+                  {wa ? (
+                    <div>
+                      WhatsApp: <strong>{wa.sent}</strong> sent · {wa.pending} pending ·{" "}
+                      {wa.failed} failed
+                    </div>
+                  ) : null}
+                  {email ? (
+                    <div>
+                      Email: <strong>{email.sent}</strong> sent · {email.pending} pending ·{" "}
+                      {email.failed} failed
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

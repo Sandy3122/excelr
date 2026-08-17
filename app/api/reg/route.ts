@@ -22,6 +22,9 @@ import {
   listRegistrations,
   saveRegistration,
 } from "@/lib/firebase/registrations";
+import { setChannelDelivery } from "@/lib/automations/store";
+import { emptyChannelDelivery } from "@/lib/automations/types";
+import { firstNameFrom } from "@/lib/first-name";
 
 // Nodemailer + Firestore Admin need the Node runtime (not Edge).
 export const runtime = "nodejs";
@@ -127,8 +130,10 @@ export async function POST(req: Request) {
   // Use the normalized E.164 number everywhere downstream.
   if (phone) data.phone = phone.e164;
 
+  let savedId = "";
   try {
-    await saveRegistration(data, timestamp);
+    const saved = await saveRegistration(data, timestamp);
+    savedId = saved.id;
   } catch (err) {
     if (err instanceof DuplicateRegistrationError) {
       return NextResponse.json(
@@ -160,9 +165,23 @@ export async function POST(req: Request) {
     );
   }
 
+  const existing = savedId ? await getRegistrationById(savedId).catch(() => null) : null;
+  const welcomeEmailStatus = existing?.messages?.welcome?.email?.status;
+  const welcomeWaStatus = existing?.messages?.welcome?.whatsapp?.status;
+  const shouldSendWelcomeEmail =
+    welcomeEmailStatus !== "sent" && welcomeEmailStatus !== "legacy";
+  const shouldSendWelcomeWhatsApp =
+    welcomeWaStatus !== "sent" && welcomeWaStatus !== "legacy";
+
   // Email is required on every successful registration.
   try {
-    await sendEmails(data, timestamp);
+    await sendEmails(data, timestamp, { skipApplicant: !shouldSendWelcomeEmail });
+    if (savedId && shouldSendWelcomeEmail) {
+      await setChannelDelivery(savedId, "welcome", "email", {
+        ...emptyChannelDelivery("sent"),
+        sentAt: timestamp,
+      });
+    }
   } catch (err) {
     console.error("[reg] Nodemailer send failed:", err);
     await notifyAdminOfFailure({
@@ -211,7 +230,9 @@ export async function POST(req: Request) {
       });
     }
   })();
-  const whatsappPromise = sendWhatsAppConfirmation(data, phone);
+  const whatsappPromise = shouldSendWelcomeWhatsApp
+    ? sendWhatsAppConfirmation(data, phone, savedId)
+    : Promise.resolve();
 
   await Promise.all([consumePromise, whatsappPromise]);
 
@@ -221,6 +242,7 @@ export async function POST(req: Request) {
 async function sendWhatsAppConfirmation(
   data: RegistrationInput,
   phone: Awaited<ReturnType<typeof isPhoneVerified>>["phone"],
+  registrationId?: string,
 ) {
   const alertDetails = {
     Name: data.fullName,
@@ -233,6 +255,12 @@ async function sendWhatsAppConfirmation(
     console.error(
       "[reg] WhatsApp confirmation skipped: Infobip is not configured.",
     );
+    if (registrationId) {
+      await setChannelDelivery(registrationId, "welcome", "whatsapp", {
+        ...emptyChannelDelivery("failed"),
+        error: "Infobip is not configured (missing API key or base URL).",
+      });
+    }
     await notifyAdminOfFailure({
       step: "whatsapp_confirmation",
       reason: "Infobip is not configured (missing API key or base URL).",
@@ -244,6 +272,12 @@ async function sendWhatsAppConfirmation(
     console.error(
       "[reg] WhatsApp confirmation skipped: normalized phone missing.",
     );
+    if (registrationId) {
+      await setChannelDelivery(registrationId, "welcome", "whatsapp", {
+        ...emptyChannelDelivery("failed"),
+        error: "Normalized phone was missing after verification.",
+      });
+    }
     await notifyAdminOfFailure({
       step: "whatsapp_confirmation",
       reason: "Normalized phone was missing after verification.",
@@ -252,7 +286,7 @@ async function sendWhatsAppConfirmation(
     return;
   }
 
-  const firstName = data.fullName.trim().split(/\s+/)[0] || "there";
+  const firstName = firstNameFrom(data.fullName);
   try {
     const wa = await sendRegistrationConfirmationWhatsApp(
       phone.infobip,
@@ -263,12 +297,25 @@ async function sendWhatsAppConfirmation(
         "[reg] WhatsApp confirmation send failed for",
         phone.masked,
       );
+      if (registrationId) {
+        await setChannelDelivery(registrationId, "welcome", "whatsapp", {
+          ...emptyChannelDelivery("failed"),
+          error: "Infobip rejected or failed the welcome WhatsApp template send.",
+        });
+      }
       await notifyAdminOfFailure({
         step: "whatsapp_confirmation",
         reason: "Infobip rejected or failed the welcome WhatsApp template send.",
         details: { ...alertDetails, "First name": firstName },
       });
       return;
+    }
+    if (registrationId) {
+      await setChannelDelivery(registrationId, "welcome", "whatsapp", {
+        ...emptyChannelDelivery("sent"),
+        sentAt: new Date().toISOString(),
+        providerMessageId: wa.providerMessageId || null,
+      });
     }
     console.info(
       "[reg] WhatsApp confirmation accepted by Infobip for",
@@ -277,6 +324,15 @@ async function sendWhatsAppConfirmation(
     );
   } catch (err) {
     console.error("[reg] WhatsApp confirmation send failed:", err);
+    if (registrationId) {
+      await setChannelDelivery(registrationId, "welcome", "whatsapp", {
+        ...emptyChannelDelivery("failed"),
+        error:
+          err instanceof Error
+            ? err.message
+            : "Unexpected error sending welcome WhatsApp message.",
+      });
+    }
     await notifyAdminOfFailure({
       step: "whatsapp_confirmation",
       reason:
@@ -288,7 +344,11 @@ async function sendWhatsAppConfirmation(
   }
 }
 
-async function sendEmails(data: RegistrationInput, timestamp: string) {
+async function sendEmails(
+  data: RegistrationInput,
+  timestamp: string,
+  opts?: { skipApplicant?: boolean },
+) {
   const from = registrationMailFrom();
   const notifyTo = registrationNotifyTo();
   const sendApplicantConfirmation =
@@ -316,7 +376,8 @@ async function sendEmails(data: RegistrationInput, timestamp: string) {
     html: adminHtml(data, timestamp),
   });
 
-  const applicantSend = sendApplicantConfirmation
+  const applicantSend =
+    sendApplicantConfirmation && !opts?.skipApplicant
     ? renderApplicantEmailHtml(data.fullName).then((html) =>
         transporter.sendMail({
           from,
