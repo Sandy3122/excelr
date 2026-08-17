@@ -1,8 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { AdminPagination } from "@/components/admin/pagination";
+import { LeadsPageSkeleton, TableRowSkeleton } from "@/components/admin/skeleton";
+import { useCursorPagination } from "@/components/admin/use-cursor-pagination";
 import type { StoredRegistration } from "@/lib/firebase/registration-types";
 import { AUTOMATION_KINDS } from "@/lib/automations/types";
 
@@ -11,6 +14,7 @@ interface LeadsResponse {
   error?: string;
   registrations: StoredRegistration[];
   nextCursor: string | null;
+  total?: number;
 }
 
 function channelStatus(reg: StoredRegistration, kind: string, channel: string) {
@@ -21,48 +25,56 @@ function channelStatus(reg: StoredRegistration, kind: string, channel: string) {
   return kind === "welcome" ? "legacy" : "pending";
 }
 
+async function fetchLeadsPage(cursor: string | undefined, pageSize: number) {
+  const params = new URLSearchParams({ limit: String(pageSize) });
+  if (cursor) params.set("cursor", cursor);
+  const res = await fetch(`/api/admin/leads?${params.toString()}`);
+  const json = (await res.json()) as LeadsResponse;
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || "Could not load leads.");
+  }
+  return {
+    items: json.registrations,
+    nextCursor: json.nextCursor,
+    total: json.total ?? json.registrations.length,
+  };
+}
+
+const TABLE_HEADERS = [
+  "Name",
+  "Email",
+  "Phone",
+  "College",
+  "Registered",
+  "Welcome",
+  "Carry",
+  "21 Aug",
+  "22 Aug",
+];
+
 export default function AdminLeadsPage() {
-  const [rows, setRows] = useState<StoredRegistration[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [q, setQ] = useState("");
-
-  const load = useCallback(async (next?: string | null, append = false) => {
-    setLoading(true);
-    setError("");
-    try {
-      const params = new URLSearchParams({ limit: "100" });
-      if (next) params.set("cursor", next);
-      const res = await fetch(`/api/admin/leads?${params.toString()}`);
-      const json = (await res.json()) as LeadsResponse;
-      if (!res.ok || !json.ok) {
-        setError(json.error || "Could not load leads.");
-        return;
-      }
-      setRows((prev) => (append ? [...prev, ...json.registrations] : json.registrations));
-      setCursor(json.nextCursor);
-    } catch {
-      setError("Could not load leads.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const pager = useCursorPagination<StoredRegistration>(fetchLeadsPage, 25);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter((r) =>
+    if (!needle) return pager.items;
+    return pager.items.filter((r) =>
       [r.fullName, r.email, r.phone, r.college, r.qualification]
         .join(" ")
         .toLowerCase()
         .includes(needle),
     );
-  }, [rows, q]);
+  }, [pager.items, q]);
+
+  function handlePageChange(n: number) {
+    pager.goToPage(n);
+    document.querySelector("main")?.scrollTo({ top: 0 });
+  }
+
+  if (pager.loading && pager.items.length === 0) {
+    return <LeadsPageSkeleton />;
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -70,7 +82,7 @@ export default function AdminLeadsPage() {
         <div>
           <h1 className="font-heading text-3xl font-bold text-navy-900">Leads</h1>
           <p className="mt-1 text-muted">
-            {rows.length} loaded{cursor ? " (more available)" : ""}
+            {pager.total} registered candidate{pager.total === 1 ? "" : "s"}
           </p>
         </div>
         <a
@@ -87,71 +99,76 @@ export default function AdminLeadsPage() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name, email, phone, college…"
+          placeholder="Search this page by name, email, phone, or college…"
           className="field-input pl-10"
         />
       </label>
 
-      {error ? <p className="text-red-600">{error}</p> : null}
+      {pager.error ? (
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{pager.error}</p>
+      ) : null}
 
-      <div className="overflow-x-auto rounded-2xl bg-white shadow-card">
-        <table className="min-w-[1100px] w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">College</th>
-              <th className="px-4 py-3">Registered</th>
-              <th className="px-4 py-3">Welcome</th>
-              <th className="px-4 py-3">Carry</th>
-              <th className="px-4 py-3">21 Aug</th>
-              <th className="px-4 py-3">22 Aug</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((r) => (
-              <tr key={r.id} className="border-t border-slate-100">
-                <td className="px-4 py-3 font-medium">{r.fullName}</td>
-                <td className="px-4 py-3">{r.email}</td>
-                <td className="px-4 py-3 whitespace-nowrap">{r.phone}</td>
-                <td className="px-4 py-3">{r.college}</td>
-                <td className="px-4 py-3 whitespace-nowrap text-muted">
-                  {(r.submittedAt || r.submittedAtIso)
-                    ? new Date(r.submittedAt || r.submittedAtIso).toLocaleString("en-IN", {
-                        timeZone: "Asia/Kolkata",
-                      })
-                    : "—"}
-                </td>
-                {AUTOMATION_KINDS.map((kind) => (
-                  <td key={kind} className="px-4 py-3">
-                    <div className="flex flex-col gap-1">
-                      <StatusBadge status={channelStatus(r, kind, "whatsapp")} />
-                      {kind === "welcome" || kind === "reminder_day_before" ? (
-                        <StatusBadge status={channelStatus(r, kind, "email")} />
-                      ) : null}
-                    </div>
-                  </td>
+      <div className="overflow-hidden rounded-2xl bg-white shadow-card">
+        <div className="overflow-x-auto">
+          <table className="min-w-[1100px] w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
+              <tr>
+                {TABLE_HEADERS.map((h) => (
+                  <th key={h} className="px-4 py-3">
+                    {h}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {loading ? <p className="p-4 text-sm text-muted">Loading…</p> : null}
-        {!loading && filtered.length === 0 ? (
-          <p className="p-4 text-sm text-muted">No leads match this view.</p>
+            </thead>
+            <tbody>
+              {pager.loading
+                ? Array.from({ length: Math.min(pager.pageSize, 25) }).map((_, i) => (
+                    <TableRowSkeleton key={i} cols={9} />
+                  ))
+                : filtered.map((r) => (
+                    <tr key={r.id} className="border-t border-slate-100">
+                      <td className="px-4 py-3 font-medium">{r.fullName}</td>
+                      <td className="px-4 py-3">{r.email}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{r.phone}</td>
+                      <td className="px-4 py-3">{r.college}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-muted">
+                        {r.submittedAt || r.submittedAtIso
+                          ? new Date(r.submittedAt || r.submittedAtIso).toLocaleString(
+                              "en-IN",
+                              { timeZone: "Asia/Kolkata" },
+                            )
+                          : "—"}
+                      </td>
+                      {AUTOMATION_KINDS.map((kind) => (
+                        <td key={kind} className="px-4 py-3">
+                          <div className="flex flex-col gap-1">
+                            <StatusBadge status={channelStatus(r, kind, "whatsapp")} />
+                            {kind === "welcome" || kind === "reminder_day_before" ? (
+                              <StatusBadge status={channelStatus(r, kind, "email")} />
+                            ) : null}
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+            </tbody>
+          </table>
+        </div>
+        {!pager.loading && filtered.length === 0 ? (
+          <p className="border-t border-slate-100 p-4 text-sm text-muted">
+            No leads match this view.
+          </p>
         ) : null}
+        <AdminPagination
+          page={pager.page}
+          pageSize={pager.pageSize}
+          total={pager.total}
+          hasNext={pager.hasNext}
+          disabled={pager.loading}
+          onPageChange={handlePageChange}
+          onPageSizeChange={pager.changePageSize}
+        />
       </div>
-
-      {cursor ? (
-        <button
-          type="button"
-          onClick={() => void load(cursor, true)}
-          className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold"
-        >
-          Load more
-        </button>
-      ) : null}
     </div>
   );
 }

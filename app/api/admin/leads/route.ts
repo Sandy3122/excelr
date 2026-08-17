@@ -3,6 +3,7 @@ import { z } from "zod";
 import { isAdminAuthorized } from "@/lib/admin/authorize";
 import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
 import {
+  countRegistrations,
   getRegistrationById,
   listRegistrations,
 } from "@/lib/firebase/registrations";
@@ -52,11 +53,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, registration });
     }
 
-    const result = await listRegistrations({
-      limit: parsed.data.limit ?? 50,
-      cursor: parsed.data.cursor,
-    });
-    return NextResponse.json({ ok: true, ...result });
+    const [result, total] = await Promise.all([
+      listRegistrations({
+        limit: parsed.data.limit ?? 50,
+        cursor: parsed.data.cursor,
+      }),
+      countRegistrations(),
+    ]);
+    return NextResponse.json({ ok: true, total, ...result });
   } catch (err) {
     console.error("[admin/leads] read failed:", err);
     return NextResponse.json(

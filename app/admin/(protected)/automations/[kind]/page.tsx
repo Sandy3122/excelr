@@ -4,6 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Download, Play, RefreshCw } from "lucide-react";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { AdminPagination } from "@/components/admin/pagination";
+import {
+  AutomationDetailSkeleton,
+  TableRowSkeleton,
+} from "@/components/admin/skeleton";
+import { useCursorPagination } from "@/components/admin/use-cursor-pagination";
 import type {
   AutomationKind,
   AutomationOverview,
@@ -17,32 +23,54 @@ interface KindResponse {
   automation?: AutomationOverview;
   templateName?: string;
   recentRuns?: AutomationRun[];
-  registrations?: StoredRegistration[];
-  nextCursor?: string | null;
+}
+
+interface LeadsResponse {
+  ok: boolean;
+  error?: string;
+  registrations: StoredRegistration[];
+  nextCursor: string | null;
+  total?: number;
+}
+
+async function fetchLeadsPage(cursor: string | undefined, pageSize: number) {
+  const params = new URLSearchParams({ limit: String(pageSize) });
+  if (cursor) params.set("cursor", cursor);
+  const res = await fetch(`/api/admin/leads?${params.toString()}`);
+  const json = (await res.json()) as LeadsResponse;
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || "Could not load leads.");
+  }
+  return {
+    items: json.registrations,
+    nextCursor: json.nextCursor,
+    total: json.total ?? json.registrations.length,
+  };
 }
 
 export default function AutomationDetailPage() {
   const params = useParams<{ kind: string }>();
   const kind = params.kind as AutomationKind;
-  const [data, setData] = useState<KindResponse | null>(null);
-  const [error, setError] = useState("");
+  const [meta, setMeta] = useState<KindResponse | null>(null);
+  const [metaError, setMetaError] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const pager = useCursorPagination<StoredRegistration>(fetchLeadsPage, 25);
 
-  const load = useCallback(async () => {
-    setError("");
-    const res = await fetch(`/api/admin/automations/${kind}?limit=80`);
+  const loadMeta = useCallback(async () => {
+    setMetaError("");
+    const res = await fetch(`/api/admin/automations/${kind}`);
     const json = (await res.json()) as KindResponse;
     if (!res.ok || !json.ok) {
-      setError(json.error || "Could not load this automation.");
+      setMetaError(json.error || "Could not load this automation.");
       return;
     }
-    setData(json);
+    setMeta(json);
   }, [kind]);
 
   useEffect(() => {
-    void load().catch(() => setError("Could not load this automation."));
-  }, [load]);
+    void loadMeta().catch(() => setMetaError("Could not load this automation."));
+  }, [loadMeta]);
 
   async function runSend(opts: {
     force?: boolean;
@@ -70,29 +98,48 @@ export default function AutomationDetailPage() {
             registrationId: opts.registrationId,
           }),
         });
-        const json = (await res.json()) as { ok?: boolean; error?: string; run?: AutomationRun };
+        const json = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          run?: AutomationRun;
+        };
         if (!res.ok || !json.ok || !json.run) {
-          setError(json.error || "Send failed.");
+          setMetaError(json.error || "Send failed.");
           break;
         }
         lastNotice = `Sent ${json.run.stats.sent}, failed ${json.run.stats.failed}, skipped ${json.run.stats.skipped}.`;
         keepGoing = json.run.status === "running" && !opts.registrationId;
       }
       setNotice(lastNotice);
-      await load();
+      await Promise.all([loadMeta(), Promise.resolve(pager.reload())]);
     } catch {
-      setError("Send failed.");
+      setMetaError("Send failed.");
     } finally {
       setBusy(false);
     }
   }
 
-  if (error && !data) return <p className="text-red-600">{error}</p>;
-  if (!data?.automation) return <p className="text-muted">Loading…</p>;
+  const goToPage = (n: number) => {
+    pager.goToPage(n);
+    document.querySelector("main")?.scrollTo({ top: 0 });
+  };
 
-  const item = data.automation;
+  if (metaError && !meta) {
+    return (
+      <div className="mx-auto max-w-6xl">
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{metaError}</p>
+      </div>
+    );
+  }
+  if (!meta?.automation) {
+    return <AutomationDetailSkeleton />;
+  }
+
+  const item = meta.automation;
   const wa = item.counts.whatsapp;
   const email = item.counts.email;
+  const showEmail = item.channels.includes("email");
+  const colCount = showEmail ? 6 : 5;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -100,8 +147,8 @@ export default function AutomationDetailPage() {
         <div>
           <h1 className="font-heading text-3xl font-bold text-navy-900">{item.title}</h1>
           <p className="mt-1 text-muted">{item.scheduleLabel}</p>
-          {data.templateName ? (
-            <p className="mt-1 text-xs text-faint">WhatsApp template: {data.templateName}</p>
+          {meta.templateName ? (
+            <p className="mt-1 text-xs text-faint">WhatsApp template: {meta.templateName}</p>
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -118,7 +165,7 @@ export default function AutomationDetailPage() {
             onClick={() => void runSend({ retryFailed: true, force: true })}
             className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-60"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
             Retry failed
           </button>
           <button
@@ -136,7 +183,9 @@ export default function AutomationDetailPage() {
       {notice ? (
         <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>
       ) : null}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {metaError ? (
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{metaError}</p>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {wa ? (
@@ -152,73 +201,93 @@ export default function AutomationDetailPage() {
           <div className="rounded-2xl bg-white p-5 shadow-card">
             <div className="text-sm font-medium text-muted">Email</div>
             <div className="mt-2 text-sm">
-              <strong>{email.sent}</strong> sent · {email.pending} pending · {email.failed} failed ·{" "}
-              {email.skipped} skipped
+              <strong>{email.sent}</strong> sent · {email.pending} pending · {email.failed}{" "}
+              failed · {email.skipped} skipped
             </div>
           </div>
         ) : null}
       </div>
 
-      <section className="overflow-x-auto rounded-2xl bg-white shadow-card">
-        <table className="min-w-[900px] w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">WhatsApp</th>
-              {item.channels.includes("email") ? (
-                <th className="px-4 py-3">Email status</th>
-              ) : null}
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data.registrations || []).map((r) => {
-              const waStatus =
-                r.messages?.[kind]?.whatsapp?.status ||
-                (kind === "welcome" ? "legacy" : "pending");
-              const emailStatus =
-                r.messages?.[kind]?.email?.status ||
-                (kind === "welcome" ? "legacy" : "pending");
-              return (
-                <tr key={r.id} className="border-t border-slate-100">
-                  <td className="px-4 py-3 font-medium">{r.fullName}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{r.phone}</td>
-                  <td className="px-4 py-3">{r.email}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={waStatus} />
-                    {r.messages?.[kind]?.whatsapp?.error ? (
-                      <div className="mt-1 max-w-xs truncate text-xs text-red-600">
-                        {r.messages?.[kind]?.whatsapp?.error}
-                      </div>
-                    ) : null}
-                  </td>
-                  {item.channels.includes("email") ? (
-                    <td className="px-4 py-3">
-                      <StatusBadge status={emailStatus} />
-                    </td>
-                  ) : null}
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        void runSend({ force: true, retryFailed: true, registrationId: r.id })
-                      }
-                      className="text-sm font-semibold text-brand-blue hover:underline disabled:opacity-50"
-                    >
-                      Send
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <section className="overflow-hidden rounded-2xl bg-white shadow-card">
+        <div className="overflow-x-auto">
+          <table className="min-w-[900px] w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
+              <tr>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Phone</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">WhatsApp</th>
+                {showEmail ? <th className="px-4 py-3">Email status</th> : null}
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pager.loading
+                ? Array.from({ length: pager.pageSize }).map((_, i) => (
+                    <TableRowSkeleton key={i} cols={colCount} />
+                  ))
+                : pager.items.map((r) => {
+                    const waStatus =
+                      r.messages?.[kind]?.whatsapp?.status ||
+                      (kind === "welcome" ? "legacy" : "pending");
+                    const emailStatus =
+                      r.messages?.[kind]?.email?.status ||
+                      (kind === "welcome" ? "legacy" : "pending");
+                    return (
+                      <tr key={r.id} className="border-t border-slate-100">
+                        <td className="px-4 py-3 font-medium">{r.fullName}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">{r.phone}</td>
+                        <td className="px-4 py-3">{r.email}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={waStatus} />
+                          {r.messages?.[kind]?.whatsapp?.error ? (
+                            <div className="mt-1 max-w-xs truncate text-xs text-red-600">
+                              {r.messages?.[kind]?.whatsapp?.error}
+                            </div>
+                          ) : null}
+                        </td>
+                        {showEmail ? (
+                          <td className="px-4 py-3">
+                            <StatusBadge status={emailStatus} />
+                          </td>
+                        ) : null}
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              void runSend({
+                                force: true,
+                                retryFailed: true,
+                                registrationId: r.id,
+                              })
+                            }
+                            className="text-sm font-semibold text-brand-blue hover:underline disabled:opacity-50"
+                          >
+                            Send
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+            </tbody>
+          </table>
+        </div>
+        {!pager.loading && pager.items.length === 0 ? (
+          <p className="border-t border-slate-100 p-4 text-sm text-muted">No leads yet.</p>
+        ) : null}
+        <AdminPagination
+          page={pager.page}
+          pageSize={pager.pageSize}
+          total={pager.total}
+          hasNext={pager.hasNext}
+          disabled={pager.loading}
+          onPageChange={goToPage}
+          onPageSizeChange={pager.changePageSize}
+        />
       </section>
 
-      {data.recentRuns && data.recentRuns.length > 0 ? (
+      {meta.recentRuns && meta.recentRuns.length > 0 ? (
         <section>
           <h2 className="mb-3 font-heading text-lg font-bold">Run history</h2>
           <div className="overflow-hidden rounded-2xl bg-white shadow-card">
@@ -233,7 +302,7 @@ export default function AutomationDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.recentRuns.map((run) => (
+                {meta.recentRuns.map((run) => (
                   <tr key={run.id} className="border-t border-slate-100">
                     <td className="px-4 py-3">
                       {run.startedAt

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AutomationOverview } from "@/lib/automations/types";
+import { AutomationsIndexSkeleton } from "@/components/admin/skeleton";
 
 interface OverviewResponse {
   ok: boolean;
@@ -13,6 +14,7 @@ interface OverviewResponse {
 export default function AutomationsIndexPage() {
   const [items, setItems] = useState<AutomationOverview[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,6 +29,8 @@ export default function AutomationsIndexPage() {
         if (!cancelled) setItems(json.automations);
       } catch {
         if (!cancelled) setError("Could not load automations.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -34,8 +38,15 @@ export default function AutomationsIndexPage() {
     };
   }, []);
 
-  if (error) return <p className="text-red-600">{error}</p>;
-  if (!items.length) return <p className="text-muted">Loading automations…</p>;
+  if (loading) return <AutomationsIndexSkeleton />;
+  if (error) {
+    return (
+      <div className="mx-auto max-w-5xl">
+        <h1 className="font-heading text-3xl font-bold text-navy-900">Automations</h1>
+        <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -59,9 +70,7 @@ export default function AutomationsIndexPage() {
                 <div>
                   <h2 className="font-heading text-xl font-bold">{item.title}</h2>
                   <p className="mt-1 text-sm text-muted">{item.scheduleLabel}</p>
-                  <p className="mt-1 text-sm text-faint">
-                    {item.channels.join(" + ")}
-                  </p>
+                  <p className="mt-1 text-sm text-faint">{item.channels.join(" + ")}</p>
                 </div>
                 <div className="text-right text-sm">
                   {wa ? (

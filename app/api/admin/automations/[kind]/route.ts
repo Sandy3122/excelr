@@ -6,7 +6,6 @@ import { isAutomationKind, getAutomation } from "@/lib/automations/catalog";
 import { computeAutomationOverview } from "@/lib/automations/overview";
 import { listRecentRuns } from "@/lib/automations/store";
 import { runAutomation } from "@/lib/automations/runner";
-import { listRegistrations } from "@/lib/firebase/registrations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,22 +34,17 @@ export async function GET(
     );
   }
 
-  const url = new URL(req.url);
-  const cursor = url.searchParams.get("cursor") || undefined;
-  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 50)));
-
   try {
     const overview = await computeAutomationOverview();
     const automation = overview.automations.find((a) => a.kind === params.kind);
     const def = getAutomation(params.kind);
     const recentRuns = await listRecentRuns(params.kind, 8);
-    const leads = await listRegistrations({ limit, cursor });
     return NextResponse.json({
       ok: true,
       automation,
       templateName: def.whatsappTemplateName,
       recentRuns,
-      ...leads,
+      totalLeads: overview.totalLeads,
     });
   } catch (err) {
     console.error("[admin/automations/kind] GET failed:", err);

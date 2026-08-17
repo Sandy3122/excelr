@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { OverviewSkeleton } from "@/components/admin/skeleton";
 import type {
   AutomationOverview,
   AutomationRun,
@@ -55,10 +56,15 @@ export default function AdminOverviewPage() {
   }, []);
 
   if (error) {
-    return <p className="text-red-600">{error}</p>;
+    return (
+      <div className="mx-auto max-w-6xl">
+        <h1 className="font-heading text-3xl font-bold text-navy-900">Overview</h1>
+        <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+      </div>
+    );
   }
   if (!data) {
-    return <p className="text-muted">Loading dashboard…</p>;
+    return <OverviewSkeleton />;
   }
 
   return (
@@ -70,7 +76,7 @@ export default function AdminOverviewPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-2xl bg-white p-5 shadow-card">
           <div className="text-sm font-medium text-muted">Registered leads</div>
           <div className="mt-2 font-heading text-3xl font-bold">{data.totalLeads}</div>
