@@ -7,31 +7,30 @@ import {
 } from "@/lib/automations/types";
 import type { StoredRegistration } from "@/lib/firebase/registration-types";
 
-export const DELIVERY_FILTERS = [
-  "",
+export const DELIVERY_FILTER_VALUES = [
   "pending",
   "sent",
   "failed",
   "skipped",
 ] as const;
 
-export type DeliveryFilter = (typeof DELIVERY_FILTERS)[number];
+export type DeliveryFilter = (typeof DELIVERY_FILTER_VALUES)[number];
 
 export interface LeadFilters {
   q: string;
-  qualification: string;
-  college: string;
-  status: DeliveryFilter;
-  /** Which automation the status filter applies to. "" = any. */
-  statusKind: AutomationKind | "";
+  qualifications: string[];
+  colleges: string[];
+  statuses: DeliveryFilter[];
+  /** Which automations the status filter applies to. Empty = any. */
+  statusKinds: AutomationKind[];
 }
 
 export const EMPTY_LEAD_FILTERS: LeadFilters = {
   q: "",
-  qualification: "",
-  college: "",
-  status: "",
-  statusKind: "",
+  qualifications: [],
+  colleges: [],
+  statuses: [],
+  statusKinds: [],
 };
 
 export const QUALIFICATION_FILTER_OPTIONS = QUALIFICATION_OPTIONS;
@@ -54,7 +53,7 @@ export function leadChannelStatus(
 
 export function rollupStatus(
   status: MessageStatus,
-): Exclude<DeliveryFilter, ""> | "sending" {
+): DeliveryFilter | "sending" {
   if (status === "legacy" || status === "sent") return "sent";
   if (status === "sending") return "sending";
   if (status === "failed") return "failed";
@@ -74,7 +73,7 @@ export function statusesForKind(
 export function kindMatchesStatus(
   reg: StoredRegistration,
   kind: AutomationKind,
-  status: Exclude<DeliveryFilter, "">,
+  status: DeliveryFilter,
 ): boolean {
   const rolled = statusesForKind(reg, kind).map(rollupStatus);
   if (status === "pending") {
@@ -97,26 +96,38 @@ export function matchesLeadFilters(
       .toLowerCase();
     if (!hay.includes(needle)) return false;
   }
-  if (filters.qualification && reg.qualification !== filters.qualification) {
+  if (
+    filters.qualifications.length > 0 &&
+    !filters.qualifications.includes(reg.qualification)
+  ) {
     return false;
   }
-  if (filters.college && reg.college !== filters.college) return false;
+  if (filters.colleges.length > 0 && !filters.colleges.includes(reg.college)) {
+    return false;
+  }
 
-  const status = filters.status;
-  if (!status) return true;
+  if (filters.statuses.length === 0) return true;
 
-  const statusKind = lockedKind ?? filters.statusKind;
-  if (statusKind) return kindMatchesStatus(reg, statusKind, status);
-  return AUTOMATION_KINDS.some((kind) => kindMatchesStatus(reg, kind, status));
+  const kinds = lockedKind
+    ? [lockedKind]
+    : filters.statusKinds.length > 0
+      ? filters.statusKinds
+      : [...AUTOMATION_KINDS];
+  return kinds.some((kind) =>
+    filters.statuses.some((status) => kindMatchesStatus(reg, kind, status)),
+  );
 }
 
-export function hasActiveLeadFilters(filters: LeadFilters): boolean {
+export function hasActiveLeadFilters(
+  filters: LeadFilters,
+  lockedKind?: AutomationKind,
+): boolean {
   return Boolean(
     filters.q.trim() ||
-      filters.qualification ||
-      filters.college ||
-      filters.status ||
-      filters.statusKind,
+      filters.qualifications.length ||
+      filters.colleges.length ||
+      filters.statuses.length ||
+      (!lockedKind && filters.statusKinds.length),
   );
 }
 
@@ -124,6 +135,19 @@ export function uniqueColleges(leads: StoredRegistration[]): string[] {
   return [...new Set(leads.map((r) => r.college.trim()).filter(Boolean))].sort(
     (a, b) => a.localeCompare(b),
   );
+}
+
+export function uniqueQualifications(leads: StoredRegistration[]): string[] {
+  const fromData = new Set(
+    leads.map((r) => r.qualification.trim()).filter(Boolean),
+  );
+  if (fromData.size === 0) return [...QUALIFICATION_OPTIONS];
+  const knownSet = new Set<string>(QUALIFICATION_OPTIONS);
+  const known = QUALIFICATION_OPTIONS.filter((opt) => fromData.has(opt));
+  const extra = [...fromData]
+    .filter((opt) => !knownSet.has(opt))
+    .sort((a, b) => a.localeCompare(b));
+  return [...known, ...extra];
 }
 
 export function idsMatching(

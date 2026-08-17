@@ -75,35 +75,41 @@ describe("matchesLeadFilters", () => {
     ).toBe(false);
   });
 
-  it("filters by qualification and college", () => {
+  it("filters by qualification and college with multi-select", () => {
     expect(
       matchesLeadFilters(ada, {
         ...EMPTY_LEAD_FILTERS,
-        qualification: "B.E / B.Tech",
-        college: "NITK",
+        qualifications: ["B.E / B.Tech", "MCA"],
+        colleges: ["NITK"],
       }),
     ).toBe(true);
     expect(
       matchesLeadFilters(ada, {
         ...EMPTY_LEAD_FILTERS,
-        qualification: "MCA",
+        qualifications: ["MCA"],
       }),
     ).toBe(false);
+    expect(
+      matchesLeadFilters(bob, {
+        ...EMPTY_LEAD_FILTERS,
+        qualifications: ["B.E / B.Tech", "MCA"],
+      }),
+    ).toBe(true);
   });
 
   it("filters failed welcome without locking other kinds", () => {
     expect(
       matchesLeadFilters(bob, {
         ...EMPTY_LEAD_FILTERS,
-        status: "failed",
-        statusKind: "welcome",
+        statuses: ["failed"],
+        statusKinds: ["welcome"],
       }),
     ).toBe(true);
     expect(
       matchesLeadFilters(ada, {
         ...EMPTY_LEAD_FILTERS,
-        status: "failed",
-        statusKind: "welcome",
+        statuses: ["failed"],
+        statusKinds: ["welcome"],
       }),
     ).toBe(false);
   });

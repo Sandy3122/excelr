@@ -52,7 +52,7 @@ export function SendProgressModal({
       aria-modal="true"
       aria-labelledby="send-progress-title"
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-card-lg">
+      <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-card-lg sm:p-6">
         <div className="flex items-start gap-3">
           {progress.done && !progress.error ? (
             <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" />

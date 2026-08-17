@@ -1,9 +1,10 @@
 "use client";
 
 import { Search, X } from "lucide-react";
+import { MultiSelect } from "@/components/admin/multi-select";
 import {
+  DELIVERY_FILTER_VALUES,
   EMPTY_LEAD_FILTERS,
-  QUALIFICATION_FILTER_OPTIONS,
   hasActiveLeadFilters,
   type LeadFilters,
 } from "@/lib/admin/lead-filters";
@@ -16,11 +17,17 @@ const KIND_LABELS: Record<AutomationKind, string> = {
   reminder_event_day: "Reminder 22 Aug",
 };
 
-const SELECT_CLASS = "field-input py-2.5 pr-8 text-sm";
+const STATUS_LABELS: Record<(typeof DELIVERY_FILTER_VALUES)[number], string> = {
+  pending: "Pending",
+  sent: "Sent",
+  failed: "Failed",
+  skipped: "Skipped",
+};
 
 interface LeadFilterBarProps {
   filters: LeadFilters;
   colleges: string[];
+  qualifications: string[];
   lockedKind?: AutomationKind;
   resultCount: number;
   totalCount: number;
@@ -30,19 +37,18 @@ interface LeadFilterBarProps {
 export function LeadFilterBar({
   filters,
   colleges,
+  qualifications,
   lockedKind,
   resultCount,
   totalCount,
   onChange,
 }: LeadFilterBarProps) {
-  const active = hasActiveLeadFilters(
-    lockedKind ? { ...filters, statusKind: "" } : filters,
-  );
+  const active = hasActiveLeadFilters(filters, lockedKind);
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <label className="relative block sm:col-span-2 lg:col-span-1 xl:col-span-1">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <label className="relative block sm:col-span-2 xl:col-span-1">
           <span className="sr-only">Search leads</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
           <input
@@ -52,79 +58,53 @@ export function LeadFilterBar({
             className="field-input py-2.5 pl-10 text-sm"
           />
         </label>
-        <label className="block">
-          <span className="sr-only">Qualification</span>
-          <select
-            value={filters.qualification}
-            onChange={(e) =>
-              onChange({ ...filters, qualification: e.target.value })
-            }
-            className={SELECT_CLASS}
-          >
-            <option value="">All qualifications</option>
-            {QUALIFICATION_FILTER_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="sr-only">College</span>
-          <select
-            value={filters.college}
-            onChange={(e) => onChange({ ...filters, college: e.target.value })}
-            className={SELECT_CLASS}
-          >
-            <option value="">All colleges</option>
-            {colleges.map((college) => (
-              <option key={college} value={college}>
-                {college}
-              </option>
-            ))}
-          </select>
-        </label>
+        <MultiSelect
+          label="Qualification"
+          placeholder="All qualifications"
+          value={filters.qualifications}
+          options={qualifications.map((value) => ({ value, label: value }))}
+          onChange={(qualifications) => onChange({ ...filters, qualifications })}
+        />
+        <MultiSelect
+          label="College"
+          placeholder="All colleges"
+          searchable
+          value={filters.colleges}
+          options={colleges.map((value) => ({ value, label: value }))}
+          onChange={(next) => onChange({ ...filters, colleges: next })}
+        />
         {lockedKind ? null : (
-          <label className="block">
-            <span className="sr-only">Automation</span>
-            <select
-              value={filters.statusKind}
-              onChange={(e) =>
-                onChange({
-                  ...filters,
-                  statusKind: e.target.value as LeadFilters["statusKind"],
-                })
-              }
-              className={SELECT_CLASS}
-            >
-              <option value="">Any message</option>
-              {AUTOMATION_KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {KIND_LABELS[kind]}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label className="block">
-          <span className="sr-only">Delivery status</span>
-          <select
-            value={filters.status}
-            onChange={(e) =>
+          <MultiSelect
+            label="Automation"
+            placeholder="Any message"
+            value={filters.statusKinds}
+            options={AUTOMATION_KINDS.map((kind) => ({
+              value: kind,
+              label: KIND_LABELS[kind],
+            }))}
+            onChange={(statusKinds) =>
               onChange({
                 ...filters,
-                status: e.target.value as LeadFilters["status"],
+                statusKinds: statusKinds as LeadFilters["statusKinds"],
               })
             }
-            className={SELECT_CLASS}
-          >
-            <option value="">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="sent">Sent</option>
-            <option value="failed">Failed</option>
-            <option value="skipped">Skipped</option>
-          </select>
-        </label>
+          />
+        )}
+        <MultiSelect
+          label="Delivery status"
+          placeholder="All statuses"
+          value={filters.statuses}
+          options={DELIVERY_FILTER_VALUES.map((value) => ({
+            value,
+            label: STATUS_LABELS[value],
+          }))}
+          onChange={(statuses) =>
+            onChange({
+              ...filters,
+              statuses: statuses as LeadFilters["statuses"],
+            })
+          }
+        />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
         <p>
@@ -134,12 +114,7 @@ export function LeadFilterBar({
         {active ? (
           <button
             type="button"
-            onClick={() =>
-              onChange({
-                ...EMPTY_LEAD_FILTERS,
-                statusKind: lockedKind ? filters.statusKind : "",
-              })
-            }
+            onClick={() => onChange({ ...EMPTY_LEAD_FILTERS })}
             className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:underline"
           >
             <X className="h-3.5 w-3.5" />

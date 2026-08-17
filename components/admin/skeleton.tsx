@@ -71,10 +71,16 @@ export function OverviewSkeleton() {
         <Skeleton className="h-9 w-44" />
         <Skeleton className="mt-2 h-4 w-80 max-w-full" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <StatCardSkeleton key={i} />
-        ))}
+      <div className="overflow-hidden rounded-2xl bg-white shadow-card">
+        <div className="grid grid-cols-1 gap-px bg-slate-100 min-[420px]:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-white p-5">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="mt-3 h-8 w-16" />
+              <Skeleton className="mt-2 h-3 w-36" />
+            </div>
+          ))}
+        </div>
       </div>
       <section>
         <Skeleton className="mb-3 h-7 w-40" />
@@ -117,13 +123,14 @@ export function LeadsPageSkeleton() {
       </div>
       <Skeleton className="h-12 w-full rounded-xl" />
       <TableSkeleton
-        cols={9}
+        cols={10}
         rows={10}
         headers={[
           "Name",
           "Email",
           "Phone",
           "College",
+          "Qualification",
           "Registered",
           "Welcome",
           "Carry",

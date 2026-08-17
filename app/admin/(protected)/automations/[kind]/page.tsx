@@ -27,6 +27,7 @@ import {
   leadChannelStatus,
   matchesLeadFilters,
   uniqueColleges,
+  uniqueQualifications,
   type LeadFilters,
 } from "@/lib/admin/lead-filters";
 import type {
@@ -56,15 +57,13 @@ export default function AutomationDetailPage() {
   const [metaError, setMetaError] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const [filters, setFilters] = useState<LeadFilters>({
-    ...EMPTY_LEAD_FILTERS,
-    statusKind: kind,
-  });
+  const [filters, setFilters] = useState<LeadFilters>(EMPTY_LEAD_FILTERS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<SendProgressState>(EMPTY_SEND_PROGRESS);
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
+  const mobileHeaderCheckboxRef = useRef<HTMLInputElement>(null);
   const { leads, loading: leadsLoading, error: leadsError, reload } = useAllLeads();
 
   const loadMeta = useCallback(
@@ -88,12 +87,13 @@ export default function AutomationDetailPage() {
   }, [loadMeta]);
 
   useEffect(() => {
-    setFilters((prev) => ({ ...prev, statusKind: kind }));
+    setFilters(EMPTY_LEAD_FILTERS);
     setSelected(new Set());
     setPage(1);
   }, [kind]);
 
   const colleges = useMemo(() => uniqueColleges(leads), [leads]);
+  const qualifications = useMemo(() => uniqueQualifications(leads), [leads]);
   const filtered = useMemo(
     () => leads.filter((reg) => matchesLeadFilters(reg, filters, kind)),
     [leads, filters, kind],
@@ -112,8 +112,9 @@ export default function AutomationDetailPage() {
   }, [filters, pageSize]);
 
   useEffect(() => {
-    const el = headerCheckboxRef.current;
-    if (el) el.indeterminate = somePageSelected;
+    [headerCheckboxRef, mobileHeaderCheckboxRef].forEach((ref) => {
+      if (ref.current) ref.current.indeterminate = somePageSelected;
+    });
   }, [somePageSelected]);
 
   function pool(): StoredRegistration[] {
@@ -220,7 +221,7 @@ export default function AutomationDetailPage() {
   const wa = item.counts.whatsapp;
   const email = item.counts.email;
   const showEmail = item.channels.includes("email");
-  const colCount = showEmail ? 7 : 6;
+  const colCount = showEmail ? 8 : 7;
   const usingSelection = selected.size > 0;
   const pendingCount = idsFor("pending").length;
   const failedCount = idsFor("failed").length;
@@ -228,18 +229,18 @@ export default function AutomationDetailPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold text-navy-900">{item.title}</h1>
-          <p className="mt-1 text-muted">{item.scheduleLabel}</p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">{item.title}</h1>
+          <p className="mt-1 text-sm text-muted sm:text-base">{item.scheduleLabel}</p>
           {meta.templateName ? (
-            <p className="mt-1 text-xs text-faint">WhatsApp template: {meta.templateName}</p>
+            <p className="mt-1 break-all text-xs text-faint">WhatsApp template: {meta.templateName}</p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
           <a
             href={`/api/admin/automations/${kind}/export`}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold"
           >
             <Download className="h-4 w-4" />
             Download report
@@ -257,7 +258,7 @@ export default function AutomationDetailPage() {
                   : `Retry failed sends for ${failedCount} lead${failedCount === 1 ? "" : "s"} matching the current filters?`,
               })
             }
-            className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
             Retry failed
@@ -275,7 +276,7 @@ export default function AutomationDetailPage() {
                   : `Resend to all ${allCount} lead${allCount === 1 ? "" : "s"} matching the current filters, including people who already received it?`,
               })
             }
-            className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-60"
           >
             <RotateCcw className="h-4 w-4" />
             Resend
@@ -293,7 +294,7 @@ export default function AutomationDetailPage() {
                   : `Send to ${pendingCount} pending lead${pendingCount === 1 ? "" : "s"} matching the current filters? Messages go out in batches of 40.`,
               })
             }
-            className="btn-gradient px-5 py-2 text-sm disabled:opacity-60"
+            className="btn-gradient px-5 py-2 text-sm disabled:opacity-60 sm:col-span-2 lg:col-span-1"
           >
             <Play className="h-4 w-4" />
             {busy ? "Sending…" : usingSelection ? "Send selected" : "Send pending"}
@@ -335,27 +336,101 @@ export default function AutomationDetailPage() {
       <LeadFilterBar
         filters={filters}
         colleges={colleges}
+        qualifications={qualifications}
         lockedKind={kind}
         resultCount={filtered.length}
         totalCount={leads.length}
         onChange={setFilters}
       />
 
-      <section className="overflow-hidden rounded-2xl bg-white shadow-card">
-        {allPageSelected && filtered.length > pageItems.length ? (
-          <div className="border-b border-slate-100 bg-sky-50 px-4 py-2 text-sm">
-            All {pageItems.length} on this page are selected.{" "}
-            <button
-              type="button"
-              className="font-semibold text-brand-blue hover:underline"
-              onClick={() => setSelected(new Set(filtered.map((r) => r.id)))}
-            >
-              Select all {filtered.length} matching filters
-            </button>
-          </div>
-        ) : null}
+      {allPageSelected && filtered.length > pageItems.length ? (
+        <div className="rounded-2xl bg-sky-50 px-4 py-2 text-sm">
+          All {pageItems.length} on this page are selected.{" "}
+          <button
+            type="button"
+            className="font-semibold text-brand-blue hover:underline"
+            onClick={() => setSelected(new Set(filtered.map((r) => r.id)))}
+          >
+            Select all {filtered.length} matching filters
+          </button>
+        </div>
+      ) : null}
+
+      <div className="space-y-3 md:hidden">
+        <label className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-medium shadow-card">
+          <input
+            ref={mobileHeaderCheckboxRef}
+            type="checkbox"
+            checked={allPageSelected}
+            onChange={togglePage}
+            disabled={pageItems.length === 0 || busy}
+            className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+          />
+          Select this page
+        </label>
+        {leadsLoading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-36 animate-pulse rounded-2xl bg-white shadow-card" />
+            ))
+          : pageItems.map((r) => {
+              const waStatus = leadChannelStatus(r, kind, "whatsapp");
+              const emailStatus = leadChannelStatus(r, kind, "email");
+              const delivered = isDelivered(waStatus);
+              return (
+                <article key={r.id} className="rounded-2xl bg-white p-4 shadow-card">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(r.id)}
+                      onChange={() => toggleOne(r.id)}
+                      disabled={busy}
+                      aria-label={`Select ${r.fullName}`}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-heading font-bold">{r.fullName}</h3>
+                      <p className="mt-1 break-all text-sm">{r.email}</p>
+                      <p className="mt-0.5 text-sm text-muted">{r.phone}</p>
+                      <p className="mt-2 text-sm">
+                        {r.qualification || "—"}
+                        {r.college ? ` · ${r.college}` : ""}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <StatusBadge status={waStatus} />
+                        {showEmail ? <StatusBadge status={emailStatus} /> : null}
+                      </div>
+                      {r.messages?.[kind]?.whatsapp?.error ? (
+                        <p className="mt-2 text-xs text-red-600">{r.messages[kind]?.whatsapp?.error}</p>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void runSend({
+                            action: delivered ? "resend" : "run",
+                            ids: [r.id],
+                            title: delivered
+                              ? `Resending ${item.title}`
+                              : `Sending ${item.title}`,
+                            confirm: delivered
+                              ? `Resend this message to ${r.fullName}? They already have a delivery on file.`
+                              : `Send this message to ${r.fullName} now?`,
+                          })
+                        }
+                        className="mt-3 text-sm font-semibold text-brand-blue hover:underline disabled:opacity-50"
+                      >
+                        {delivered ? "Resend" : "Send"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+      </div>
+
+      <section className="hidden overflow-hidden rounded-2xl bg-white shadow-card md:block">
         <div className="overflow-x-auto">
-          <table className="min-w-[900px] w-full text-left text-sm">
+          <table className="min-w-[980px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="w-10 px-4 py-3">
@@ -372,6 +447,7 @@ export default function AutomationDetailPage() {
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Qualification</th>
                 <th className="px-4 py-3">WhatsApp</th>
                 {showEmail ? <th className="px-4 py-3">Email status</th> : null}
                 <th className="px-4 py-3"></th>
@@ -399,8 +475,9 @@ export default function AutomationDetailPage() {
                           />
                         </td>
                         <td className="px-4 py-3 font-medium">{r.fullName}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{r.phone}</td>
+                        <td className="whitespace-nowrap px-4 py-3">{r.phone}</td>
                         <td className="px-4 py-3">{r.email}</td>
+                        <td className="whitespace-nowrap px-4 py-3">{r.qualification || "—"}</td>
                         <td className="px-4 py-3">
                           <StatusBadge status={waStatus} />
                           {r.messages?.[kind]?.whatsapp?.error ? (
@@ -446,6 +523,15 @@ export default function AutomationDetailPage() {
             No leads match these filters.
           </p>
         ) : null}
+      </section>
+
+      {!leadsLoading && filtered.length === 0 ? (
+        <p className="rounded-2xl bg-white p-4 text-sm text-muted shadow-card md:hidden">
+          No leads match these filters.
+        </p>
+      ) : null}
+
+      <div className="overflow-hidden rounded-2xl bg-white shadow-card">
         <AdminPagination
           page={safePage}
           pageSize={pageSize}
@@ -455,10 +541,10 @@ export default function AutomationDetailPage() {
           onPageChange={goToPage}
           onPageSizeChange={setPageSize}
         />
-      </section>
+      </div>
 
       {selected.size > 0 ? (
-        <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-navy-900 px-4 py-3 text-white shadow-card-lg">
+        <div className="sticky bottom-3 z-20 flex flex-col gap-3 rounded-2xl bg-navy-900 px-4 py-3 text-white shadow-card-lg sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <p className="text-sm font-semibold">
             {selected.size} selected
             {selected.size !== filtered.length ? (
@@ -474,7 +560,7 @@ export default function AutomationDetailPage() {
               </>
             ) : null}
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <button
               type="button"
               disabled={busy}
@@ -509,7 +595,7 @@ export default function AutomationDetailPage() {
                   confirm: `Send to ${selected.size} selected lead${selected.size === 1 ? "" : "s"}? Already-delivered copies will be skipped.`,
                 })
               }
-              className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-navy-900"
+              className="col-span-2 rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-navy-900 sm:col-span-1"
             >
               Send selected
             </button>
@@ -521,7 +607,8 @@ export default function AutomationDetailPage() {
         <section>
           <h2 className="mb-3 font-heading text-lg font-bold">Run history</h2>
           <div className="overflow-hidden rounded-2xl bg-white shadow-card">
-            <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto">
+            <table className="min-w-[520px] w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-4 py-3">When</th>
@@ -549,6 +636,7 @@ export default function AutomationDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
       ) : null}

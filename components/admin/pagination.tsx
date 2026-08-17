@@ -77,19 +77,22 @@ export function AdminPagination({
         </label>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 overflow-x-auto">
         <button
           type="button"
           disabled={!canPrev}
           onClick={() => onPageChange(page - 1)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-ink hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-ink hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Previous page"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
+        <span className="px-2 text-sm text-muted sm:hidden">
+          {page} / {totalPages}
+        </span>
         {windowItems.map((item, i) =>
           item === "ellipsis" ? (
-            <span key={`e-${i}`} className="px-1 text-faint">
+            <span key={`e-${i}`} className="hidden px-1 text-faint sm:inline">
               …
             </span>
           ) : (
@@ -99,7 +102,7 @@ export function AdminPagination({
               disabled={disabled}
               onClick={() => onPageChange(item)}
               aria-current={item === page ? "page" : undefined}
-              className={`inline-flex h-9 min-w-9 items-center justify-center rounded-lg px-2 text-sm font-semibold ${
+              className={`hidden h-9 min-w-9 items-center justify-center rounded-lg px-2 text-sm font-semibold sm:inline-flex ${
                 item === page
                   ? "bg-navy-900 text-white"
                   : "border border-slate-200 text-ink hover:bg-slate-50 disabled:opacity-40"
@@ -113,7 +116,7 @@ export function AdminPagination({
           type="button"
           disabled={!canNext}
           onClick={() => onPageChange(page + 1)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-ink hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-ink hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Next page"
         >
           <ChevronRight className="h-4 w-4" />

@@ -42,7 +42,7 @@ export default function AutomationsIndexPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-5xl">
-        <h1 className="font-heading text-3xl font-bold text-navy-900">Automations</h1>
+        <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">Automations</h1>
         <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
       </div>
     );
@@ -51,7 +51,7 @@ export default function AutomationsIndexPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold text-navy-900">Automations</h1>
+        <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">Automations</h1>
         <p className="mt-1 text-muted">
           Send WhatsApp and email in batches, and see whether each message went out.
         </p>
@@ -66,13 +66,13 @@ export default function AutomationsIndexPage() {
               href={`/admin/automations/${item.kind}`}
               className="rounded-2xl bg-white p-6 shadow-card transition hover:shadow-card-lg"
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <h2 className="font-heading text-xl font-bold">{item.title}</h2>
                   <p className="mt-1 text-sm text-muted">{item.scheduleLabel}</p>
                   <p className="mt-1 text-sm text-faint">{item.channels.join(" + ")}</p>
                 </div>
-                <div className="text-right text-sm">
+                <div className="grid grid-cols-1 gap-1 text-sm sm:text-right">
                   {wa ? (
                     <div>
                       WhatsApp: <strong>{wa.sent}</strong> sent · {wa.pending} pending ·{" "}
