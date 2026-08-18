@@ -106,7 +106,7 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     if (status === "sent" || status === "skipped" || status === "legacy") {
       return { ok: false, reason: "already_sent" };
     }
-    if (status === "failed" && !input.retryFailed && !input.force) {
+    if (status === "failed" && !input.retryFailed) {
       return { ok: false, reason: "already_sent" };
     }
   }

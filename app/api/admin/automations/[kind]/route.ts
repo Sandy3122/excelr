@@ -95,8 +95,7 @@ export async function POST(
       force: parsed.data.force ?? true,
       retryFailed:
         parsed.data.action === "retry_failed" ||
-        parsed.data.action === "resend" ||
-        Boolean(parsed.data.force),
+        parsed.data.action === "resend",
       resend: parsed.data.action === "resend",
       registrationId: parsed.data.registrationId,
       registrationIds: parsed.data.registrationIds,

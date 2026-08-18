@@ -22,7 +22,7 @@ import {
   listRegistrations,
   saveRegistration,
 } from "@/lib/firebase/registrations";
-import { setChannelDelivery } from "@/lib/automations/store";
+import { persistChannelDelivery } from "@/lib/automations/store";
 import { emptyChannelDelivery } from "@/lib/automations/types";
 import { firstNameFrom } from "@/lib/first-name";
 
@@ -177,7 +177,7 @@ export async function POST(req: Request) {
   try {
     await sendEmails(data, timestamp, { skipApplicant: !shouldSendWelcomeEmail });
     if (savedId && shouldSendWelcomeEmail) {
-      await setChannelDelivery(savedId, "welcome", "email", {
+      await persistChannelDelivery(savedId, "welcome", "email", {
         ...emptyChannelDelivery("sent"),
         sentAt: timestamp,
       });
@@ -256,7 +256,7 @@ async function sendWhatsAppConfirmation(
       "[reg] WhatsApp confirmation skipped: Infobip is not configured.",
     );
     if (registrationId) {
-      await setChannelDelivery(registrationId, "welcome", "whatsapp", {
+      await persistChannelDelivery(registrationId, "welcome", "whatsapp", {
         ...emptyChannelDelivery("failed"),
         error: "Infobip is not configured (missing API key or base URL).",
       });
@@ -273,7 +273,7 @@ async function sendWhatsAppConfirmation(
       "[reg] WhatsApp confirmation skipped: normalized phone missing.",
     );
     if (registrationId) {
-      await setChannelDelivery(registrationId, "welcome", "whatsapp", {
+      await persistChannelDelivery(registrationId, "welcome", "whatsapp", {
         ...emptyChannelDelivery("failed"),
         error: "Normalized phone was missing after verification.",
       });
@@ -298,7 +298,7 @@ async function sendWhatsAppConfirmation(
         phone.masked,
       );
       if (registrationId) {
-        await setChannelDelivery(registrationId, "welcome", "whatsapp", {
+        await persistChannelDelivery(registrationId, "welcome", "whatsapp", {
           ...emptyChannelDelivery("failed"),
           error: "Infobip rejected or failed the welcome WhatsApp template send.",
         });
@@ -311,7 +311,7 @@ async function sendWhatsAppConfirmation(
       return;
     }
     if (registrationId) {
-      await setChannelDelivery(registrationId, "welcome", "whatsapp", {
+      await persistChannelDelivery(registrationId, "welcome", "whatsapp", {
         ...emptyChannelDelivery("sent"),
         sentAt: new Date().toISOString(),
         providerMessageId: wa.providerMessageId || null,
@@ -325,7 +325,7 @@ async function sendWhatsAppConfirmation(
   } catch (err) {
     console.error("[reg] WhatsApp confirmation send failed:", err);
     if (registrationId) {
-      await setChannelDelivery(registrationId, "welcome", "whatsapp", {
+      await persistChannelDelivery(registrationId, "welcome", "whatsapp", {
         ...emptyChannelDelivery("failed"),
         error:
           err instanceof Error

@@ -211,12 +211,63 @@ export async function setChannelDelivery(
     );
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Write delivery status with retries so a blip does not leave a lock that later resends. */
+export async function persistChannelDelivery(
+  registrationId: string,
+  kind: AutomationKind,
+  channel: Channel,
+  delivery: ChannelDelivery,
+): Promise<void> {
+  let last: unknown;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await setChannelDelivery(registrationId, kind, channel, delivery);
+      return;
+    } catch (err) {
+      last = err;
+      await wait(150 * 2 ** attempt);
+    }
+  }
+  throw last instanceof Error ? last : new Error("Could not save delivery status.");
+}
+
+/** Keep an in-flight lock alive if the message went out but status could not be saved. */
+export async function extendChannelClaim(
+  registrationId: string,
+  kind: AutomationKind,
+  channel: Channel,
+): Promise<void> {
+  try {
+    await regsCol()
+      .doc(registrationId)
+      .set(
+        {
+          messages: {
+            [kind]: {
+              [channel]: {
+                claimedAt: new Date().toISOString(),
+              },
+            },
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+  } catch (err) {
+    console.error("[delivery] Could not extend send lock:", err);
+  }
+}
+
 export async function claimChannel(
   registrationId: string,
   kind: AutomationKind,
   channel: Channel,
   nowIso: string,
-  opts?: { resend?: boolean },
+  opts?: { resend?: boolean; retryFailed?: boolean },
 ): Promise<boolean> {
   const ref = regsCol().doc(registrationId);
   return getAdminFirestore().runTransaction(async (tx) => {
@@ -227,6 +278,9 @@ export async function claimChannel(
       | undefined;
     if (!opts?.resend) {
       if (current === "sent" || current === "skipped" || current === "legacy") {
+        return false;
+      }
+      if (current === "failed" && !opts?.retryFailed) {
         return false;
       }
     }

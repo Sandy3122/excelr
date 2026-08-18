@@ -140,6 +140,17 @@ describe("evaluateEligibility", () => {
     expect(result).toEqual({ ok: false, reason: "already_sent" });
   });
 
+  it("does not retry failed messages with force alone", () => {
+    const result = evaluateEligibility({
+      kind: "reminder_event_day",
+      channel: "whatsapp",
+      now: istWallClockToUtc("2026-08-22T08:51:00"),
+      snapshot: { status: "failed" },
+      force: true,
+    });
+    expect(result).toEqual({ ok: false, reason: "already_sent" });
+  });
+
   it("does not auto-retry failed unless asked", () => {
     const result = evaluateEligibility({
       kind: "reminder_event_day",

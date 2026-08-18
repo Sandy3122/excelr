@@ -14,7 +14,9 @@ import { sendAutomationEmail } from "./mail";
 import {
   claimChannel,
   createAutomationRun,
+  extendChannelClaim,
   patchAutomationRun,
+  persistChannelDelivery,
   setChannelDelivery,
   setCronCursor,
 } from "./store";
@@ -316,7 +318,10 @@ async function processBatch(
         }
         continue;
       }
-      const ok = await claimChannel(reg.id, kind, channel, nowIso, { resend });
+      const ok = await claimChannel(reg.id, kind, channel, nowIso, {
+        resend,
+        retryFailed,
+      });
       if (ok) channels.push(channel);
     }
     if (channels.length) {
@@ -369,16 +374,24 @@ async function processBatch(
   await mapPool(waTargets, WRITE_CONCURRENCY, async (item) => {
     const result = waResults.get(item.reg.id);
     if (result?.ok) {
-      await setChannelDelivery(item.reg.id, kind, "whatsapp", {
-        ...emptyChannelDelivery("sent"),
-        sentAt: new Date().toISOString(),
-        providerMessageId: result.id || null,
-      });
-      sent += 1;
+      try {
+        await persistChannelDelivery(item.reg.id, kind, "whatsapp", {
+          ...emptyChannelDelivery("sent"),
+          sentAt: new Date().toISOString(),
+          providerMessageId: result.id || null,
+        });
+        sent += 1;
+      } catch (err) {
+        console.error("[runner] Sent WhatsApp but could not save status:", err);
+        await extendChannelClaim(item.reg.id, kind, "whatsapp");
+        sent += 1;
+      }
     } else {
-      await setChannelDelivery(item.reg.id, kind, "whatsapp", {
+      await persistChannelDelivery(item.reg.id, kind, "whatsapp", {
         ...emptyChannelDelivery("failed"),
         error: result?.error || "WHATSAPP_SEND_FAILED",
+      }).catch((err) => {
+        console.error("[runner] Could not save WhatsApp failure:", err);
       });
       failed += 1;
     }
@@ -388,15 +401,23 @@ async function processBatch(
   await mapPool(emailTargets, EMAIL_CONCURRENCY, async (item) => {
     const result = await sendAutomationEmail(kind, item.reg);
     if (result.ok) {
-      await setChannelDelivery(item.reg.id, kind, "email", {
-        ...emptyChannelDelivery("sent"),
-        sentAt: new Date().toISOString(),
-      });
-      sent += 1;
+      try {
+        await persistChannelDelivery(item.reg.id, kind, "email", {
+          ...emptyChannelDelivery("sent"),
+          sentAt: new Date().toISOString(),
+        });
+        sent += 1;
+      } catch (err) {
+        console.error("[runner] Sent email but could not save status:", err);
+        await extendChannelClaim(item.reg.id, kind, "email");
+        sent += 1;
+      }
     } else {
-      await setChannelDelivery(item.reg.id, kind, "email", {
+      await persistChannelDelivery(item.reg.id, kind, "email", {
         ...emptyChannelDelivery("failed"),
         error: result.error,
+      }).catch((err) => {
+        console.error("[runner] Could not save email failure:", err);
       });
       failed += 1;
     }
