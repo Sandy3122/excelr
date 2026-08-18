@@ -9,7 +9,7 @@ export const EVENT = {
   title: "ExcelR's Placement Drive",
   role: "For Java Full Stack",
   tagline:
-    "Connect with top tech companies, ace your interviews, and launch your career — all in one day at ExcelR's Marathalli Campus.",
+    "Connect with top tech companies, ace your interviews, and launch your career — all in one day at ExcelR's Marathahalli Campus.",
   laptopNote:
     "Note: Candidates are requested to bring their own laptops to complete the technical round.",
   date: "22nd August 2026",

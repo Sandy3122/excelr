@@ -95,7 +95,7 @@ Decorative glow blobs use low-alpha versions of the blues/indigos, e.g. `#3B82F6
   - H1 "ExcelR's Placement Drive" (72px Poppins 700, white)
   - "For Java Full Stack" (48px) inside a highlighted pill/badge
   - **Accent underline bar** 260×4, blue gradient (`8:903`)
-  - Paragraph (`8:905`): *"Connect with top tech companies, ace your interviews, and launch your career — all in one day at ExcelR's Marathalli Campus."* (18px Inter, light slate)
+  - Paragraph (`8:905`): *"Connect with top tech companies, ace your interviews, and launch your career — all in one day at ExcelR's Marathahalli Campus."* (18px Inter, light slate)
   - **"Register Now" gradient pill button** with arrow icon (`47:1423`, ~228×84)
   - RIGHT (`8:910`): hero **photo** of student w/ laptop (540×580) — `public/reg/hero-student.png` (transparent). A soft blue glow circle sits behind it. **"Absolutely FREE for All" badge** overlaps near the image — `public/reg/free-badge.png`.
 - **Mobile:** same content stacked; H1 smaller; button full-width-ish (260×56); "Note: Candidates are requested to bring their own laptops…" appears under the button; FREE badge below.
@@ -144,7 +144,7 @@ Two-column grid on desktop (1152 wide), single column on mobile.
   - First item expanded by default; answer sample: *"The drive is open to all — freshers who have recently graduated and experienced professionals looking to switch into a Java Full Stack development role. …"* (confirm real copy with owner).
 
 ### 3.5 Footer  (desktop `8:694`, 1920×66 · mobile `1:686`)
-- Thin top border. Left: "© 2026 PlaceDrive. All rights reserved." Right (desktop): "Marathalli Campus, Bangalore — 22 Aug 2026". Mobile: copyright centered.
+- Thin top border. Left: "© 2026 PlaceDrive. All rights reserved." Right (desktop): "Marathahalli Campus, Bangalore — 22 Aug 2026". Mobile: copyright centered.
 
 ---
 
