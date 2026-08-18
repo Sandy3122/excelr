@@ -53,15 +53,27 @@ export function LeadFilterBar({
 }: LeadFilterBarProps) {
   const [open, setOpen] = useState(false);
   const active = hasActiveLeadFilters(filters, lockedKind);
-  const badge =
-    (filters.q.trim() ? 1 : 0) +
+  const drawerBadge =
     (filters.qualifications.length ? 1 : 0) +
     (filters.colleges.length ? 1 : 0) +
     (filters.statuses.length ? 1 : 0) +
     (!lockedKind && filters.statusKinds.length ? 1 : 0);
 
-  const fields = (
-    <FilterFields
+  const searchField = (
+    <label className="relative block min-w-0 flex-1">
+      <span className="sr-only">Search leads</span>
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+      <input
+        value={filters.q}
+        onChange={(e) => onChange({ ...filters, q: e.target.value })}
+        placeholder="Search name, email, phone, college…"
+        className="field-input py-2.5 pl-10 text-sm"
+      />
+    </label>
+  );
+
+  const selectFields = (
+    <FilterSelects
       filters={filters}
       colleges={colleges}
       qualifications={qualifications}
@@ -72,15 +84,23 @@ export function LeadFilterBar({
 
   return (
     <div className="space-y-3">
-      <div className="hidden lg:block">{fields}</div>
+      <div className="hidden lg:block">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-5">
+          <div className="lg:col-span-2 xl:col-span-1">{searchField}</div>
+          {selectFields}
+        </div>
+      </div>
 
-      <div className="flex gap-2 lg:hidden">
-        <MobileToolbarButton
-          label="Filters"
-          badge={badge || undefined}
-          onClick={() => setOpen(true)}
-        />
-        {mobileActions}
+      <div className="space-y-2 lg:hidden">
+        {searchField}
+        <div className="flex gap-2">
+          <MobileToolbarButton
+            label="Filters"
+            badge={drawerBadge || undefined}
+            onClick={() => setOpen(true)}
+          />
+          {mobileActions}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
@@ -102,7 +122,7 @@ export function LeadFilterBar({
 
       <RightDrawer open={open} title="Filters" onClose={() => setOpen(false)}>
         <div className="space-y-4">
-          {fields}
+          <div className="grid grid-cols-1 gap-3">{selectFields}</div>
           {extra}
           <button
             type="button"
@@ -117,7 +137,7 @@ export function LeadFilterBar({
   );
 }
 
-function FilterFields({
+function FilterSelects({
   filters,
   colleges,
   qualifications,
@@ -131,17 +151,7 @@ function FilterFields({
   onChange: (next: LeadFilters) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-5">
-      <label className="relative block lg:col-span-2 xl:col-span-1">
-        <span className="sr-only">Search leads</span>
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-        <input
-          value={filters.q}
-          onChange={(e) => onChange({ ...filters, q: e.target.value })}
-          placeholder="Search name, email, phone, college…"
-          className="field-input py-2.5 pl-10 text-sm"
-        />
-      </label>
+    <>
       <MultiSelect
         label="Qualification"
         placeholder="All qualifications"
@@ -189,6 +199,6 @@ function FilterFields({
           })
         }
       />
-    </div>
+    </>
   );
 }
