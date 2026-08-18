@@ -72,9 +72,9 @@ export function LeadFilterBar({
 
   return (
     <div className="space-y-3">
-      <div className="hidden md:block">{fields}</div>
+      <div className="hidden lg:block">{fields}</div>
 
-      <div className="flex gap-2 md:hidden">
+      <div className="flex gap-2 lg:hidden">
         <MobileToolbarButton
           label="Filters"
           badge={badge || undefined}
@@ -131,8 +131,8 @@ function FilterFields({
   onChange: (next: LeadFilters) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      <label className="relative block sm:col-span-2 xl:col-span-1">
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-5">
+      <label className="relative block lg:col-span-2 xl:col-span-1">
         <span className="sr-only">Search leads</span>
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
         <input

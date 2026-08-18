@@ -49,7 +49,7 @@ export default function AutomationsIndexPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto min-w-0 max-w-5xl space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">Automations</h1>
         <p className="mt-1 text-muted">

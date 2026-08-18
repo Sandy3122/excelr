@@ -118,7 +118,7 @@ export default function AdminLeadsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="mx-auto min-w-0 max-w-7xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">Leads</h1>
@@ -128,7 +128,7 @@ export default function AdminLeadsPage() {
         </div>
         <a
           href="/api/admin/leads/export"
-          className="hidden items-center gap-2 rounded-full bg-navy-900 px-4 py-2 text-sm font-semibold text-white md:inline-flex"
+          className="hidden items-center gap-2 rounded-full bg-navy-900 px-4 py-2 text-sm font-semibold text-white lg:inline-flex"
         >
           <Download className="h-4 w-4" />
           Download CSV
@@ -165,7 +165,7 @@ export default function AdminLeadsPage() {
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
       ) : null}
 
-      <div className="space-y-3 md:hidden">
+      <div className="space-y-3 lg:hidden">
         {loading
           ? Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="h-40 animate-pulse rounded-2xl bg-white shadow-card" />
@@ -195,7 +195,7 @@ export default function AdminLeadsPage() {
         </div>
       </div>
 
-      <div className="hidden overflow-hidden rounded-2xl bg-white shadow-card md:block">
+      <div className="hidden min-w-0 overflow-hidden rounded-2xl bg-white shadow-card lg:block">
         <div className="overflow-x-auto">
           <table className="min-w-[1280px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">

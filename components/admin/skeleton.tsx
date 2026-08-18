@@ -72,7 +72,7 @@ export function OverviewSkeleton() {
         <Skeleton className="mt-2 h-4 w-80 max-w-full" />
       </div>
       <div className="overflow-hidden rounded-2xl bg-white shadow-card">
-        <div className="grid grid-cols-1 gap-px bg-slate-100 min-[420px]:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-px bg-slate-100 sm:grid-cols-2 xl:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="bg-white p-5">
               <Skeleton className="h-4 w-28" />
@@ -84,7 +84,7 @@ export function OverviewSkeleton() {
       </div>
       <section>
         <Skeleton className="mb-3 h-7 w-40" />
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="rounded-2xl bg-white p-6 shadow-card">
               <div className="flex justify-between gap-3">

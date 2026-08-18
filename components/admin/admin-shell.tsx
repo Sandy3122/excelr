@@ -3,8 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, LogOut, Menu, Send, Users } from "lucide-react";
-import { RightDrawer } from "@/components/admin/right-drawer";
+import {
+  LayoutDashboard,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Send,
+  Users,
+} from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -12,10 +18,12 @@ const NAV = [
   { href: "/admin/automations", label: "Automations", icon: Send },
 ];
 
+const SIDEBAR_KEY = "admin-sidebar-collapsed";
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [navOpen, setNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -30,8 +38,24 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setNavOpen(false);
-  }, [pathname]);
+    try {
+      setCollapsed(window.localStorage.getItem(SIDEBAR_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   async function handleLogout() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -41,14 +65,24 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-[#F4F6FB] text-ink">
-      <aside className="hidden h-full w-60 shrink-0 flex-col border-r border-white/10 bg-navy-900 text-white md:flex">
-        <div className="shrink-0 px-5 py-6">
-          <div className="font-heading text-sm font-semibold tracking-wide text-white/70">
-            ExcelR
-          </div>
-          <div className="mt-1 font-heading text-lg font-bold">Placement Admin</div>
+      <aside
+        className={`hidden h-full shrink-0 flex-col border-r border-white/10 bg-navy-900 text-white lg:flex ${
+          collapsed ? "w-[4.5rem]" : "w-60"
+        }`}
+      >
+        <div className={`shrink-0 ${collapsed ? "px-3 py-5" : "px-5 py-6"}`}>
+          {collapsed ? (
+            <div className="text-center font-heading text-sm font-bold">E</div>
+          ) : (
+            <>
+              <div className="font-heading text-sm font-semibold tracking-wide text-white/70">
+                ExcelR
+              </div>
+              <div className="mt-1 font-heading text-lg font-bold">Placement Admin</div>
+            </>
+          )}
         </div>
-        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3">
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2">
           {NAV.map((item) => {
             const active =
               item.href === "/admin"
@@ -59,76 +93,87 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                title={item.label}
+                className={`flex items-center rounded-xl py-2.5 text-sm font-medium transition ${
+                  collapsed ? "justify-center px-2" : "gap-3 px-3"
+                } ${
                   active
                     ? "bg-white/10 text-white"
                     : "text-white/70 hover:bg-white/5 hover:text-white"
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                {item.label}
+                {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
               </Link>
             );
           })}
         </nav>
-        <button
-          type="button"
-          onClick={() => void handleLogout()}
-          className="m-3 flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-white/70 hover:bg-white/5 hover:text-white"
-        >
-          <LogOut className="h-4 w-4" />
-          Log out
-        </button>
+        <div className="shrink-0 space-y-1 p-2">
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            title={collapsed ? "Expand sidebar" : "Minimize sidebar"}
+            className={`flex w-full items-center rounded-xl py-2.5 text-sm text-white/70 hover:bg-white/5 hover:text-white ${
+              collapsed ? "justify-center px-2" : "gap-3 px-3"
+            }`}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <>
+                <PanelLeftClose className="h-4 w-4" />
+                Minimize
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            title="Log out"
+            className={`flex w-full items-center rounded-xl py-2.5 text-left text-sm text-white/70 hover:bg-white/5 hover:text-white ${
+              collapsed ? "justify-center px-2" : "gap-3 px-3"
+            }`}
+          >
+            <LogOut className="h-4 w-4" />
+            {collapsed ? <span className="sr-only">Log out</span> : "Log out"}
+          </button>
+        </div>
       </aside>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 md:hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
           <div className="font-heading font-bold">Placement Admin</div>
           <button
             type="button"
-            onClick={() => setNavOpen(true)}
-            className="rounded-full p-2 text-navy-900 hover:bg-slate-100"
-            aria-label="Open menu"
+            onClick={() => void handleLogout()}
+            className="text-sm text-muted"
           >
-            <Menu className="h-5 w-5" />
+            Log out
           </button>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6 md:px-8">
-          {children}
-        </main>
-      </div>
-
-      <RightDrawer open={navOpen} title="Menu" onClose={() => setNavOpen(false)}>
-        <nav className="flex flex-col gap-1">
+        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200 bg-white px-2 py-2 lg:hidden">
           {NAV.map((item) => {
             const active =
               item.href === "/admin"
                 ? pathname === "/admin"
                 : pathname.startsWith(item.href);
-            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium ${
-                  active ? "bg-navy-900 text-white" : "text-ink hover:bg-slate-50"
+                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium ${
+                  active ? "bg-navy-900 text-white" : "text-muted"
                 }`}
               >
-                <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <button
-          type="button"
-          onClick={() => void handleLogout()}
-          className="mt-6 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-muted hover:bg-slate-50 hover:text-ink"
-        >
-          <LogOut className="h-4 w-4" />
-          Log out
-        </button>
-      </RightDrawer>
+        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 sm:px-4 sm:py-6 lg:px-6 xl:px-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

@@ -321,7 +321,7 @@ export default function AutomationDetailPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto min-w-0 max-w-6xl space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">{item.title}</h1>
@@ -332,7 +332,7 @@ export default function AutomationDetailPage() {
             </p>
           ) : null}
         </div>
-        <div className="hidden grid-cols-1 gap-2 sm:grid-cols-2 md:grid lg:flex lg:flex-wrap">
+        <div className="hidden flex-wrap gap-2 lg:flex">
           <a
             href={`/api/admin/automations/${kind}/export`}
             className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold"
@@ -568,7 +568,7 @@ export default function AutomationDetailPage() {
         </div>
       ) : null}
 
-      <div className="space-y-3 md:hidden">
+      <div className="space-y-3 lg:hidden">
         <label className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-medium shadow-card">
           <input
             ref={mobileHeaderCheckboxRef}
@@ -644,7 +644,7 @@ export default function AutomationDetailPage() {
             })}
       </div>
 
-      <section className="hidden overflow-hidden rounded-2xl bg-white shadow-card md:block">
+      <section className="hidden min-w-0 overflow-hidden rounded-2xl bg-white shadow-card lg:block">
         <div className="overflow-x-auto">
           <table className="min-w-[980px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
@@ -778,7 +778,7 @@ export default function AutomationDetailPage() {
       </section>
 
       {!leadsLoading && filtered.length === 0 ? (
-        <p className="rounded-2xl bg-white p-4 text-sm text-muted shadow-card md:hidden">
+        <p className="rounded-2xl bg-white p-4 text-sm text-muted shadow-card lg:hidden">
           No leads match these filters.
         </p>
       ) : null}
@@ -863,7 +863,7 @@ export default function AutomationDetailPage() {
             sort={runSort}
             onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
             onClear={() => setRunSort(emptyTableSort())}
-            className="flex items-center gap-2 text-sm text-muted md:hidden"
+            className="flex items-center gap-2 text-sm text-muted lg:hidden"
           />
           <div className="mt-3 overflow-hidden rounded-2xl bg-white shadow-card">
             <div className="overflow-x-auto">

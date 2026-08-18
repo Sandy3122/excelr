@@ -117,7 +117,7 @@ export default function AdminOverviewPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="mx-auto min-w-0 max-w-6xl space-y-8">
       <div>
         <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">Overview</h1>
         <p className="mt-1 text-sm text-muted sm:text-base">
@@ -126,7 +126,7 @@ export default function AdminOverviewPage() {
       </div>
 
       <div className="overflow-hidden rounded-2xl bg-white shadow-card">
-        <div className="grid grid-cols-1 gap-px bg-slate-100 min-[420px]:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-px bg-slate-100 sm:grid-cols-2 xl:grid-cols-5">
           {stats.map((stat) => (
             <Link
               key={stat.key}
@@ -147,7 +147,7 @@ export default function AdminOverviewPage() {
 
       <section>
         <h2 className="mb-3 font-heading text-lg font-bold sm:text-xl">Automations</h2>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           {data.automations.map((item) => {
             const wa = item.counts.whatsapp;
             const email = item.counts.email;
@@ -198,7 +198,7 @@ export default function AdminOverviewPage() {
             sort={runSort}
             onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
             onClear={() => setRunSort(emptyTableSort())}
-            className="flex items-center gap-2 text-sm text-muted md:hidden"
+            className="flex items-center gap-2 text-sm text-muted lg:hidden"
           />
         ) : null}
         <div className="mt-3 overflow-hidden rounded-2xl bg-white shadow-card">
@@ -206,7 +206,7 @@ export default function AdminOverviewPage() {
             <p className="p-6 text-sm text-muted">No automation runs yet.</p>
           ) : (
             <>
-              <div className="space-y-3 p-4 md:hidden">
+              <div className="space-y-3 p-4 lg:hidden">
                 {sortedRuns.map((run, i) => (
                   <div key={run.id} className="rounded-xl bg-slate-50 p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
@@ -229,7 +229,7 @@ export default function AdminOverviewPage() {
                   </div>
                 ))}
               </div>
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
                     <tr>
