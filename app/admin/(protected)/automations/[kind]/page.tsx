@@ -22,6 +22,20 @@ import {
   type SendProgressState,
 } from "@/components/admin/send-progress-modal";
 import {
+  EMPTY_SEND_CONFIRM,
+  SendConfirmModal,
+  type SendConfirmState,
+} from "@/components/admin/send-confirm-modal";
+import { SortableTh, TableSortSelect } from "@/components/admin/sortable-th";
+import {
+  emptyTableSort,
+  dateSortValue,
+  nextTableSort,
+  sortRows,
+  statusSortValue,
+  type TableSortState,
+} from "@/lib/admin/table-sort";
+import {
   EMPTY_LEAD_FILTERS,
   kindMatchesStatus,
   leadChannelStatus,
@@ -50,6 +64,33 @@ function isDelivered(status: MessageStatus) {
   return status === "sent" || status === "legacy" || status === "skipped";
 }
 
+type LeadSortKey =
+  | "name"
+  | "phone"
+  | "email"
+  | "qualification"
+  | "whatsapp"
+  | "emailStatus";
+
+type RunSortKey = "when" | "by" | "sent" | "failed" | "skipped";
+
+const LEAD_SORT_OPTIONS: { key: LeadSortKey; label: string }[] = [
+  { key: "name", label: "Name" },
+  { key: "phone", label: "Phone" },
+  { key: "email", label: "Email" },
+  { key: "qualification", label: "Qualification" },
+  { key: "whatsapp", label: "WhatsApp" },
+  { key: "emailStatus", label: "Email status" },
+];
+
+const RUN_SORT_OPTIONS: { key: RunSortKey; label: string }[] = [
+  { key: "when", label: "When" },
+  { key: "by", label: "By" },
+  { key: "sent", label: "Sent" },
+  { key: "failed", label: "Failed" },
+  { key: "skipped", label: "Skipped" },
+];
+
 export default function AutomationDetailPage() {
   const params = useParams<{ kind: string }>();
   const kind = params.kind as AutomationKind;
@@ -62,6 +103,14 @@ export default function AutomationDetailPage() {
   const [pageSize, setPageSize] = useState(25);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<SendProgressState>(EMPTY_SEND_PROGRESS);
+  const [confirm, setConfirm] = useState<SendConfirmState>(EMPTY_SEND_CONFIRM);
+  const [pendingSend, setPendingSend] = useState<{
+    action: SendAction;
+    ids: string[];
+    title: string;
+  } | null>(null);
+  const [leadSort, setLeadSort] = useState<TableSortState<LeadSortKey>>(emptyTableSort());
+  const [runSort, setRunSort] = useState<TableSortState<RunSortKey>>(emptyTableSort());
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
   const mobileHeaderCheckboxRef = useRef<HTMLInputElement>(null);
   const { leads, loading: leadsLoading, error: leadsError, reload } = useAllLeads();
@@ -98,9 +147,23 @@ export default function AutomationDetailPage() {
     () => leads.filter((reg) => matchesLeadFilters(reg, filters, kind)),
     [leads, filters, kind],
   );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize) || 1);
+  const sorted = useMemo(
+    () =>
+      sortRows(filtered, leadSort, (reg, key) => {
+        if (key === "name") return reg.fullName;
+        if (key === "phone") return reg.phone;
+        if (key === "email") return reg.email;
+        if (key === "qualification") return reg.qualification;
+        if (key === "whatsapp") {
+          return statusSortValue(leadChannelStatus(reg, kind, "whatsapp"));
+        }
+        return statusSortValue(leadChannelStatus(reg, kind, "email"));
+      }),
+    [filtered, leadSort, kind],
+  );
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize) || 1);
   const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const pageItems = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
   const pageIds = pageItems.map((r) => r.id);
   const selectedOnPage = pageIds.filter((id) => selected.has(id));
   const allPageSelected =
@@ -109,7 +172,7 @@ export default function AutomationDetailPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filters, pageSize]);
+  }, [filters, pageSize, leadSort]);
 
   useEffect(() => {
     [headerCheckboxRef, mobileHeaderCheckboxRef].forEach((ref) => {
@@ -137,17 +200,31 @@ export default function AutomationDetailPage() {
     return source.map((r) => r.id);
   }
 
-  async function runSend(opts: {
+  function requestSend(opts: {
     action: SendAction;
     ids: string[];
     title: string;
-    confirm: string;
+    body: string;
   }) {
     if (opts.ids.length === 0) {
       window.alert("No leads match this action with the current selection or filters.");
       return;
     }
-    if (!window.confirm(opts.confirm)) return;
+    setPendingSend({ action: opts.action, ids: opts.ids, title: opts.title });
+    setConfirm({
+      open: true,
+      title: opts.title,
+      body: opts.body,
+      count: opts.ids.length,
+      supportsEmail: Boolean(meta?.automation?.channels.includes("email")),
+    });
+  }
+
+  async function executeSend(includeEmail: boolean) {
+    if (!pendingSend) return;
+    const opts = pendingSend;
+    setPendingSend(null);
+    setConfirm(EMPTY_SEND_CONFIRM);
     setBusy(true);
     setNotice("");
     try {
@@ -156,6 +233,7 @@ export default function AutomationDetailPage() {
         ids: opts.ids,
         action: opts.action,
         title: opts.title,
+        includeEmail,
         onProgress: setProgress,
       });
       if (!result.error) {
@@ -230,6 +308,13 @@ export default function AutomationDetailPage() {
   const allPendingCount = leads.filter((r) =>
     kindMatchesStatus(r, kind, "pending"),
   ).length;
+  const sortedRuns = sortRows(meta.recentRuns ?? [], runSort, (run, key) => {
+    if (key === "when") return dateSortValue(run.startedAt);
+    if (key === "by") return run.triggeredBy;
+    if (key === "sent") return run.stats.sent;
+    if (key === "failed") return run.stats.failed;
+    return run.stats.skipped;
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -253,11 +338,11 @@ export default function AutomationDetailPage() {
             type="button"
             disabled={busy || failedCount === 0}
             onClick={() =>
-              void runSend({
+              requestSend({
                 action: "retry_failed",
                 ids: idsFor("failed"),
                 title: `Retrying failed ${item.title} messages`,
-                confirm: usingSelection
+                body: usingSelection
                   ? `Retry failed sends for ${failedCount} selected lead${failedCount === 1 ? "" : "s"}?`
                   : `Retry failed sends for ${failedCount} lead${failedCount === 1 ? "" : "s"} matching the current filters?`,
               })
@@ -271,11 +356,11 @@ export default function AutomationDetailPage() {
             type="button"
             disabled={busy || allCount === 0}
             onClick={() =>
-              void runSend({
+              requestSend({
                 action: "resend",
                 ids: idsFor("all"),
                 title: `Resending ${item.title}`,
-                confirm: usingSelection
+                body: usingSelection
                   ? `Resend to ${allCount} selected lead${allCount === 1 ? "" : "s"}, including people who already received it?`
                   : `Resend to all ${allCount} lead${allCount === 1 ? "" : "s"} matching the current filters, including people who already received it?`,
               })
@@ -289,11 +374,11 @@ export default function AutomationDetailPage() {
             type="button"
             disabled={busy || allLeadIds.length === 0}
             onClick={() =>
-              void runSend({
+              requestSend({
                 action: "run",
                 ids: allLeadIds,
                 title: `Sending ${item.title} to all leads`,
-                confirm: `Send “${item.title}” to all ${allLeadIds.length} registered lead${allLeadIds.length === 1 ? "" : "s"}? This ignores filters and checkboxes. ${allPendingCount} ${allPendingCount === 1 ? "is" : "are"} still pending; people who already received it will be skipped. Messages go out in batches of 40.`,
+                body: `Send “${item.title}” to all ${allLeadIds.length} registered lead${allLeadIds.length === 1 ? "" : "s"}? This ignores filters and checkboxes. ${allPendingCount} ${allPendingCount === 1 ? "is" : "are"} still pending; people who already received it will be skipped. Messages go out in batches of 40.`,
               })
             }
             className="btn-gradient px-5 py-2 text-sm disabled:opacity-60 sm:col-span-2 lg:col-span-1"
@@ -305,11 +390,11 @@ export default function AutomationDetailPage() {
             type="button"
             disabled={busy || (usingSelection ? selected.size === 0 : pendingCount === 0)}
             onClick={() =>
-              void runSend({
+              requestSend({
                 action: "run",
                 ids: usingSelection ? [...selected] : idsFor("pending"),
                 title: `Sending ${item.title}`,
-                confirm: usingSelection
+                body: usingSelection
                   ? `Send to ${selected.size} selected lead${selected.size === 1 ? "" : "s"}? Already-delivered copies will be skipped.`
                   : `Send to ${pendingCount} pending lead${pendingCount === 1 ? "" : "s"} matching the current filters? Messages go out in batches of 40.`,
               })
@@ -361,6 +446,17 @@ export default function AutomationDetailPage() {
         resultCount={filtered.length}
         totalCount={leads.length}
         onChange={setFilters}
+      />
+
+      <TableSortSelect
+        options={
+          showEmail
+            ? LEAD_SORT_OPTIONS
+            : LEAD_SORT_OPTIONS.filter((o) => o.key !== "emailStatus")
+        }
+        sort={leadSort}
+        onSort={(column) => setLeadSort((prev) => nextTableSort(prev, column))}
+        onClear={() => setLeadSort(emptyTableSort())}
       />
 
       {allPageSelected && filtered.length > pageItems.length ? (
@@ -430,13 +526,13 @@ export default function AutomationDetailPage() {
                         type="button"
                         disabled={busy}
                         onClick={() =>
-                          void runSend({
+                          requestSend({
                             action: delivered ? "resend" : "run",
                             ids: [r.id],
                             title: delivered
                               ? `Resending ${item.title}`
                               : `Sending ${item.title}`,
-                            confirm: delivered
+                            body: delivered
                               ? `Resend this message to ${r.fullName}? They already have a delivery on file.`
                               : `Send this message to ${r.fullName} now?`,
                           })
@@ -469,12 +565,44 @@ export default function AutomationDetailPage() {
                     className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
                   />
                 </th>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Phone</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Qualification</th>
-                <th className="px-4 py-3">WhatsApp</th>
-                {showEmail ? <th className="px-4 py-3">Email status</th> : null}
+                <SortableTh
+                  label="Name"
+                  column="name"
+                  sort={leadSort}
+                  onSort={(column) => setLeadSort((prev) => nextTableSort(prev, column))}
+                />
+                <SortableTh
+                  label="Phone"
+                  column="phone"
+                  sort={leadSort}
+                  onSort={(column) => setLeadSort((prev) => nextTableSort(prev, column))}
+                />
+                <SortableTh
+                  label="Email"
+                  column="email"
+                  sort={leadSort}
+                  onSort={(column) => setLeadSort((prev) => nextTableSort(prev, column))}
+                />
+                <SortableTh
+                  label="Qualification"
+                  column="qualification"
+                  sort={leadSort}
+                  onSort={(column) => setLeadSort((prev) => nextTableSort(prev, column))}
+                />
+                <SortableTh
+                  label="WhatsApp"
+                  column="whatsapp"
+                  sort={leadSort}
+                  onSort={(column) => setLeadSort((prev) => nextTableSort(prev, column))}
+                />
+                {showEmail ? (
+                  <SortableTh
+                    label="Email status"
+                    column="emailStatus"
+                    sort={leadSort}
+                    onSort={(column) => setLeadSort((prev) => nextTableSort(prev, column))}
+                  />
+                ) : null}
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -524,13 +652,13 @@ export default function AutomationDetailPage() {
                             type="button"
                             disabled={busy}
                             onClick={() =>
-                              void runSend({
+                              requestSend({
                                 action: delivered ? "resend" : "run",
                                 ids: [r.id],
                                 title: delivered
                                   ? `Resending ${item.title}`
                                   : `Sending ${item.title}`,
-                                confirm: delivered
+                                body: delivered
                                   ? `Resend this message to ${r.fullName}? They already have a delivery on file.`
                                   : `Send this message to ${r.fullName} now?`,
                               })
@@ -601,11 +729,11 @@ export default function AutomationDetailPage() {
               type="button"
               disabled={busy}
               onClick={() =>
-                void runSend({
+                requestSend({
                   action: "resend",
                   ids: [...selected],
                   title: `Resending ${item.title}`,
-                  confirm: `Resend to ${selected.size} selected lead${selected.size === 1 ? "" : "s"}?`,
+                  body: `Resend to ${selected.size} selected lead${selected.size === 1 ? "" : "s"}?`,
                 })
               }
               className="rounded-full border border-white/30 px-4 py-1.5 text-sm font-semibold"
@@ -616,11 +744,11 @@ export default function AutomationDetailPage() {
               type="button"
               disabled={busy}
               onClick={() =>
-                void runSend({
+                requestSend({
                   action: "run",
                   ids: [...selected],
                   title: `Sending ${item.title}`,
-                  confirm: `Send to ${selected.size} selected lead${selected.size === 1 ? "" : "s"}? Already-delivered copies will be skipped.`,
+                  body: `Send to ${selected.size} selected lead${selected.size === 1 ? "" : "s"}? Already-delivered copies will be skipped.`,
                 })
               }
               className="col-span-2 rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-navy-900 sm:col-span-1"
@@ -634,21 +762,52 @@ export default function AutomationDetailPage() {
       {meta.recentRuns && meta.recentRuns.length > 0 ? (
         <section>
           <h2 className="mb-3 font-heading text-lg font-bold">Run history</h2>
-          <div className="overflow-hidden rounded-2xl bg-white shadow-card">
+          <TableSortSelect
+            options={RUN_SORT_OPTIONS}
+            sort={runSort}
+            onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+            onClear={() => setRunSort(emptyTableSort())}
+          />
+          <div className="mt-3 overflow-hidden rounded-2xl bg-white shadow-card">
             <div className="overflow-x-auto">
             <table className="min-w-[520px] w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
                 <tr>
                   <th className="whitespace-nowrap px-4 py-3">S.No</th>
-                  <th className="px-4 py-3">When</th>
-                  <th className="px-4 py-3">By</th>
-                  <th className="px-4 py-3">Sent</th>
-                  <th className="px-4 py-3">Failed</th>
-                  <th className="px-4 py-3">Skipped</th>
+                  <SortableTh
+                    label="When"
+                    column="when"
+                    sort={runSort}
+                    onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                  />
+                  <SortableTh
+                    label="By"
+                    column="by"
+                    sort={runSort}
+                    onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                  />
+                  <SortableTh
+                    label="Sent"
+                    column="sent"
+                    sort={runSort}
+                    onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                  />
+                  <SortableTh
+                    label="Failed"
+                    column="failed"
+                    sort={runSort}
+                    onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                  />
+                  <SortableTh
+                    label="Skipped"
+                    column="skipped"
+                    sort={runSort}
+                    onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                  />
                 </tr>
               </thead>
               <tbody>
-                {meta.recentRuns.map((run, i) => (
+                {sortedRuns.map((run, i) => (
                   <tr key={run.id} className="border-t border-slate-100">
                     <td className="whitespace-nowrap px-4 py-3 tabular-nums text-muted">
                       {i + 1}
@@ -673,6 +832,14 @@ export default function AutomationDetailPage() {
         </section>
       ) : null}
 
+      <SendConfirmModal
+        confirm={confirm}
+        onCancel={() => {
+          setPendingSend(null);
+          setConfirm(EMPTY_SEND_CONFIRM);
+        }}
+        onConfirm={(includeEmail) => void executeSend(includeEmail)}
+      />
       <SendProgressModal
         progress={progress}
         onClose={() => setProgress(EMPTY_SEND_PROGRESS)}

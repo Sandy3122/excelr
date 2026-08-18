@@ -5,6 +5,14 @@ import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { OverviewSkeleton } from "@/components/admin/skeleton";
 import { fetchAdminJson } from "@/components/admin/fetch-json";
+import { SortableTh, TableSortSelect } from "@/components/admin/sortable-th";
+import {
+  emptyTableSort,
+  dateSortValue,
+  nextTableSort,
+  sortRows,
+  type TableSortState,
+} from "@/lib/admin/table-sort";
 import type {
   AutomationOverview,
   AutomationRun,
@@ -18,6 +26,17 @@ interface OverviewResponse {
   automations: AutomationOverview[];
   recentRuns: AutomationRun[];
 }
+
+type RunSortKey = "kind" | "trigger" | "status" | "sent" | "failed" | "when";
+
+const RUN_SORT_OPTIONS: { key: RunSortKey; label: string }[] = [
+  { key: "kind", label: "Automation" },
+  { key: "trigger", label: "Trigger" },
+  { key: "status", label: "Status" },
+  { key: "sent", label: "Sent" },
+  { key: "failed", label: "Failed" },
+  { key: "when", label: "When" },
+];
 
 function primaryCounts(item: AutomationOverview): ChannelCounts {
   return (
@@ -35,6 +54,7 @@ function primaryCounts(item: AutomationOverview): ChannelCounts {
 export default function AdminOverviewPage() {
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [error, setError] = useState("");
+  const [runSort, setRunSort] = useState<TableSortState<RunSortKey>>(emptyTableSort());
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +106,15 @@ export default function AdminOverviewPage() {
       };
     }),
   ];
+
+  const sortedRuns = sortRows(data.recentRuns, runSort, (run, key) => {
+    if (key === "kind") return run.kind;
+    if (key === "trigger") return run.triggeredBy;
+    if (key === "status") return run.status;
+    if (key === "sent") return run.stats.sent;
+    if (key === "failed") return run.stats.failed;
+    return dateSortValue(run.startedAt);
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -163,13 +192,21 @@ export default function AdminOverviewPage() {
 
       <section>
         <h2 className="mb-3 font-heading text-lg font-bold sm:text-xl">Recent sends</h2>
-        <div className="overflow-hidden rounded-2xl bg-white shadow-card">
+        {data.recentRuns.length > 0 ? (
+          <TableSortSelect
+            options={RUN_SORT_OPTIONS}
+            sort={runSort}
+            onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+            onClear={() => setRunSort(emptyTableSort())}
+          />
+        ) : null}
+        <div className="mt-3 overflow-hidden rounded-2xl bg-white shadow-card">
           {data.recentRuns.length === 0 ? (
             <p className="p-6 text-sm text-muted">No automation runs yet.</p>
           ) : (
             <>
               <div className="space-y-3 p-4 md:hidden">
-                {data.recentRuns.map((run, i) => (
+                {sortedRuns.map((run, i) => (
                   <div key={run.id} className="rounded-xl bg-slate-50 p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium">
@@ -196,16 +233,46 @@ export default function AdminOverviewPage() {
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
                     <tr>
                       <th className="whitespace-nowrap px-4 py-3">S.No</th>
-                      <th className="px-4 py-3">Automation</th>
-                      <th className="px-4 py-3">Trigger</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Sent</th>
-                      <th className="px-4 py-3">Failed</th>
-                      <th className="px-4 py-3">When</th>
+                      <SortableTh
+                        label="Automation"
+                        column="kind"
+                        sort={runSort}
+                        onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                      />
+                      <SortableTh
+                        label="Trigger"
+                        column="trigger"
+                        sort={runSort}
+                        onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                      />
+                      <SortableTh
+                        label="Status"
+                        column="status"
+                        sort={runSort}
+                        onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                      />
+                      <SortableTh
+                        label="Sent"
+                        column="sent"
+                        sort={runSort}
+                        onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                      />
+                      <SortableTh
+                        label="Failed"
+                        column="failed"
+                        sort={runSort}
+                        onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                      />
+                      <SortableTh
+                        label="When"
+                        column="when"
+                        sort={runSort}
+                        onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
+                      />
                     </tr>
                   </thead>
                   <tbody>
-                    {data.recentRuns.map((run, i) => (
+                    {sortedRuns.map((run, i) => (
                       <tr key={run.id} className="border-t border-slate-100">
                         <td className="whitespace-nowrap px-4 py-3 tabular-nums text-muted">
                           {i + 1}

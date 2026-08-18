@@ -89,6 +89,25 @@ export function getAutomation(kind: AutomationKind): AutomationDef {
   return AUTOMATIONS[kind];
 }
 
+export function automationSupportsEmail(kind: AutomationKind): boolean {
+  return getAutomation(kind).channels.includes("email");
+}
+
+/**
+ * Cron always uses the catalog channels. Admin sends WhatsApp by default;
+ * email only when `includeEmail` is true and the automation has an email.
+ */
+export function channelsForAutomationRun(
+  kind: AutomationKind,
+  options: { triggeredBy: "cron" | "admin"; includeEmail?: boolean },
+): Channel[] {
+  const allowed = getAutomation(kind).channels;
+  if (options.triggeredBy === "cron" || options.includeEmail === true) {
+    return [...allowed];
+  }
+  return allowed.filter((channel) => channel === "whatsapp");
+}
+
 export function scheduledSendAt(kind: AutomationKind): Date | null {
   const spec = AUTOMATIONS[kind].schedule;
   if (spec.type !== "at") return null;

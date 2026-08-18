@@ -7,7 +7,7 @@ import {
   getRegistrationsByIds,
   phoneToDocId,
 } from "@/lib/firebase/registrations";
-import { getAutomation } from "./catalog";
+import { channelsForAutomationRun, getAutomation } from "./catalog";
 import { evaluateEligibility } from "./schedule";
 import { greetingName } from "./messages";
 import { sendAutomationEmail } from "./mail";
@@ -42,6 +42,8 @@ export interface RunAutomationOptions {
   registrationId?: string;
   /** Send only these registrations (admin selected / filtered batch). */
   registrationIds?: string[];
+  /** Admin opt-in: also send email when the automation has one. Cron ignores this. */
+  includeEmail?: boolean;
   timeBudgetMs?: number;
 }
 
@@ -97,7 +99,10 @@ export async function runAutomation(
   options: RunAutomationOptions,
 ): Promise<AutomationRun> {
   const kind = options.kind;
-  const def = getAutomation(kind);
+  const runChannels = channelsForAutomationRun(kind, {
+    triggeredBy: options.triggeredBy,
+    includeEmail: options.includeEmail,
+  });
   const force = Boolean(options.force);
   const retryFailed = Boolean(options.retryFailed);
   const resend = Boolean(options.resend);
@@ -127,7 +132,16 @@ export async function runAutomation(
           : await getRegistrationsByIds(selectedIds);
       stats.scanned = regs.length;
       if (regs.length > 0) {
-        await processBatch(kind, regs, force, retryFailed, resend, stats, now());
+        await processBatch(
+          kind,
+          regs,
+          force,
+          retryFailed,
+          resend,
+          stats,
+          now(),
+          runChannels,
+        );
       }
       await patchAutomationRun(run.id, {
         status: "completed",
@@ -149,7 +163,7 @@ export async function runAutomation(
       stats.scanned += page.registrations.length;
 
       const eligible = page.registrations.filter((reg) =>
-        def.channels.some((channel) => {
+        runChannels.some((channel) => {
           const result = evaluateEligibility({
             kind,
             channel,
@@ -174,6 +188,7 @@ export async function runAutomation(
           resend,
           stats,
           now(),
+          runChannels,
         );
       }
 
@@ -230,6 +245,7 @@ async function processBatch(
   resend: boolean,
   stats: AutomationRunStats,
   now: Date,
+  runChannels: Channel[],
 ): Promise<void> {
   const def = getAutomation(kind);
   const nowIso = now.toISOString();
@@ -242,7 +258,7 @@ async function processBatch(
 
   for (const reg of regs) {
     const channels: Channel[] = [];
-    for (const channel of def.channels) {
+    for (const channel of runChannels) {
       const elig = evaluateEligibility({
         kind,
         channel,

@@ -121,11 +121,24 @@ async function readFirestoreCache(): Promise<CachedPayload | null> {
   }
 }
 
+const CACHE_WRITE_MS = 4_000;
+
 async function writeFirestoreCache(payload: CachedPayload): Promise<void> {
   try {
-    await cacheRef().set(payload);
+    await Promise.race([
+      cacheRef().set(payload),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error("cache_write_timeout")),
+          CACHE_WRITE_MS,
+        );
+      }),
+    ]);
   } catch (err) {
-    console.error("[overview] Failed to persist stats cache:", err);
+    const message = err instanceof Error ? err.message : "unknown";
+    // Cache is optional. A hung gRPC commit can burn ~80s of retries and is
+    // not a billing/quota failure — skip it rather than blocking the dashboard.
+    console.warn("[overview] Stats cache not persisted:", message);
   }
 }
 
@@ -197,7 +210,7 @@ export async function getAutomationOverview(options?: {
 
     const payload = await scanCounts();
     memoryCache = payload;
-    void writeFirestoreCache(payload);
+    await writeFirestoreCache(payload);
     return toOverview(payload);
   })();
 

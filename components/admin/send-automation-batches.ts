@@ -10,6 +10,7 @@ interface SendBatchesOptions {
   ids: string[];
   action: SendAction;
   title: string;
+  includeEmail?: boolean;
   onProgress: (progress: SendProgressState) => void;
 }
 
@@ -18,6 +19,7 @@ export async function sendAutomationBatches({
   ids,
   action,
   title,
+  includeEmail = false,
   onProgress,
 }: SendBatchesOptions): Promise<SendProgressState> {
   const unique = [...new Set(ids.filter(Boolean))];
@@ -57,6 +59,7 @@ export async function sendAutomationBatches({
       body: JSON.stringify({
         action,
         force: true,
+        includeEmail,
         registrationIds: chunk,
       }),
     });

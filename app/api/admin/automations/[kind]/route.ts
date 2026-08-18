@@ -14,6 +14,7 @@ export const maxDuration = 60;
 const postSchema = z.object({
   action: z.enum(["run", "retry_failed", "resend"]).default("run"),
   force: z.boolean().optional(),
+  includeEmail: z.boolean().optional(),
   registrationId: z.string().trim().min(1).max(256).optional(),
   registrationIds: z.array(z.string().trim().min(1).max(256)).max(50).optional(),
 });
@@ -99,6 +100,7 @@ export async function POST(
       resend: parsed.data.action === "resend",
       registrationId: parsed.data.registrationId,
       registrationIds: parsed.data.registrationIds,
+      includeEmail: parsed.data.includeEmail,
     });
     invalidateOverviewCache();
     return NextResponse.json({ ok: true, run });

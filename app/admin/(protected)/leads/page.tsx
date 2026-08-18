@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { AdminPagination } from "@/components/admin/pagination";
 import { LeadsPageSkeleton, TableRowSkeleton } from "@/components/admin/skeleton";
 import { LeadFilterBar } from "@/components/admin/lead-filter-bar";
+import { SortableTh, TableSortSelect } from "@/components/admin/sortable-th";
 import { useAllLeads } from "@/components/admin/use-all-leads";
 import {
   EMPTY_LEAD_FILTERS,
@@ -15,21 +16,40 @@ import {
   uniqueQualifications,
   type LeadFilters,
 } from "@/lib/admin/lead-filters";
+import {
+  emptyTableSort,
+  dateSortValue,
+  nextTableSort,
+  sortRows,
+  statusSortValue,
+  type TableSortState,
+} from "@/lib/admin/table-sort";
 import { AUTOMATION_KINDS } from "@/lib/automations/types";
 import type { StoredRegistration } from "@/lib/firebase/registration-types";
 
-const TABLE_HEADERS = [
-  "S.No",
-  "Name",
-  "Email",
-  "Phone",
-  "College",
-  "Qualification",
-  "Registered",
-  "Welcome",
-  "Carry",
-  "21 Aug",
-  "22 Aug",
+type LeadSortKey =
+  | "name"
+  | "email"
+  | "phone"
+  | "college"
+  | "qualification"
+  | "registered"
+  | "welcome"
+  | "carry"
+  | "reminder21"
+  | "reminder22";
+
+const LEAD_SORT_OPTIONS: { key: LeadSortKey; label: string }[] = [
+  { key: "name", label: "Name" },
+  { key: "email", label: "Email" },
+  { key: "phone", label: "Phone" },
+  { key: "college", label: "College" },
+  { key: "qualification", label: "Qualification" },
+  { key: "registered", label: "Registered" },
+  { key: "welcome", label: "Welcome" },
+  { key: "carry", label: "Carry" },
+  { key: "reminder21", label: "21 Aug" },
+  { key: "reminder22", label: "22 Aug" },
 ];
 
 const KIND_SHORT = {
@@ -38,6 +58,23 @@ const KIND_SHORT = {
   reminder_day_before: "21 Aug",
   reminder_event_day: "22 Aug",
 } as const;
+
+function leadSortValue(reg: StoredRegistration, key: LeadSortKey): unknown {
+  if (key === "name") return reg.fullName;
+  if (key === "email") return reg.email;
+  if (key === "phone") return reg.phone;
+  if (key === "college") return reg.college;
+  if (key === "qualification") return reg.qualification;
+  if (key === "registered") return dateSortValue(reg.submittedAt || reg.submittedAtIso);
+  if (key === "welcome") return statusSortValue(leadChannelStatus(reg, "welcome", "whatsapp"));
+  if (key === "carry") {
+    return statusSortValue(leadChannelStatus(reg, "things_to_carry", "whatsapp"));
+  }
+  if (key === "reminder21") {
+    return statusSortValue(leadChannelStatus(reg, "reminder_day_before", "whatsapp"));
+  }
+  return statusSortValue(leadChannelStatus(reg, "reminder_event_day", "whatsapp"));
+}
 
 function registeredLabel(reg: StoredRegistration) {
   const raw = reg.submittedAt || reg.submittedAtIso;
@@ -50,6 +87,7 @@ export default function AdminLeadsPage() {
   const [filters, setFilters] = useState<LeadFilters>(EMPTY_LEAD_FILTERS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [sort, setSort] = useState<TableSortState<LeadSortKey>>(emptyTableSort());
 
   const colleges = useMemo(() => uniqueColleges(leads), [leads]);
   const qualifications = useMemo(() => uniqueQualifications(leads), [leads]);
@@ -57,14 +95,18 @@ export default function AdminLeadsPage() {
     () => leads.filter((reg) => matchesLeadFilters(reg, filters)),
     [leads, filters],
   );
+  const sorted = useMemo(
+    () => sortRows(filtered, sort, leadSortValue),
+    [filtered, sort],
+  );
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize) || 1);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize) || 1);
   const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const pageItems = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   useEffect(() => {
     setPage(1);
-  }, [filters, pageSize]);
+  }, [filters, pageSize, sort]);
 
   function handlePageChange(n: number) {
     setPage(n);
@@ -100,6 +142,13 @@ export default function AdminLeadsPage() {
         resultCount={filtered.length}
         totalCount={leads.length}
         onChange={setFilters}
+      />
+
+      <TableSortSelect
+        options={LEAD_SORT_OPTIONS}
+        sort={sort}
+        onSort={(column) => setSort((prev) => nextTableSort(prev, column))}
+        onClear={() => setSort(emptyTableSort())}
       />
 
       {error ? (
@@ -141,10 +190,15 @@ export default function AdminLeadsPage() {
           <table className="min-w-[1280px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
               <tr>
-                {TABLE_HEADERS.map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3">
-                    {h}
-                  </th>
+                <th className="whitespace-nowrap px-4 py-3">S.No</th>
+                {LEAD_SORT_OPTIONS.map((col) => (
+                  <SortableTh
+                    key={col.key}
+                    label={col.label}
+                    column={col.key}
+                    sort={sort}
+                    onSort={(column) => setSort((prev) => nextTableSort(prev, column))}
+                  />
                 ))}
               </tr>
             </thead>
