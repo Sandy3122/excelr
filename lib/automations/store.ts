@@ -15,6 +15,7 @@ import {
   type ChannelDelivery,
   type MessageStatus,
 } from "./types";
+import { istDateKey, istDayUtcRange } from "./ist";
 
 function runsCol() {
   return getAdminFirestore().collection(FIRESTORE_AUTOMATION_RUNS_COLLECTION);
@@ -98,6 +99,45 @@ export async function listRecentRuns(
   const runs = snap.docs.map((doc) => serializeRun(doc.id, doc.data() || {}));
   const filtered = kind ? runs.filter((r) => r.kind === kind) : runs;
   return filtered.slice(0, limit);
+}
+
+/** Distinct IST calendar days that have automation runs (newest first). */
+export async function listAutomationRunDays(
+  scanLimit = 2500,
+): Promise<string[]> {
+  const snap = await runsCol()
+    .orderBy("startedAt", "desc")
+    .select("startedAt")
+    .limit(scanLimit)
+    .get();
+  const seen = new Set<string>();
+  const days: string[] = [];
+  for (const doc of snap.docs) {
+    const startedAt = doc.data()?.startedAt as string | undefined;
+    if (!startedAt) continue;
+    const parsed = Date.parse(startedAt);
+    if (!Number.isFinite(parsed)) continue;
+    const key = istDateKey(new Date(parsed));
+    if (seen.has(key)) continue;
+    seen.add(key);
+    days.push(key);
+  }
+  return days;
+}
+
+/** All runs that started during the given IST calendar day (`YYYY-MM-DD`). */
+export async function listRunsOnIstDay(
+  dateKey: string,
+  limit = 500,
+): Promise<AutomationRun[]> {
+  const { startIso, endIso } = istDayUtcRange(dateKey);
+  const snap = await runsCol()
+    .where("startedAt", ">=", startIso)
+    .where("startedAt", "<", endIso)
+    .orderBy("startedAt", "desc")
+    .limit(limit)
+    .get();
+  return snap.docs.map((doc) => serializeRun(doc.id, doc.data() || {}));
 }
 
 export async function completeStaleAutomationRuns(

@@ -74,3 +74,39 @@ export function istDateKey(date: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
 }
+
+const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+export function formatIstDateLabel(key: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!match) return key;
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12) return key;
+  return `${day} ${MONTHS_SHORT[month - 1]} ${match[1]}`;
+}
+
+export function nextIstDateKey(key: string): string {
+  const noon = istWallClockToUtc(`${key}T12:00:00`);
+  return istDateKey(new Date(noon.getTime() + 24 * 60 * 60 * 1000));
+}
+
+/** Half-open UTC range covering one IST calendar day. */
+export function istDayUtcRange(key: string): { startIso: string; endIso: string } {
+  const start = istWallClockToUtc(`${key}T00:00:00`);
+  const end = istWallClockToUtc(`${nextIstDateKey(key)}T00:00:00`);
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}

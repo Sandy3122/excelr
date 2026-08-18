@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatIst, getIstParts, istWallClockToUtc } from "./ist";
+import {
+  formatIst,
+  formatIstDateLabel,
+  getIstParts,
+  istDayUtcRange,
+  istWallClockToUtc,
+  nextIstDateKey,
+} from "./ist";
 
 describe("istWallClockToUtc", () => {
   it("converts 21 Aug 2026 12:00 IST to 06:30 UTC", () => {
@@ -38,3 +45,23 @@ describe("formatIst", () => {
     );
   });
 });
+
+describe("ist day keys", () => {
+  it("advances to the next IST calendar day", () => {
+    expect(nextIstDateKey("2026-08-18")).toBe("2026-08-19");
+  });
+
+  it("covers 19 Aug 2026 IST in UTC", () => {
+    expect(istDayUtcRange("2026-08-19")).toEqual({
+      startIso: "2026-08-18T18:30:00.000Z",
+      endIso: "2026-08-19T18:30:00.000Z",
+    });
+  });
+});
+
+describe("formatIstDateLabel", () => {
+  it("formats an IST date key", () => {
+    expect(formatIstDateLabel("2026-08-18")).toBe("18 Aug 2026");
+  });
+});
+
