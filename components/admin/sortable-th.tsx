@@ -49,14 +49,16 @@ export function TableSortSelect<K extends string>({
   sort,
   onSort,
   onClear,
+  className = "flex items-center gap-2 text-sm text-muted",
 }: {
   options: { key: K; label: string }[];
   sort: TableSortState<K>;
   onSort: (column: K) => void;
   onClear: () => void;
+  className?: string;
 }) {
   return (
-    <div className="flex items-center gap-2 text-sm text-muted md:hidden">
+    <div className={className}>
       <label className="flex min-w-0 flex-1 items-center gap-2">
         <span className="shrink-0">Sort</span>
         <select

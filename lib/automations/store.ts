@@ -100,6 +100,96 @@ export async function listRecentRuns(
   return filtered.slice(0, limit);
 }
 
+export async function completeStaleAutomationRuns(
+  maxAgeMs = 2 * 60 * 1000,
+): Promise<number> {
+  const snap = await runsCol().orderBy("startedAt", "desc").limit(30).get();
+  const now = Date.now();
+  let n = 0;
+  for (const doc of snap.docs) {
+    const run = serializeRun(doc.id, doc.data() || {});
+    if (run.status !== "running") continue;
+    const started = run.startedAt ? Date.parse(run.startedAt) : 0;
+    if (!Number.isFinite(started) || now - started < maxAgeMs) continue;
+    await patchAutomationRun(run.id, {
+      status: "completed",
+      completedAt: new Date().toISOString(),
+      error: run.error || "Timed out; the next cron tick continues remaining leads.",
+    });
+    n += 1;
+  }
+  return n;
+}
+
+function cronStateRef() {
+  return getAdminFirestore().collection("meta").doc("cronState");
+}
+
+export async function acquireCronLock(
+  owner: string,
+  ttlMs: number,
+): Promise<boolean> {
+  try {
+    return await getAdminFirestore().runTransaction(async (tx) => {
+      const ref = cronStateRef();
+      const snap = await tx.get(ref);
+      const now = Date.now();
+      const lockUntil = Number(snap.data()?.lockUntil || 0);
+      if (lockUntil > now) return false;
+      tx.set(
+        ref,
+        { lockUntil: now + ttlMs, lockOwner: owner },
+        { merge: true },
+      );
+      return true;
+    });
+  } catch (err) {
+    console.warn(
+      "[cron] Could not acquire lock:",
+      err instanceof Error ? err.message : err,
+    );
+    return true;
+  }
+}
+
+export async function releaseCronLock(owner: string): Promise<void> {
+  try {
+    await getAdminFirestore().runTransaction(async (tx) => {
+      const ref = cronStateRef();
+      const snap = await tx.get(ref);
+      if (String(snap.data()?.lockOwner || "") !== owner) return;
+      tx.set(ref, { lockUntil: 0, lockOwner: null }, { merge: true });
+    });
+  } catch (err) {
+    console.warn(
+      "[cron] Could not release lock:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+export async function getCronCursor(
+  kind: AutomationKind,
+): Promise<string | undefined> {
+  try {
+    const snap = await cronStateRef().get();
+    const cursor = snap.data()?.cursors?.[kind];
+    return typeof cursor === "string" && cursor ? cursor : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function setCronCursor(
+  kind: AutomationKind,
+  cursor: string | null,
+): Promise<void> {
+  await cronStateRef().set(
+    { cursors: { [kind]: cursor } },
+    { merge: true },
+  );
+}
+
 export async function setChannelDelivery(
   registrationId: string,
   kind: AutomationKind,

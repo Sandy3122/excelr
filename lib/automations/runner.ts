@@ -16,7 +16,9 @@ import {
   createAutomationRun,
   patchAutomationRun,
   setChannelDelivery,
+  setCronCursor,
 } from "./store";
+import { shouldStartCronBatch, CRON_BATCH_HEADROOM_MS } from "./cron-limits";
 import {
   emptyChannelDelivery,
   emptyRunStats,
@@ -29,7 +31,9 @@ import {
 const PAGE_SIZE = 80;
 const WHATSAPP_BATCH = 40;
 const EMAIL_CONCURRENCY = 6;
+const WRITE_CONCURRENCY = 8;
 const TIME_BUDGET_MS = 45_000;
+const BATCH_HEADROOM_MS = 6_000;
 
 export interface RunAutomationOptions {
   kind: AutomationKind;
@@ -45,6 +49,12 @@ export interface RunAutomationOptions {
   /** Admin opt-in: also send email when the automation has one. Cron ignores this. */
   includeEmail?: boolean;
   timeBudgetMs?: number;
+  /** Resume an oldest-first scan from this registration id. */
+  startCursor?: string;
+  /** Cap Infobip send batches this invocation (cron uses 1). */
+  maxSendBatches?: number;
+  /** Persist scan cursor so the next cron tick continues. */
+  persistCursor?: boolean;
 }
 
 function infobipTo(phone: string): string {
@@ -152,10 +162,23 @@ export async function runAutomation(
       return { ...run, status: "completed", stats, completedAt: new Date().toISOString() };
     }
 
-    let cursor: string | undefined;
+    let cursor: string | undefined = options.startCursor;
     let finishedScan = false;
+    let batchesSent = 0;
 
-    while (Date.now() - started < budget) {
+    while (
+      shouldStartCronBatch({
+        startedAt: started,
+        now: Date.now(),
+        budgetMs: budget,
+        headroomMs:
+          options.triggeredBy === "cron"
+            ? CRON_BATCH_HEADROOM_MS
+            : BATCH_HEADROOM_MS,
+        batchesSent,
+        maxBatches: options.maxSendBatches,
+      })
+    ) {
       const page = await listRegistrationsAscending({
         limit: PAGE_SIZE,
         cursor,
@@ -190,34 +213,43 @@ export async function runAutomation(
           now(),
           runChannels,
         );
+        batchesSent += 1;
       }
 
-      if (eligible.length > WHATSAPP_BATCH) {
-        await patchAutomationRun(run.id, { cursor: cursor || null, stats });
-        continue;
+      const pageHasMoreEligible = eligible.length > WHATSAPP_BATCH;
+      if (!pageHasMoreEligible) {
+        if (!page.nextCursor) {
+          finishedScan = true;
+          cursor = undefined;
+          break;
+        }
+        cursor = page.nextCursor;
       }
 
-      if (!page.nextCursor) {
-        finishedScan = true;
-        break;
+      if (options.persistCursor) {
+        await setCronCursor(kind, finishedScan ? null : cursor || null);
       }
-      cursor = page.nextCursor;
-      await patchAutomationRun(run.id, { cursor, stats });
+      await patchAutomationRun(run.id, { cursor: cursor || null, stats });
     }
 
-    const status = finishedScan ? "completed" : "running";
+    if (options.persistCursor) {
+      await setCronCursor(kind, finishedScan ? null : cursor || null);
+    }
+
+    // Always complete this tick so the dashboard does not sit on "sending".
+    // Remaining leads are picked up on the next cron via the saved cursor.
     await patchAutomationRun(run.id, {
-      status,
+      status: "completed",
       stats,
       cursor: finishedScan ? null : cursor || null,
-      completedAt: finishedScan ? new Date().toISOString() : null,
+      completedAt: new Date().toISOString(),
     });
     return {
       ...run,
-      status,
+      status: "completed",
       stats,
       cursor: finishedScan ? null : cursor || null,
-      completedAt: finishedScan ? new Date().toISOString() : null,
+      completedAt: new Date().toISOString(),
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Automation run failed.";
@@ -255,8 +287,10 @@ async function processBatch(
     channels: Channel[];
   };
   const claimed: Claimed[] = [];
+  let skippedCutoff = 0;
+  let skippedSent = 0;
 
-  for (const reg of regs) {
+  await mapPool(regs, WRITE_CONCURRENCY, async (reg) => {
     const channels: Channel[] = [];
     for (const channel of runChannels) {
       const elig = evaluateEligibility({
@@ -276,9 +310,9 @@ async function processBatch(
             ...emptyChannelDelivery("skipped"),
             skippedReason: "Past the 8:45 AM IST cutoff on event day.",
           });
-          bump(stats, "skipped");
+          skippedCutoff += 1;
         } else if (elig.reason === "already_sent") {
-          bump(stats, "skipped");
+          skippedSent += 1;
         }
         continue;
       }
@@ -287,9 +321,14 @@ async function processBatch(
     }
     if (channels.length) {
       claimed.push({ reg, channels });
-      bump(stats, "claimed", channels.length);
     }
-  }
+  });
+  bump(stats, "skipped", skippedCutoff + skippedSent);
+  bump(
+    stats,
+    "claimed",
+    claimed.reduce((n, item) => n + item.channels.length, 0),
+  );
 
   const waTargets = claimed.filter((c) => c.channels.includes("whatsapp"));
   const waResults = new Map<string, { ok: boolean; id?: string; error?: string }>();
@@ -324,7 +363,10 @@ async function processBatch(
     }
   }
 
-  for (const item of waTargets) {
+  let sent = 0;
+  let failed = 0;
+
+  await mapPool(waTargets, WRITE_CONCURRENCY, async (item) => {
     const result = waResults.get(item.reg.id);
     if (result?.ok) {
       await setChannelDelivery(item.reg.id, kind, "whatsapp", {
@@ -332,15 +374,15 @@ async function processBatch(
         sentAt: new Date().toISOString(),
         providerMessageId: result.id || null,
       });
-      bump(stats, "sent");
+      sent += 1;
     } else {
       await setChannelDelivery(item.reg.id, kind, "whatsapp", {
         ...emptyChannelDelivery("failed"),
         error: result?.error || "WHATSAPP_SEND_FAILED",
       });
-      bump(stats, "failed");
+      failed += 1;
     }
-  }
+  });
 
   const emailTargets = claimed.filter((c) => c.channels.includes("email"));
   await mapPool(emailTargets, EMAIL_CONCURRENCY, async (item) => {
@@ -350,13 +392,16 @@ async function processBatch(
         ...emptyChannelDelivery("sent"),
         sentAt: new Date().toISOString(),
       });
-      bump(stats, "sent");
+      sent += 1;
     } else {
       await setChannelDelivery(item.reg.id, kind, "email", {
         ...emptyChannelDelivery("failed"),
         error: result.error,
       });
-      bump(stats, "failed");
+      failed += 1;
     }
   });
+
+  bump(stats, "sent", sent);
+  bump(stats, "failed", failed);
 }

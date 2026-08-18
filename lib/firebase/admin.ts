@@ -1,5 +1,8 @@
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
-import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import {
+  initializeFirestore,
+  type Firestore,
+} from "firebase-admin/firestore";
 import { getFirebaseServiceAccount } from "./config";
 
 /**
@@ -28,6 +31,10 @@ function getAdminApp(): App {
   });
 }
 
+let db: Firestore | null = null;
+
 export function getAdminFirestore(): Firestore {
-  return getFirestore(getAdminApp());
+  if (db) return db;
+  db = initializeFirestore(getAdminApp(), { preferRest: true });
+  return db;
 }

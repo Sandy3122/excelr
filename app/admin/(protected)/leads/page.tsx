@@ -128,7 +128,7 @@ export default function AdminLeadsPage() {
         </div>
         <a
           href="/api/admin/leads/export"
-          className="inline-flex items-center gap-2 rounded-full bg-navy-900 px-4 py-2 text-sm font-semibold text-white"
+          className="hidden items-center gap-2 rounded-full bg-navy-900 px-4 py-2 text-sm font-semibold text-white md:inline-flex"
         >
           <Download className="h-4 w-4" />
           Download CSV
@@ -142,13 +142,23 @@ export default function AdminLeadsPage() {
         resultCount={filtered.length}
         totalCount={leads.length}
         onChange={setFilters}
-      />
-
-      <TableSortSelect
-        options={LEAD_SORT_OPTIONS}
-        sort={sort}
-        onSort={(column) => setSort((prev) => nextTableSort(prev, column))}
-        onClear={() => setSort(emptyTableSort())}
+        extra={
+          <div className="space-y-3">
+            <TableSortSelect
+              options={LEAD_SORT_OPTIONS}
+              sort={sort}
+              onSort={(column) => setSort((prev) => nextTableSort(prev, column))}
+              onClear={() => setSort(emptyTableSort())}
+            />
+            <a
+              href="/api/admin/leads/export"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white"
+            >
+              <Download className="h-4 w-4" />
+              Download CSV
+            </a>
+          </div>
+        }
       />
 
       {error ? (

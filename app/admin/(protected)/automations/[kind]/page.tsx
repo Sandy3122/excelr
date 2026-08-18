@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { Download, Play, RefreshCw, RotateCcw, Users } from "lucide-react";
+import { Download, Play, RefreshCw, RotateCcw, Send, Users } from "lucide-react";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { AdminPagination } from "@/components/admin/pagination";
 import {
@@ -10,6 +10,8 @@ import {
   TableRowSkeleton,
 } from "@/components/admin/skeleton";
 import { LeadFilterBar } from "@/components/admin/lead-filter-bar";
+import { MobileToolbarButton } from "@/components/admin/mobile-toolbar-button";
+import { RightDrawer } from "@/components/admin/right-drawer";
 import { clearAdminFetchCache, fetchAdminJson } from "@/components/admin/fetch-json";
 import { invalidateLeadsCache, useAllLeads } from "@/components/admin/use-all-leads";
 import {
@@ -111,6 +113,7 @@ export default function AutomationDetailPage() {
   } | null>(null);
   const [leadSort, setLeadSort] = useState<TableSortState<LeadSortKey>>(emptyTableSort());
   const [runSort, setRunSort] = useState<TableSortState<RunSortKey>>(emptyTableSort());
+  const [actionsOpen, setActionsOpen] = useState(false);
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
   const mobileHeaderCheckboxRef = useRef<HTMLInputElement>(null);
   const { leads, loading: leadsLoading, error: leadsError, reload } = useAllLeads();
@@ -210,6 +213,7 @@ export default function AutomationDetailPage() {
       window.alert("No leads match this action with the current selection or filters.");
       return;
     }
+    setActionsOpen(false);
     setPendingSend({ action: opts.action, ids: opts.ids, title: opts.title });
     setConfirm({
       open: true,
@@ -323,10 +327,12 @@ export default function AutomationDetailPage() {
           <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">{item.title}</h1>
           <p className="mt-1 text-sm text-muted sm:text-base">{item.scheduleLabel}</p>
           {meta.templateName ? (
-            <p className="mt-1 break-all text-xs text-faint">WhatsApp template: {meta.templateName}</p>
+            <p className="mt-1 hidden break-all text-xs text-faint sm:block">
+              WhatsApp template: {meta.templateName}
+            </p>
           ) : null}
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
+        <div className="hidden grid-cols-1 gap-2 sm:grid-cols-2 md:grid lg:flex lg:flex-wrap">
           <a
             href={`/api/admin/automations/${kind}/export`}
             className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold"
@@ -417,9 +423,9 @@ export default function AutomationDetailPage() {
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{leadsError}</p>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
         {wa ? (
-          <div className="rounded-2xl bg-white p-5 shadow-card">
+          <div className="rounded-2xl bg-white p-4 shadow-card sm:p-5">
             <div className="text-sm font-medium text-muted">WhatsApp</div>
             <div className="mt-2 text-sm">
               <strong>{wa.sent}</strong> sent · {wa.pending} pending · {wa.failed} failed ·{" "}
@@ -446,18 +452,108 @@ export default function AutomationDetailPage() {
         resultCount={filtered.length}
         totalCount={leads.length}
         onChange={setFilters}
+        extra={
+          <TableSortSelect
+            options={
+              showEmail
+                ? LEAD_SORT_OPTIONS
+                : LEAD_SORT_OPTIONS.filter((o) => o.key !== "emailStatus")
+            }
+            sort={leadSort}
+            onSort={(column) => setLeadSort((prev) => nextTableSort(prev, column))}
+            onClear={() => setLeadSort(emptyTableSort())}
+          />
+        }
+        mobileActions={
+          <MobileToolbarButton
+            label="Actions"
+            icon={Send}
+            onClick={() => setActionsOpen(true)}
+          />
+        }
       />
 
-      <TableSortSelect
-        options={
-          showEmail
-            ? LEAD_SORT_OPTIONS
-            : LEAD_SORT_OPTIONS.filter((o) => o.key !== "emailStatus")
-        }
-        sort={leadSort}
-        onSort={(column) => setLeadSort((prev) => nextTableSort(prev, column))}
-        onClear={() => setLeadSort(emptyTableSort())}
-      />
+      <RightDrawer open={actionsOpen} title="Actions" onClose={() => setActionsOpen(false)}>
+        <div className="grid grid-cols-1 gap-2">
+          <a
+            href={`/api/admin/automations/${kind}/export`}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2.5 text-sm font-semibold"
+          >
+            <Download className="h-4 w-4" />
+            Download report
+          </a>
+          <button
+            type="button"
+            disabled={busy || failedCount === 0}
+            onClick={() =>
+              requestSend({
+                action: "retry_failed",
+                ids: idsFor("failed"),
+                title: `Retrying failed ${item.title} messages`,
+                body: usingSelection
+                  ? `Retry failed sends for ${failedCount} selected lead${failedCount === 1 ? "" : "s"}?`
+                  : `Retry failed sends for ${failedCount} lead${failedCount === 1 ? "" : "s"} matching the current filters?`,
+              })
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
+            Retry failed
+          </button>
+          <button
+            type="button"
+            disabled={busy || allCount === 0}
+            onClick={() =>
+              requestSend({
+                action: "resend",
+                ids: idsFor("all"),
+                title: `Resending ${item.title}`,
+                body: usingSelection
+                  ? `Resend to ${allCount} selected lead${allCount === 1 ? "" : "s"}, including people who already received it?`
+                  : `Resend to all ${allCount} lead${allCount === 1 ? "" : "s"} matching the current filters, including people who already received it?`,
+              })
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Resend
+          </button>
+          <button
+            type="button"
+            disabled={busy || allLeadIds.length === 0}
+            onClick={() =>
+              requestSend({
+                action: "run",
+                ids: allLeadIds,
+                title: `Sending ${item.title} to all leads`,
+                body: `Send “${item.title}” to all ${allLeadIds.length} registered lead${allLeadIds.length === 1 ? "" : "s"}? This ignores filters and checkboxes. ${allPendingCount} ${allPendingCount === 1 ? "is" : "are"} still pending; people who already received it will be skipped. Messages go out in batches of 40.`,
+              })
+            }
+            className="btn-gradient px-5 py-2.5 text-sm disabled:opacity-60"
+          >
+            <Users className="h-4 w-4" />
+            {busy ? "Sending…" : `Send to all (${allLeadIds.length})`}
+          </button>
+          <button
+            type="button"
+            disabled={busy || (usingSelection ? selected.size === 0 : pendingCount === 0)}
+            onClick={() =>
+              requestSend({
+                action: "run",
+                ids: usingSelection ? [...selected] : idsFor("pending"),
+                title: `Sending ${item.title}`,
+                body: usingSelection
+                  ? `Send to ${selected.size} selected lead${selected.size === 1 ? "" : "s"}? Already-delivered copies will be skipped.`
+                  : `Send to ${pendingCount} pending lead${pendingCount === 1 ? "" : "s"} matching the current filters? Messages go out in batches of 40.`,
+              })
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+          >
+            <Play className="h-4 w-4" />
+            {busy ? "Sending…" : usingSelection ? "Send selected" : "Send pending"}
+          </button>
+        </div>
+      </RightDrawer>
 
       {allPageSelected && filtered.length > pageItems.length ? (
         <div className="rounded-2xl bg-sky-50 px-4 py-2 text-sm">
@@ -767,6 +863,7 @@ export default function AutomationDetailPage() {
             sort={runSort}
             onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
             onClear={() => setRunSort(emptyTableSort())}
+            className="flex items-center gap-2 text-sm text-muted md:hidden"
           />
           <div className="mt-3 overflow-hidden rounded-2xl bg-white shadow-card">
             <div className="overflow-x-auto">

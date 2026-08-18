@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { LayoutDashboard, LogOut, Send, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LayoutDashboard, LogOut, Menu, Send, Users } from "lucide-react";
+import { RightDrawer } from "@/components/admin/right-drawer";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -14,6 +15,7 @@ const NAV = [
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -26,6 +28,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       document.body.style.overflow = prevBody;
     };
   }, []);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
 
   async function handleLogout() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -68,7 +74,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <button
           type="button"
           onClick={() => void handleLogout()}
-          className="m-3 shrink-0 flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-white/70 hover:bg-white/5 hover:text-white"
+          className="m-3 flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-white/70 hover:bg-white/5 hover:text-white"
         >
           <LogOut className="h-4 w-4" />
           Log out
@@ -80,35 +86,49 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <div className="font-heading font-bold">Placement Admin</div>
           <button
             type="button"
-            onClick={() => void handleLogout()}
-            className="text-sm text-muted"
+            onClick={() => setNavOpen(true)}
+            className="rounded-full p-2 text-navy-900 hover:bg-slate-100"
+            aria-label="Open menu"
           >
-            Log out
+            <Menu className="h-5 w-5" />
           </button>
         </header>
-        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200 bg-white px-2 py-2 md:hidden">
+        <main className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6 md:px-8">
+          {children}
+        </main>
+      </div>
+
+      <RightDrawer open={navOpen} title="Menu" onClose={() => setNavOpen(false)}>
+        <nav className="flex flex-col gap-1">
           {NAV.map((item) => {
             const active =
               item.href === "/admin"
                 ? pathname === "/admin"
                 : pathname.startsWith(item.href);
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium ${
-                  active ? "bg-navy-900 text-white" : "text-muted"
+                className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium ${
+                  active ? "bg-navy-900 text-white" : "text-ink hover:bg-slate-50"
                 }`}
               >
+                <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <main className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6 md:px-8">
-          {children}
-        </main>
-      </div>
+        <button
+          type="button"
+          onClick={() => void handleLogout()}
+          className="mt-6 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-muted hover:bg-slate-50 hover:text-ink"
+        >
+          <LogOut className="h-4 w-4" />
+          Log out
+        </button>
+      </RightDrawer>
     </div>
   );
 }

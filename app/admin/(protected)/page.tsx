@@ -198,6 +198,7 @@ export default function AdminOverviewPage() {
             sort={runSort}
             onSort={(column) => setRunSort((prev) => nextTableSort(prev, column))}
             onClear={() => setRunSort(emptyTableSort())}
+            className="flex items-center gap-2 text-sm text-muted md:hidden"
           />
         ) : null}
         <div className="mt-3 overflow-hidden rounded-2xl bg-white shadow-card">
