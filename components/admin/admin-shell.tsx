@@ -24,6 +24,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -58,9 +60,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   async function handleLogout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.replace("/admin/login");
-    router.refresh();
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await fetch("/api/admin/logout", { method: "POST" });
+      router.replace("/admin/login");
+      router.refresh();
+    } finally {
+      setLoggingOut(false);
+      setLogoutOpen(false);
+    }
   }
 
   return (
@@ -128,7 +137,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </button>
           <button
             type="button"
-            onClick={() => void handleLogout()}
+            onClick={() => setLogoutOpen(true)}
             title="Log out"
             className={`flex w-full items-center rounded-xl py-2.5 text-left text-sm text-white/70 hover:bg-white/5 hover:text-white ${
               collapsed ? "justify-center px-2" : "gap-3 px-3"
@@ -145,7 +154,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <div className="font-heading font-bold">Placement Admin</div>
           <button
             type="button"
-            onClick={() => void handleLogout()}
+            onClick={() => setLogoutOpen(true)}
             className="text-sm text-muted"
           >
             Log out
@@ -174,6 +183,45 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {logoutOpen ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-navy-900/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="logout-confirm-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-card-lg sm:p-6">
+            <h2
+              id="logout-confirm-title"
+              className="font-heading text-lg font-bold text-navy-900"
+            >
+              Log out?
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              You will need to sign in again to open Placement Admin.
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={loggingOut}
+                onClick={() => setLogoutOpen(false)}
+                className="rounded-full border border-slate-300 px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={loggingOut}
+                onClick={() => void handleLogout()}
+                className="btn-gradient py-2.5 text-sm disabled:opacity-60"
+              >
+                {loggingOut ? "Logging out…" : "Log out"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
