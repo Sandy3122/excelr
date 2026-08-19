@@ -8,7 +8,10 @@ import { firstNameFrom } from "@/lib/first-name";
 import { buildInitialMessages, parseRegistrationMessages } from "@/lib/automations/messages";
 import type { RegistrationRecord, StoredRegistration } from "./registration-types";
 import { getAdminFirestore } from "./admin";
-import { FIRESTORE_REGISTRATIONS_COLLECTION } from "./config";
+import {
+  FIRESTORE_REGISTRATION_EMAILS_COLLECTION,
+  FIRESTORE_REGISTRATIONS_COLLECTION,
+} from "./config";
 
 export const REGISTRATION_EVENT = "java-fullstack-placement-drive";
 export type { RegistrationRecord, StoredRegistration } from "./registration-types";
@@ -52,12 +55,80 @@ export function toRegistrationRecord(
   };
 }
 
+/** Document id for the email uniqueness lookup (lowercase, no slashes). */
+export function emailToDocId(email: string): string {
+  return email.trim().toLowerCase().replace(/\//g, "_");
+}
+
+export type RegistrationIdentityConflict = "phone" | "email";
+
+/**
+ * Phone is unique. Email is unique. Name / college / qualification are not.
+ * Same phone + same email is a retry, not a conflict.
+ */
+export function registrationIdentityConflict(input: {
+  phoneId: string;
+  emailLower: string;
+  phoneExists: boolean;
+  existingEmailLower: string;
+  emailLookupPhoneId: string | null;
+}): RegistrationIdentityConflict | null {
+  const existingEmail = input.existingEmailLower.trim().toLowerCase();
+  const lookupId = input.emailLookupPhoneId;
+
+  if (input.phoneExists) {
+    if (existingEmail && existingEmail !== input.emailLower) return "phone";
+    if (lookupId && lookupId !== input.phoneId) return "email";
+    return null;
+  }
+
+  if (lookupId && lookupId !== input.phoneId) return "email";
+  return null;
+}
+
 function registrationsCol() {
   return getAdminFirestore().collection(FIRESTORE_REGISTRATIONS_COLLECTION);
 }
 
+function registrationEmailsCol() {
+  return getAdminFirestore().collection(FIRESTORE_REGISTRATION_EMAILS_COLLECTION);
+}
+
+function emailLookupRef(emailLower: string) {
+  return registrationEmailsCol().doc(emailToDocId(emailLower));
+}
+
+function buildRetryPatch(
+  record: RegistrationRecord,
+  existing: DocumentData | undefined,
+  timestamp: string,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {
+    ...record,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  if (existing?.messages) return patch;
+
+  const submittedIso = String(existing?.submittedAtIso || timestamp);
+  const { messages, thingsToCarryDueAt } = buildInitialMessages(
+    new Date(submittedIso),
+  );
+  if (messages.welcome?.whatsapp) {
+    messages.welcome.whatsapp.status = "legacy";
+  }
+  if (messages.welcome?.email) {
+    messages.welcome.email.status = "legacy";
+  }
+  patch.messages = messages;
+  patch.thingsToCarryDueAt = thingsToCarryDueAt
+    ? thingsToCarryDueAt.toISOString()
+    : null;
+  return patch;
+}
+
 /**
- * Upsert a registration keyed by verified phone.
+ * Upsert a registration keyed by verified phone (get by document id).
+ * Email uniqueness uses a get() on registrationEmails/{email}.
  * Same phone + same email is treated as a retry (merge).
  * Same phone / different email, or same email / different phone → 409.
  */
@@ -69,58 +140,79 @@ export async function saveRegistration(
   const id = phoneToDocId(data.phone);
   const record = toRegistrationRecord(data, timestamp);
   const phoneRef = col.doc(id);
-  const phoneSnap = await phoneRef.get();
+  const emailRef = emailLookupRef(record.emailLower);
 
-  if (phoneSnap.exists) {
-    const existingEmail = String(phoneSnap.data()?.emailLower || "");
-    if (existingEmail && existingEmail !== record.emailLower) {
-      throw new DuplicateRegistrationError("phone");
-    }
-    const patch: Record<string, unknown> = {
-      ...record,
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-    if (!phoneSnap.data()?.messages) {
-      const submittedIso = String(phoneSnap.data()?.submittedAtIso || timestamp);
-      const { messages, thingsToCarryDueAt } = buildInitialMessages(
-        new Date(submittedIso),
+  const saved = await getAdminFirestore().runTransaction(async (tx) => {
+    const phoneSnap = await tx.get(phoneRef);
+    const emailSnap = await tx.get(emailRef);
+
+    let emailLookupPhoneId = emailSnap.exists
+      ? String(emailSnap.data()?.registrationId || "")
+      : "";
+
+    // Legacy leads created before the email lookup collection. Only needed
+    // when this phone is new; retries already own the phone document.
+    if (!emailLookupPhoneId && !phoneSnap.exists) {
+      const legacy = await tx.get(
+        col.where("emailLower", "==", record.emailLower).limit(1),
       );
-      if (messages.welcome?.whatsapp) {
-        messages.welcome.whatsapp.status = "legacy";
-      }
-      if (messages.welcome?.email) {
-        messages.welcome.email.status = "legacy";
-      }
-      patch.messages = messages;
-      patch.thingsToCarryDueAt = thingsToCarryDueAt
-        ? thingsToCarryDueAt.toISOString()
-        : null;
+      emailLookupPhoneId = legacy.docs[0]?.id || "";
     }
-    await phoneRef.set(patch, { merge: true });
-    return { id, created: false };
-  }
 
-  const emailSnap = await col
-    .where("emailLower", "==", record.emailLower)
-    .limit(1)
-    .get();
-  if (!emailSnap.empty) {
-    throw new DuplicateRegistrationError("email");
-  }
+    const conflict = registrationIdentityConflict({
+      phoneId: id,
+      emailLower: record.emailLower,
+      phoneExists: phoneSnap.exists,
+      existingEmailLower: String(phoneSnap.data()?.emailLower || ""),
+      emailLookupPhoneId: emailLookupPhoneId || null,
+    });
 
-  const registeredAt = new Date(timestamp);
-  const { messages, thingsToCarryDueAt } = buildInitialMessages(registeredAt);
+    if (conflict) {
+      if (conflict === "email" && emailLookupPhoneId && !emailSnap.exists) {
+        tx.set(
+          emailRef,
+          {
+            registrationId: emailLookupPhoneId,
+            emailLower: record.emailLower,
+          },
+          { merge: true },
+        );
+      }
+      return { id, created: false, conflict };
+    }
 
-  await phoneRef.set({
-    ...record,
-    messages,
-    thingsToCarryDueAt: thingsToCarryDueAt
-      ? thingsToCarryDueAt.toISOString()
-      : null,
-    submittedAt: FieldValue.serverTimestamp(),
-    createdAt: FieldValue.serverTimestamp(),
+    tx.set(
+      emailRef,
+      {
+        registrationId: id,
+        emailLower: record.emailLower,
+      },
+      { merge: true },
+    );
+
+    if (phoneSnap.exists) {
+      tx.set(phoneRef, buildRetryPatch(record, phoneSnap.data(), timestamp), {
+        merge: true,
+      });
+      return { id, created: false, conflict: null };
+    }
+
+    const registeredAt = new Date(timestamp);
+    const { messages, thingsToCarryDueAt } = buildInitialMessages(registeredAt);
+    tx.set(phoneRef, {
+      ...record,
+      messages,
+      thingsToCarryDueAt: thingsToCarryDueAt
+        ? thingsToCarryDueAt.toISOString()
+        : null,
+      submittedAt: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return { id, created: true, conflict: null };
   });
-  return { id, created: true };
+
+  if (saved.conflict) throw new DuplicateRegistrationError(saved.conflict);
+  return { id: saved.id, created: saved.created };
 }
 
 export async function getRegistrationById(

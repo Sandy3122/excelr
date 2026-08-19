@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  emailToDocId,
   phoneToDocId,
   REGISTRATION_EVENT,
+  registrationIdentityConflict,
   toRegistrationRecord,
 } from "./registrations";
 import type { RegistrationInput } from "@/lib/reg-schema";
@@ -14,6 +16,63 @@ const sample: RegistrationInput = {
   qualification: "B.E / B.Tech",
   pageUrl: "https://placements.excelr.in/reg",
 };
+
+describe("emailToDocId", () => {
+  it("lowercases the email for the lookup document id", () => {
+    expect(emailToDocId("Ada@Example.com")).toBe("ada@example.com");
+  });
+});
+
+describe("registrationIdentityConflict", () => {
+  const base = {
+    phoneId: "919876543210",
+    emailLower: "ada@example.com",
+  };
+
+  it("allows a new phone and email", () => {
+    expect(
+      registrationIdentityConflict({
+        ...base,
+        phoneExists: false,
+        existingEmailLower: "",
+        emailLookupPhoneId: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("treats same phone + same email as a retry", () => {
+    expect(
+      registrationIdentityConflict({
+        ...base,
+        phoneExists: true,
+        existingEmailLower: "ada@example.com",
+        emailLookupPhoneId: "919876543210",
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects same phone + different email", () => {
+    expect(
+      registrationIdentityConflict({
+        ...base,
+        phoneExists: true,
+        existingEmailLower: "other@example.com",
+        emailLookupPhoneId: null,
+      }),
+    ).toBe("phone");
+  });
+
+  it("rejects same email + different phone", () => {
+    expect(
+      registrationIdentityConflict({
+        ...base,
+        phoneExists: false,
+        existingEmailLower: "",
+        emailLookupPhoneId: "911111111111",
+      }),
+    ).toBe("email");
+  });
+});
 
 describe("phoneToDocId", () => {
   it("strips a leading plus from E.164 numbers", () => {

@@ -17,6 +17,10 @@ export const FIRESTORE_REGISTRATIONS_COLLECTION =
 export const FIRESTORE_AUTOMATION_RUNS_COLLECTION =
   process.env.FIRESTORE_AUTOMATION_RUNS_COLLECTION || "automationRuns";
 
+/** Email → registration id lookup so uniqueness is a document get(), not a query. */
+export const FIRESTORE_REGISTRATION_EMAILS_COLLECTION =
+  process.env.FIRESTORE_REGISTRATION_EMAILS_COLLECTION || "registrationEmails";
+
 export interface FirebaseServiceAccount {
   projectId: string;
   clientEmail: string;
