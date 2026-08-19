@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthorized } from "@/lib/admin/authorize";
+import { HOLD_ADMIN_SETTINGS } from "@/lib/admin/settings-feature";
 import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
-import {
-  istDateAndTimeToUtcIso,
-} from "@/lib/registration-window";
+import { istDateAndTimeToUtcIso } from "@/lib/registration-window";
 import {
   getRegistrationWindowStatus,
   setRegistrationWindow,
@@ -15,7 +14,12 @@ export const dynamic = "force-dynamic";
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^\d{2}:\d{2}$/;
 
+function heldNotFound() {
+  return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
+}
+
 export async function GET(req: Request) {
+  if (HOLD_ADMIN_SETTINGS) return heldNotFound();
   if (!isAdminAuthorized(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
@@ -38,6 +42,7 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  if (HOLD_ADMIN_SETTINGS) return heldNotFound();
   if (!isAdminAuthorized(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }

@@ -12,12 +12,15 @@ import {
   Settings,
   Users,
 } from "lucide-react";
+import { HOLD_ADMIN_SETTINGS } from "@/lib/admin/settings-feature";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/leads", label: "Leads", icon: Users },
   { href: "/admin/automations", label: "Automations", icon: Send },
-  // { href: "/admin/settings", label: "Settings", icon: Settings },
+  ...(!HOLD_ADMIN_SETTINGS
+    ? [{ href: "/admin/settings", label: "Settings", icon: Settings }]
+    : []),
 ];
 
 const SIDEBAR_KEY = "admin-sidebar-collapsed";
