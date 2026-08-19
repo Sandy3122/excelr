@@ -25,6 +25,8 @@ import {
 import { persistChannelDelivery } from "@/lib/automations/store";
 import { emptyChannelDelivery } from "@/lib/automations/types";
 import { firstNameFrom } from "@/lib/first-name";
+import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/registration-window";
+import { getRegistrationWindowStatus } from "@/lib/registration-window-store";
 
 // Nodemailer + Firestore Admin need the Node runtime (not Edge).
 export const runtime = "nodejs";
@@ -112,6 +114,14 @@ export async function POST(req: Request) {
 
   const data = parsed.data;
   const timestamp = new Date().toISOString();
+
+  const windowStatus = await getRegistrationWindowStatus();
+  if (windowStatus.closed) {
+    return NextResponse.json(
+      { ok: false, error: REGISTRATION_CLOSED_MESSAGE, code: "REGISTRATIONS_CLOSED" },
+      { status: 403 },
+    );
+  }
 
   // The WhatsApp number must have been verified via OTP before we accept the
   // registration. We peek here (non-destructive) and only consume the marker

@@ -9,6 +9,7 @@ import { registrationFormSchema, type RegistrationFormInput, type RegistrationIn
 import { EVENT, QUALIFICATION_OPTIONS } from "@/lib/reg-content";
 import WhatsAppPhoneField from "./whatsapp-phone-field";
 import OtpVerificationModal from "./otp-verification-modal";
+import { RegistrationClosedNotice } from "./registration-closed";
 
 type Status = "idle" | "awaiting-otp" | "submitting" | "error";
 
@@ -20,10 +21,12 @@ function currentPageUrl(): string {
 export default function RegistrationForm({
   className = "",
   bare = false,
+  closed = false,
 }: {
   className?: string;
   /** Render without the card chrome (bg/rounded/shadow/padding) — e.g. inside the mobile modal, which supplies its own card. */
   bare?: boolean;
+  closed?: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
@@ -50,6 +53,7 @@ export default function RegistrationForm({
 
   const registerUser = useCallback(
     async (values: RegistrationFormInput, { keepModal = false } = {}) => {
+      if (closed) return;
       setStatus("submitting");
       setServerError(null);
       const payload: RegistrationInput = {
@@ -79,10 +83,11 @@ export default function RegistrationForm({
         );
       }
     },
-    [router],
+    [router, closed],
   );
 
   const onSubmit = async (values: RegistrationFormInput) => {
+    if (closed) return;
     setServerError(null);
 
     // If this number was already verified (e.g. register failed after OTP),
@@ -136,10 +141,14 @@ export default function RegistrationForm({
     <div
       className={
         bare
-          ? className
-          : `rounded-4xl bg-white p-6 shadow-card-lg md:p-10 ${className}`
+          ? `relative ${className}`
+          : `relative min-h-[28rem] rounded-4xl bg-white p-6 shadow-card-lg md:p-10 ${className}`
       }
     >
+      <div
+        className={closed ? "pointer-events-none select-none blur-[2.5px] opacity-40" : ""}
+        aria-hidden={closed}
+      >
       <div className="mb-6">
         <h2 className="font-heading text-[24px] font-semibold text-ink">
           Register Now
@@ -256,15 +265,22 @@ export default function RegistrationForm({
           {EVENT.laptopNote}
         </p>
       </form>
+      </div>
 
-      <OtpVerificationModal
-        open={otpOpen}
-        initialPhone={pendingValues?.phone || phoneValue}
-        registering={status === "submitting"}
-        onClose={handleCloseOtp}
-        onVerified={handleOtpVerified}
-        onPhoneChange={handlePhoneChangeFromModal}
-      />
+      {closed ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center p-5">
+          <RegistrationClosedNotice compact={bare} />
+        </div>
+      ) : (
+        <OtpVerificationModal
+          open={otpOpen}
+          initialPhone={pendingValues?.phone || phoneValue}
+          registering={status === "submitting"}
+          onClose={handleCloseOtp}
+          onVerified={handleOtpVerified}
+          onPhoneChange={handlePhoneChangeFromModal}
+        />
+      )}
     </div>
   );
 }

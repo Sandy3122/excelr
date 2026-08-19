@@ -5,12 +5,22 @@ import {
   getClientIp,
   sendStatus,
 } from "@/lib/whatsapp-otp/http";
+import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/registration-window";
+import { getRegistrationWindowStatus } from "@/lib/registration-window-store";
 
 // crypto + fetch to Infobip need the Node runtime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const windowStatus = await getRegistrationWindowStatus();
+  if (windowStatus.closed) {
+    return NextResponse.json(
+      { success: false, message: REGISTRATION_CLOSED_MESSAGE },
+      { status: 403 },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();

@@ -11,7 +11,7 @@ import { EVENT_DETAILS } from "@/lib/reg-content";
  * Detail order — desktop: Date → Time → Venue → Salary → Who
  *                mobile:  Date → Time → Venue → Who → Salary
  */
-export default function EventDetails() {
+export default function EventDetails({ closed = false }: { closed?: boolean }) {
   return (
     <section id="register" className="scroll-mt-20 bg-gradient-to-b from-[#EEF2FF] via-page to-[#F0F4FF] py-14 md:py-20">
       <div className="mx-auto max-w-content px-5 md:px-6">
@@ -45,12 +45,12 @@ export default function EventDetails() {
               })}
             </div>
 
-            <MobileRegisterTriggers />
+            <MobileRegisterTriggers closed={closed} />
           </div>
 
           {/* RIGHT — registration form card (desktop only), top-aligned with Event Details */}
           <div className="relative z-20 hidden md:block">
-            <RegistrationForm />
+            <RegistrationForm closed={closed} />
           </div>
         </div>
       </div>

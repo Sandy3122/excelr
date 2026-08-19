@@ -9,6 +9,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Send,
+  Settings,
   Users,
 } from "lucide-react";
 
@@ -16,6 +17,7 @@ const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/leads", label: "Leads", icon: Users },
   { href: "/admin/automations", label: "Automations", icon: Send },
+  // { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 const SIDEBAR_KEY = "admin-sidebar-collapsed";

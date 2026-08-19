@@ -10,7 +10,7 @@ import { EVENT } from "@/lib/reg-content";
  * left copy (lavender "Drive", blue role badge, glow underline, FREE badge),
  * right student cutout. Mobile keeps ice CTA + note.
  */
-export default function RegHero() {
+export default function RegHero({ closed = false }: { closed?: boolean }) {
   return (
     <section className="relative overflow-hidden bg-[radial-gradient(1200px_640px_at_30%_28%,#1E3F91_0%,#0E1B49_46%,#080D28_100%)] text-white">
       <GlowBlobs />
@@ -45,7 +45,13 @@ export default function RegHero() {
 
             {/* Mobile-only CTA + note */}
             <div className="md:hidden">
-              <MobileHeroRegisterButton />
+              {closed ? (
+                <p className="mt-8 max-w-sm rounded-xl border border-white/15 bg-white/10 px-4 py-3 font-body text-[14px] leading-relaxed text-white/90">
+                  Registrations for this placement drive are closed.
+                </p>
+              ) : (
+                <MobileHeroRegisterButton />
+              )}
               <p className="mt-5 max-w-sm font-body text-[13px] leading-[1.5] text-slate-400">
                 {EVENT.laptopNote}
               </p>

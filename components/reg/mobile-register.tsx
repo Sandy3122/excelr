@@ -5,13 +5,22 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import RegistrationForm from "./registration-form";
 import GradientButton from "./gradient-button";
+import { RegistrationClosedNotice } from "./registration-closed";
 
 /**
  * Mobile registration entry points (Figma hides the inline form card).
  * Hero ice CTA + Event Details orange CTA both open this modal.
  */
-export function MobileRegisterTriggers() {
+export function MobileRegisterTriggers({ closed = false }: { closed?: boolean }) {
   const [open, setOpen] = useState(false);
+
+  if (closed) {
+    return (
+      <div className="mt-8 md:hidden">
+        <RegistrationClosedNotice compact />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -100,7 +109,7 @@ function MobileRegisterModal({
           Register for ExcelR Placement Drive
         </span>
         <div className="overflow-y-auto px-5 py-6 sm:px-6">
-          <RegistrationForm bare />
+          <RegistrationForm bare closed={false} />
         </div>
       </div>
     </div>,
