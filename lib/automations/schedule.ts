@@ -1,5 +1,12 @@
-import { getIstParts, istWallClockToUtc } from "./ist";
+import { getIstParts, istDateKey, istWallClockToUtc } from "./ist";
 import {
+  DAY_BEFORE_IST_DATE,
+  EVENT_DAY_IST_DATE,
+  REMINDER_DAY_BEFORE_LATE_DELAY_MS,
+  REMINDER_EVENT_DAY_LATE_DELAY_MS,
+  TTC_DELAY_MS,
+  TTC_LAST_CHANCE_DELAY_MS,
+  TTC_LATE_DELAY_MS,
   getAutomation,
   scheduledSendAt,
   thingsToCarryCutoff,
@@ -15,6 +22,16 @@ const STALE_CLAIM_MS = 5 * 60 * 1000;
 export function isWhatsAppQuietHours(date: Date = new Date()): boolean {
   const { hour } = getIstParts(date);
   return hour >= WHATSAPP_QUIET_START_HOUR_IST || hour < WHATSAPP_QUIET_END_HOUR_IST;
+}
+
+/** Event-day morning/afternoon: allow WhatsApp during quiet hours so late 22 Aug signups still get messages. */
+export function shouldBypassWhatsAppQuietHours(date: Date): boolean {
+  if (istDateKey(date) !== EVENT_DAY_IST_DATE) return false;
+  return getIstParts(date).hour < WHATSAPP_QUIET_START_HOUR_IST;
+}
+
+function whatsappBlocked(date: Date): boolean {
+  return isWhatsAppQuietHours(date) && !shouldBypassWhatsAppQuietHours(date);
 }
 
 /** Next 8:00 AM IST at or after `date` (today if still before 8, else tomorrow). */
@@ -33,26 +50,88 @@ export function nextWhatsAppWindowStart(date: Date): Date {
   );
 }
 
+function ttcDelayMs(registeredAt: Date): number {
+  const cutoff = thingsToCarryCutoff();
+  const eventDay = istDateKey(registeredAt) === EVENT_DAY_IST_DATE;
+  const lateDayBefore =
+    istDateKey(registeredAt) === DAY_BEFORE_IST_DATE &&
+    registeredAt.getTime() >= (scheduledSendAt("reminder_day_before")?.getTime() || 0);
+
+  if (eventDay) {
+    const tenMin = new Date(registeredAt.getTime() + TTC_LATE_DELAY_MS);
+    if (registeredAt.getTime() < cutoff.getTime() && tenMin.getTime() < cutoff.getTime()) {
+      return TTC_LATE_DELAY_MS;
+    }
+    return TTC_LAST_CHANCE_DELAY_MS;
+  }
+  if (lateDayBefore) return TTC_LATE_DELAY_MS;
+  return TTC_DELAY_MS;
+}
+
 /**
  * When the "things to carry" WhatsApp should go out.
- * Returns null when it should never send (past the 22 Aug 8:45 AM IST cutoff).
+ * Returns null when it should never send.
  */
 export function computeThingsToCarryDueAt(registeredAt: Date): Date | null {
   const cutoff = thingsToCarryCutoff();
-  if (registeredAt.getTime() >= cutoff.getTime()) return null;
+  const delayMs = ttcDelayMs(registeredAt);
+  const lastChance = delayMs === TTC_LAST_CHANCE_DELAY_MS;
 
-  let due = new Date(registeredAt.getTime() + 60 * 60 * 1000);
-  if (isWhatsAppQuietHours(due)) {
+  let due = new Date(registeredAt.getTime() + delayMs);
+  if (whatsappBlocked(due)) {
     due = nextWhatsAppWindowStart(due);
   }
-  if (due.getTime() >= cutoff.getTime()) return null;
+  if (!lastChance && due.getTime() >= cutoff.getTime()) return null;
   return due;
+}
+
+/** Null = never send (event-day signups must not get the "tomorrow" reminder). */
+export function computeReminderDayBeforeDueAt(registeredAt: Date): Date | null {
+  if (istDateKey(registeredAt) >= EVENT_DAY_IST_DATE) return null;
+  const scheduled = scheduledSendAt("reminder_day_before");
+  if (!scheduled) return null;
+  if (registeredAt.getTime() < scheduled.getTime()) return scheduled;
+  const due = new Date(registeredAt.getTime() + REMINDER_DAY_BEFORE_LATE_DELAY_MS);
+  if (whatsappBlocked(due)) {
+    const held = nextWhatsAppWindowStart(due);
+    if (istDateKey(held) >= EVENT_DAY_IST_DATE) return null;
+    return held;
+  }
+  if (istDateKey(due) >= EVENT_DAY_IST_DATE) return null;
+  return due;
+}
+
+export function computeReminderEventDayDueAt(registeredAt: Date): Date | null {
+  const scheduled = scheduledSendAt("reminder_event_day");
+  if (!scheduled) return null;
+  if (
+    istDateKey(registeredAt) < EVENT_DAY_IST_DATE ||
+    registeredAt.getTime() < scheduled.getTime()
+  ) {
+    return scheduled;
+  }
+  return new Date(registeredAt.getTime() + REMINDER_EVENT_DAY_LATE_DELAY_MS);
+}
+
+export function computeAutomationDueAt(
+  kind: AutomationKind,
+  registeredAt: Date | null,
+): Date | null {
+  if (kind === "welcome") return registeredAt;
+  if (!registeredAt) return scheduledSendAt(kind);
+  if (kind === "things_to_carry") return computeThingsToCarryDueAt(registeredAt);
+  if (kind === "reminder_day_before") return computeReminderDayBeforeDueAt(registeredAt);
+  if (kind === "reminder_event_day") return computeReminderEventDayDueAt(registeredAt);
+  return null;
 }
 
 export function isScheduledAutomationDue(
   kind: AutomationKind,
   now: Date = new Date(),
 ): boolean {
+  if (kind === "reminder_day_before" && istDateKey(now) >= EVENT_DAY_IST_DATE) {
+    return false;
+  }
   const sendAt = scheduledSendAt(kind);
   if (!sendAt) return true;
   return now.getTime() >= sendAt.getTime();
@@ -60,7 +139,16 @@ export function isScheduledAutomationDue(
 
 export type Eligibility =
   | { ok: true }
-  | { ok: false; reason: "not_due" | "already_sent" | "in_flight" | "cutoff" | "quiet_hours" };
+  | {
+      ok: false;
+      reason:
+        | "not_due"
+        | "already_sent"
+        | "in_flight"
+        | "cutoff"
+        | "quiet_hours"
+        | "not_applicable";
+    };
 
 export interface ChannelSnapshot {
   status?: MessageStatus | null;
@@ -113,19 +201,31 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
 
   if (input.force || resend) return { ok: true };
 
+  const due =
+    input.dueAt ?? computeAutomationDueAt(input.kind, input.registeredAt ?? null);
+
   if (input.kind === "things_to_carry") {
-    const cutoff = thingsToCarryCutoff();
-    if (now.getTime() >= cutoff.getTime()) {
-      return { ok: false, reason: "cutoff" };
-    }
-    const due =
-      input.dueAt ??
-      (input.registeredAt
-        ? computeThingsToCarryDueAt(input.registeredAt)
-        : null);
     if (!due) return { ok: false, reason: "cutoff" };
     if (now.getTime() < due.getTime()) return { ok: false, reason: "not_due" };
-    if (input.channel === "whatsapp" && isWhatsAppQuietHours(now)) {
+    if (input.channel === "whatsapp" && whatsappBlocked(now)) {
+      return { ok: false, reason: "quiet_hours" };
+    }
+    return { ok: true };
+  }
+
+  if (input.kind === "reminder_day_before") {
+    if (!due) return { ok: false, reason: "not_applicable" };
+    if (now.getTime() < due.getTime()) return { ok: false, reason: "not_due" };
+    if (input.channel === "whatsapp" && whatsappBlocked(now)) {
+      return { ok: false, reason: "quiet_hours" };
+    }
+    return { ok: true };
+  }
+
+  if (input.kind === "reminder_event_day") {
+    if (!due) return { ok: false, reason: "not_due" };
+    if (now.getTime() < due.getTime()) return { ok: false, reason: "not_due" };
+    if (input.channel === "whatsapp" && whatsappBlocked(now)) {
       return { ok: false, reason: "quiet_hours" };
     }
     return { ok: true };
@@ -135,7 +235,7 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     return { ok: false, reason: "not_due" };
   }
 
-  if (input.channel === "whatsapp" && isWhatsAppQuietHours(now)) {
+  if (input.channel === "whatsapp" && whatsappBlocked(now)) {
     return { ok: false, reason: "quiet_hours" };
   }
 

@@ -70,8 +70,11 @@ function channelSnapshot(reg: StoredRegistration, kind: AutomationKind, channel:
   };
 }
 
-function dueAtFor(reg: StoredRegistration): Date | null {
-  const raw = reg.thingsToCarryDueAt || reg.messages?.things_to_carry?.dueAt;
+function dueAtFor(reg: StoredRegistration, kind: AutomationKind): Date | null {
+  const raw =
+    kind === "things_to_carry"
+      ? reg.thingsToCarryDueAt || reg.messages?.things_to_carry?.dueAt
+      : reg.messages?.[kind]?.dueAt;
   if (!raw) return null;
   const t = Date.parse(raw);
   return Number.isFinite(t) ? new Date(t) : null;
@@ -196,11 +199,11 @@ export async function runAutomation(
             force,
             retryFailed,
             resend,
-            dueAt: dueAtFor(reg),
+            dueAt: dueAtFor(reg, kind),
             registeredAt: registeredAtFor(reg),
             snapshot: channelSnapshot(reg, kind, channel),
           });
-          return result.ok || result.reason === "cutoff";
+          return result.ok || result.reason === "cutoff" || result.reason === "not_applicable";
         }),
       );
 
@@ -302,7 +305,7 @@ async function processBatch(
         force,
         retryFailed,
         resend,
-        dueAt: dueAtFor(reg),
+        dueAt: dueAtFor(reg, kind),
         registeredAt: registeredAtFor(reg),
         snapshot: channelSnapshot(reg, kind, channel),
       });
@@ -311,6 +314,13 @@ async function processBatch(
           await setChannelDelivery(reg.id, kind, channel, {
             ...emptyChannelDelivery("skipped"),
             skippedReason: "Past the 8:45 AM IST cutoff on event day.",
+          });
+          skippedCutoff += 1;
+        } else if (elig.reason === "not_applicable") {
+          await setChannelDelivery(reg.id, kind, channel, {
+            ...emptyChannelDelivery("skipped"),
+            skippedReason:
+              "Event-day registrations do not receive the day-before reminder.",
           });
           skippedCutoff += 1;
         } else if (elig.reason === "already_sent") {

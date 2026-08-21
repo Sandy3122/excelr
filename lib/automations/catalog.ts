@@ -22,6 +22,14 @@ export interface AutomationDef {
 export const THINGS_TO_CARRY_CUTOFF_IST = "2026-08-22T08:45:00";
 export const REMINDER_DAY_BEFORE_IST = "2026-08-21T12:00:00";
 export const REMINDER_EVENT_DAY_IST = "2026-08-22T08:50:00";
+export const DAY_BEFORE_IST_DATE = "2026-08-21";
+export const EVENT_DAY_IST_DATE = "2026-08-22";
+
+export const TTC_DELAY_MS = 60 * 60 * 1000;
+export const TTC_LATE_DELAY_MS = 10 * 60 * 1000;
+export const TTC_LAST_CHANCE_DELAY_MS = 5 * 60 * 1000;
+export const REMINDER_DAY_BEFORE_LATE_DELAY_MS = 15 * 60 * 1000;
+export const REMINDER_EVENT_DAY_LATE_DELAY_MS = 10 * 60 * 1000;
 
 export const AUTOMATIONS: Record<AutomationKind, AutomationDef> = {
   welcome: {
@@ -41,10 +49,10 @@ export const AUTOMATIONS: Record<AutomationKind, AutomationDef> = {
   things_to_carry: {
     kind: "things_to_carry",
     title: "Things to carry",
-    description: "1 hour after the person registers",
+    description: "1 hour after register; faster for late 21/22 Aug signups",
     channels: ["whatsapp"],
-    schedule: { type: "delay_after_register", delayMs: 60 * 60 * 1000 },
-    scheduleLabel: "1 hour after registration (held overnight if needed)",
+    schedule: { type: "delay_after_register", delayMs: TTC_DELAY_MS },
+    scheduleLabel: "1 hour after registration; 10 min if late on 21/22 Aug",
     whatsappTemplateName:
       process.env.INFOBIP_THINGS_TO_CARRY_TEMPLATE_NAME ||
       "fsd_placement_drive_things_2_carry_a",
@@ -55,7 +63,7 @@ export const AUTOMATIONS: Record<AutomationKind, AutomationDef> = {
     description: "Friday 21 August, 12:00 PM IST",
     channels: ["whatsapp", "email"],
     schedule: { type: "at", atIst: REMINDER_DAY_BEFORE_IST },
-    scheduleLabel: "Friday, 21 August 2026 · 12:00 PM IST",
+    scheduleLabel: "Friday, 21 August 2026 · 12:00 PM IST (15 min later if they register after noon)",
     whatsappTemplateName:
       process.env.INFOBIP_REMINDER_21AUG_TEMPLATE_NAME ||
       "fsd_placement_drive_reminder_message_21aug_a",
@@ -68,7 +76,7 @@ export const AUTOMATIONS: Record<AutomationKind, AutomationDef> = {
     description: "Saturday 22 August, 8:50 AM IST",
     channels: ["whatsapp"],
     schedule: { type: "at", atIst: REMINDER_EVENT_DAY_IST },
-    scheduleLabel: "Saturday, 22 August 2026 · 8:50 AM IST",
+    scheduleLabel: "Saturday, 22 August 2026 · 8:50 AM IST (10 min later if they register after 8:50)",
     whatsappTemplateName:
       process.env.INFOBIP_REMINDER_22AUG_TEMPLATE_NAME ||
       "fsd_placement_drive_reminder_message_22aug_a",

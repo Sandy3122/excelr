@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { istWallClockToUtc } from "./ist";
 import {
+  computeReminderDayBeforeDueAt,
+  computeReminderEventDayDueAt,
   computeThingsToCarryDueAt,
   evaluateEligibility,
   isScheduledAutomationDue,
@@ -68,13 +70,67 @@ describe("computeThingsToCarryDueAt", () => {
     );
   });
 
-  it("does not schedule after the 8:45 AM cutoff on event day", () => {
+  it("uses a 10 minute delay after noon on 21 Aug", () => {
+    const due = computeThingsToCarryDueAt(istWallClockToUtc("2026-08-21T16:00:00"));
+    expect(due?.toISOString()).toBe(
+      istWallClockToUtc("2026-08-21T16:10:00").toISOString(),
+    );
+  });
+
+  it("uses a 10 minute delay on event morning before the cutoff", () => {
+    const due = computeThingsToCarryDueAt(istWallClockToUtc("2026-08-22T08:00:00"));
+    expect(due?.toISOString()).toBe(
+      istWallClockToUtc("2026-08-22T08:10:00").toISOString(),
+    );
+  });
+
+  it("bypasses quiet hours for an early event-day signup", () => {
+    const due = computeThingsToCarryDueAt(istWallClockToUtc("2026-08-22T07:30:00"));
+    expect(due?.toISOString()).toBe(
+      istWallClockToUtc("2026-08-22T07:40:00").toISOString(),
+    );
+  });
+
+  it("uses a 5 minute last-chance delay after the 8:45 AM cutoff", () => {
+    const due = computeThingsToCarryDueAt(istWallClockToUtc("2026-08-22T10:00:00"));
+    expect(due?.toISOString()).toBe(
+      istWallClockToUtc("2026-08-22T10:05:00").toISOString(),
+    );
+  });
+});
+
+describe("late reminder catch-up", () => {
+  it("sends the day-before reminder 15 minutes after a post-noon 21 Aug signup", () => {
+    const due = computeReminderDayBeforeDueAt(
+      istWallClockToUtc("2026-08-21T16:00:00"),
+    );
+    expect(due?.toISOString()).toBe(
+      istWallClockToUtc("2026-08-21T16:15:00").toISOString(),
+    );
+  });
+
+  it("does not send the day-before reminder to event-day signups", () => {
     expect(
-      computeThingsToCarryDueAt(istWallClockToUtc("2026-08-22T08:50:00")),
+      computeReminderDayBeforeDueAt(istWallClockToUtc("2026-08-22T10:00:00")),
     ).toBeNull();
-    expect(
-      computeThingsToCarryDueAt(istWallClockToUtc("2026-08-22T08:00:00")),
-    ).toBeNull();
+  });
+
+  it("sends the event-day reminder 10 minutes after an after-8:50 signup", () => {
+    const due = computeReminderEventDayDueAt(
+      istWallClockToUtc("2026-08-22T10:00:00"),
+    );
+    expect(due?.toISOString()).toBe(
+      istWallClockToUtc("2026-08-22T10:10:00").toISOString(),
+    );
+  });
+
+  it("keeps 8:50 AM for people who registered before that time", () => {
+    const due = computeReminderEventDayDueAt(
+      istWallClockToUtc("2026-08-21T16:00:00"),
+    );
+    expect(due?.toISOString()).toBe(
+      istWallClockToUtc("2026-08-22T08:50:00").toISOString(),
+    );
   });
 });
 
@@ -92,6 +148,12 @@ describe("isScheduledAutomationDue", () => {
         istWallClockToUtc("2026-08-21T12:00:00"),
       ),
     ).toBe(true);
+    expect(
+      isScheduledAutomationDue(
+        "reminder_day_before",
+        istWallClockToUtc("2026-08-22T10:00:00"),
+      ),
+    ).toBe(false);
   });
 
   it("event-day reminder is due at 8:50 AM IST", () => {
@@ -212,5 +274,38 @@ describe("evaluateEligibility", () => {
       force: true,
     });
     expect(result).toEqual({ ok: true });
+  });
+
+  it("skips the day-before reminder for an event-day registration", () => {
+    const result = evaluateEligibility({
+      kind: "reminder_day_before",
+      channel: "whatsapp",
+      now: istWallClockToUtc("2026-08-22T10:20:00"),
+      registeredAt: istWallClockToUtc("2026-08-22T10:00:00"),
+      snapshot: { status: "pending" },
+    });
+    expect(result).toEqual({ ok: false, reason: "not_applicable" });
+  });
+
+  it("sends things to carry 10 minutes after a late 21 Aug signup", () => {
+    const registeredAt = istWallClockToUtc("2026-08-21T16:00:00");
+    expect(
+      evaluateEligibility({
+        kind: "things_to_carry",
+        channel: "whatsapp",
+        now: istWallClockToUtc("2026-08-21T16:09:00"),
+        registeredAt,
+        snapshot: { status: "pending" },
+      }),
+    ).toEqual({ ok: false, reason: "not_due" });
+    expect(
+      evaluateEligibility({
+        kind: "things_to_carry",
+        channel: "whatsapp",
+        now: istWallClockToUtc("2026-08-21T16:10:00"),
+        registeredAt,
+        snapshot: { status: "pending" },
+      }),
+    ).toEqual({ ok: true });
   });
 });

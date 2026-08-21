@@ -7,14 +7,20 @@ import {
   type MessageStatus,
   type RegistrationMessages,
 } from "./types";
-import { computeThingsToCarryDueAt } from "./schedule";
+import {
+  computeReminderDayBeforeDueAt,
+  computeReminderEventDayDueAt,
+  computeThingsToCarryDueAt,
+} from "./schedule";
 import { getAutomation } from "./catalog";
 
 export function buildInitialMessages(registeredAt: Date): {
   messages: RegistrationMessages;
   thingsToCarryDueAt: Date | null;
 } {
-  const due = computeThingsToCarryDueAt(registeredAt);
+  const ttcDue = computeThingsToCarryDueAt(registeredAt);
+  const dayBeforeDue = computeReminderDayBeforeDueAt(registeredAt);
+  const eventDayDue = computeReminderEventDayDueAt(registeredAt);
   const messages: RegistrationMessages = {};
 
   for (const kind of AUTOMATION_KINDS) {
@@ -24,18 +30,32 @@ export function buildInitialMessages(registeredAt: Date): {
       delivery[channel] = emptyChannelDelivery("pending");
     }
     if (kind === "things_to_carry") {
-      delivery.dueAt = due ? due.toISOString() : null;
-      if (!due && delivery.whatsapp) {
+      delivery.dueAt = ttcDue ? ttcDue.toISOString() : null;
+      if (!ttcDue && delivery.whatsapp) {
         delivery.whatsapp = {
           ...emptyChannelDelivery("skipped"),
           skippedReason: "Past the 8:45 AM IST cutoff on event day.",
         };
       }
     }
+    if (kind === "reminder_day_before") {
+      delivery.dueAt = dayBeforeDue ? dayBeforeDue.toISOString() : null;
+      if (!dayBeforeDue) {
+        const skipped = {
+          ...emptyChannelDelivery("skipped"),
+          skippedReason: "Event-day registrations do not receive the day-before reminder.",
+        };
+        if (delivery.whatsapp) delivery.whatsapp = skipped;
+        if (delivery.email) delivery.email = { ...skipped };
+      }
+    }
+    if (kind === "reminder_event_day") {
+      delivery.dueAt = eventDayDue ? eventDayDue.toISOString() : null;
+    }
     messages[kind] = delivery;
   }
 
-  return { messages, thingsToCarryDueAt: due };
+  return { messages, thingsToCarryDueAt: ttcDue };
 }
 
 export function parseChannelDelivery(raw: unknown): ChannelDelivery | undefined {
