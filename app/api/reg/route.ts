@@ -27,6 +27,7 @@ import { emptyChannelDelivery } from "@/lib/automations/types";
 import { firstNameFrom } from "@/lib/first-name";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/registration-window";
 import { getRegistrationWindowStatus } from "@/lib/registration-window-store";
+import { notifyRegistrationWebhook } from "@/lib/reg-webhook";
 
 // Nodemailer + Firestore Admin need the Node runtime (not Edge).
 export const runtime = "nodejs";
@@ -141,9 +142,11 @@ export async function POST(req: Request) {
   if (phone) data.phone = phone.e164;
 
   let savedId = "";
+  let created = false;
   try {
     const saved = await saveRegistration(data, timestamp);
     savedId = saved.id;
+    created = saved.created;
   } catch (err) {
     if (err instanceof DuplicateRegistrationError) {
       return NextResponse.json(
@@ -173,6 +176,14 @@ export async function POST(req: Request) {
       },
       { status: 500 },
     );
+  }
+
+  if (created) {
+    await notifyRegistrationWebhook({
+      id: savedId,
+      data,
+      submittedAt: timestamp,
+    });
   }
 
   const existing = savedId ? await getRegistrationById(savedId).catch(() => null) : null;
