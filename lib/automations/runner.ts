@@ -28,6 +28,7 @@ import {
   type AutomationRun,
   type AutomationRunStats,
   type Channel,
+  type MessageStatus,
 } from "./types";
 
 const PAGE_SIZE = 80;
@@ -78,6 +79,12 @@ function dueAtFor(reg: StoredRegistration, kind: AutomationKind): Date | null {
   if (!raw) return null;
   const t = Date.parse(raw);
   return Number.isFinite(t) ? new Date(t) : null;
+}
+
+function thingsToCarryStatusFor(
+  reg: StoredRegistration,
+): MessageStatus | null | undefined {
+  return reg.messages?.things_to_carry?.whatsapp?.status;
 }
 
 function registeredAtFor(reg: StoredRegistration): Date | null {
@@ -202,6 +209,7 @@ export async function runAutomation(
             dueAt: dueAtFor(reg, kind),
             registeredAt: registeredAtFor(reg),
             snapshot: channelSnapshot(reg, kind, channel),
+            thingsToCarryStatus: thingsToCarryStatusFor(reg),
           });
           return result.ok || result.reason === "cutoff" || result.reason === "not_applicable";
         }),
@@ -308,6 +316,7 @@ async function processBatch(
         dueAt: dueAtFor(reg, kind),
         registeredAt: registeredAtFor(reg),
         snapshot: channelSnapshot(reg, kind, channel),
+        thingsToCarryStatus: thingsToCarryStatusFor(reg),
       });
       if (!elig.ok) {
         if (elig.reason === "cutoff") {

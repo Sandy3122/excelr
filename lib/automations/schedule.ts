@@ -34,6 +34,10 @@ function whatsappBlocked(date: Date): boolean {
   return isWhatsAppQuietHours(date) && !shouldBypassWhatsAppQuietHours(date);
 }
 
+function thingsToCarryFinished(status?: MessageStatus | null): boolean {
+  return status === "sent" || status === "skipped" || status === "legacy";
+}
+
 /** Next 8:00 AM IST at or after `date` (today if still before 8, else tomorrow). */
 export function nextWhatsAppWindowStart(date: Date): Date {
   const p = getIstParts(date);
@@ -165,6 +169,8 @@ export interface EligibilityInput {
   dueAt?: Date | null;
   registeredAt?: Date | null;
   snapshot?: ChannelSnapshot;
+  /** WhatsApp status of things-to-carry; day-before reminder waits until this is done. */
+  thingsToCarryStatus?: MessageStatus | null;
 }
 
 export function isClaimStale(
@@ -216,6 +222,9 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
   if (input.kind === "reminder_day_before") {
     if (!due) return { ok: false, reason: "not_applicable" };
     if (now.getTime() < due.getTime()) return { ok: false, reason: "not_due" };
+    if (!thingsToCarryFinished(input.thingsToCarryStatus)) {
+      return { ok: false, reason: "not_due" };
+    }
     if (input.channel === "whatsapp" && whatsappBlocked(now)) {
       return { ok: false, reason: "quiet_hours" };
     }

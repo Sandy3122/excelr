@@ -308,4 +308,29 @@ describe("evaluateEligibility", () => {
       }),
     ).toEqual({ ok: true });
   });
+
+  it("holds the day-before reminder until things to carry is sent", () => {
+    const registeredAt = istWallClockToUtc("2026-08-21T16:00:00");
+    const now = istWallClockToUtc("2026-08-21T16:15:00");
+    expect(
+      evaluateEligibility({
+        kind: "reminder_day_before",
+        channel: "whatsapp",
+        now,
+        registeredAt,
+        snapshot: { status: "pending" },
+        thingsToCarryStatus: "pending",
+      }),
+    ).toEqual({ ok: false, reason: "not_due" });
+    expect(
+      evaluateEligibility({
+        kind: "reminder_day_before",
+        channel: "whatsapp",
+        now,
+        registeredAt,
+        snapshot: { status: "pending" },
+        thingsToCarryStatus: "sent",
+      }),
+    ).toEqual({ ok: true });
+  });
 });
