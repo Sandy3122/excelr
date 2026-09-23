@@ -16,15 +16,33 @@ export const EVENT = {
   dateShort: "22 Aug 2026",
 } as const;
 
+export type EventDetailIcon =
+  | "calendar"
+  | "clock"
+  | "map-pin"
+  | "rupee"
+  | "users"
+  | "note";
+
 export type EventDetail = {
   key: string;
-  icon: "calendar" | "clock" | "map-pin" | "rupee" | "users";
+  icon: EventDetailIcon;
   label: string;
   /** Optional bold heading shown above the value (used by Venue). */
   title?: string;
   value: string;
-  /** Render the value with an underline (used by the Venue address). */
-  underlineValue?: boolean;
+  /**
+   * How the value line reads:
+   * - `strong` (default) — bold ink, for short facts.
+   * - `link`   — blue + underlined, for the tappable Venue address.
+   * - `muted`  — regular weight grey, for long supporting copy.
+   */
+  valueStyle?: "strong" | "link" | "muted";
+  /**
+   * 1-based position on mobile. Defaults to the array position, which is also
+   * the desktop order.
+   */
+  mobileOrder?: number;
 };
 
 export const EVENT_DETAILS: EventDetail[] = [
@@ -37,14 +55,21 @@ export const EVENT_DETAILS: EventDetail[] = [
     title: "ExcelR Marathahalli Campus",
     value:
       "T-2 4th Floor, Raja Ikon Sy, No.89/1 Munnekolala, Village, Marathahalli – Sarjapur Outer Ring Rd, above Yes Bank, Marathahalli, Bengaluru, Karnataka 560037",
-    underlineValue: true,
+    valueStyle: "link",
   },
-  { key: "salary", icon: "rupee", label: "Salary Range", value: "salary upto 10 LPA" },
+  {
+    key: "salary",
+    icon: "rupee",
+    label: "Salary Range",
+    value: "salary upto 10 LPA",
+    mobileOrder: 5,
+  },
   {
     key: "who",
     icon: "users",
     label: "Who Can Apply",
     value: "Freshers With Java Full Stack Knowledge",
+    mobileOrder: 4,
   },
 ];
 

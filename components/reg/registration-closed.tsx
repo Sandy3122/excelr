@@ -1,3 +1,7 @@
+"use client";
+
+import { useRegEvent } from "./reg-event-context";
+
 export default function RegistrationClosedBanner() {
   return (
     <div
@@ -10,6 +14,8 @@ export default function RegistrationClosedBanner() {
 }
 
 export function RegistrationClosedNotice({ compact = false }: { compact?: boolean }) {
+  const { closedNotice } = useRegEvent();
+
   return (
     <div
       className={`rounded-2xl border border-slate-200 bg-white text-center shadow-card ${
@@ -20,9 +26,7 @@ export function RegistrationClosedNotice({ compact = false }: { compact?: boolea
         Registrations are closed
       </p>
       <p className="mt-2 font-body text-[14px] leading-relaxed text-muted md:text-[15px]">
-        Online registration for ExcelR&apos;s Java Full Stack Placement Drive is no
-        longer being accepted. If you have already registered, your seat remains
-        confirmed.
+        {closedNotice}
       </p>
     </div>
   );

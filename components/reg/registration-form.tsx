@@ -6,10 +6,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { registrationFormSchema, type RegistrationFormInput, type RegistrationInput } from "@/lib/reg-schema";
-import { EVENT, QUALIFICATION_OPTIONS } from "@/lib/reg-content";
+import { QUALIFICATION_OPTIONS } from "@/lib/reg-content";
 import WhatsAppPhoneField from "./whatsapp-phone-field";
 import OtpVerificationModal from "./otp-verification-modal";
 import { RegistrationClosedNotice } from "./registration-closed";
+import { useRegEvent } from "./reg-event-context";
 
 type Status = "idle" | "awaiting-otp" | "submitting" | "error";
 
@@ -29,6 +30,7 @@ export default function RegistrationForm({
   closed?: boolean;
 }) {
   const router = useRouter();
+  const { laptopNote, thankYouHref } = useRegEvent();
   const [status, setStatus] = useState<Status>("idle");
   const [serverError, setServerError] = useState<string | null>(null);
   const [otpOpen, setOtpOpen] = useState(false);
@@ -74,7 +76,7 @@ export default function RegistrationForm({
           throw new Error(data.error || "Something went wrong. Please try again.");
         }
         const params = new URLSearchParams({ name: values.fullName });
-        router.replace(`/reg/thank-you?${params.toString()}`);
+        router.replace(`${thankYouHref}?${params.toString()}`);
       } catch (err) {
         if (keepModal) setOtpOpen(false);
         setStatus("error");
@@ -83,7 +85,7 @@ export default function RegistrationForm({
         );
       }
     },
-    [router, closed],
+    [router, closed, thankYouHref],
   );
 
   const onSubmit = async (values: RegistrationFormInput) => {
@@ -262,7 +264,7 @@ export default function RegistrationForm({
         </button>
 
         <p className="pt-1 font-body text-[13px] leading-[1.5] text-faint">
-          {EVENT.laptopNote}
+          {laptopNote}
         </p>
       </form>
       </div>

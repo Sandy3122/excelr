@@ -1,8 +1,10 @@
-import { Calendar, Clock, MapPin, Users } from "lucide-react";
+import { Calendar, Clock, FileText, MapPin, Users } from "lucide-react";
 import type { EventDetail } from "@/lib/reg-content";
 
-/** White card: icon chip + blue uppercase label + value (spec §3.3 + reference). Used 5×. */
+/** White card: icon chip + blue uppercase label + value (spec §3.3 + reference). */
 export default function EventDetailItem({ detail }: { detail: EventDetail }) {
+  const valueStyle = detail.valueStyle ?? "strong";
+
   return (
     <div className="flex items-start gap-4 rounded-2xl bg-white p-4 shadow-card md:p-5">
       {/* 48×48 rounded icon chip, light-blue bg */}
@@ -17,11 +19,7 @@ export default function EventDetailItem({ detail }: { detail: EventDetail }) {
           <p className="mt-1 font-body text-[15px] font-semibold text-ink">{detail.title}</p>
         )}
         <p
-          className={`mt-1 font-body text-[15px] leading-[1.5] ${
-            detail.underlineValue
-              ? "text-brand-blue underline decoration-brand-blue/40 underline-offset-2"
-              : "font-semibold text-ink"
-          }`}
+          className={`mt-1 font-body text-[15px] leading-[1.5] ${VALUE_CLASS[valueStyle]}`}
         >
           {detail.value}
         </p>
@@ -29,6 +27,12 @@ export default function EventDetailItem({ detail }: { detail: EventDetail }) {
     </div>
   );
 }
+
+const VALUE_CLASS = {
+  strong: "font-semibold text-ink",
+  link: "text-brand-blue underline decoration-brand-blue/40 underline-offset-2",
+  muted: "text-muted",
+} as const;
 
 function DetailIcon({ icon }: { icon: EventDetail["icon"] }) {
   const cls = "h-5 w-5";
@@ -41,6 +45,8 @@ function DetailIcon({ icon }: { icon: EventDetail["icon"] }) {
       return <MapPin className={cls} strokeWidth={2} />;
     case "users":
       return <Users className={cls} strokeWidth={2} />;
+    case "note":
+      return <FileText className={cls} strokeWidth={2} />;
     case "rupee":
       // ₹ is a text glyph per the spec (no lucide equivalent)
       return <span className="font-heading text-[20px] font-semibold leading-none">₹</span>;

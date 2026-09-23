@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import RegistrationForm from "./registration-form";
 import GradientButton from "./gradient-button";
 import { RegistrationClosedNotice } from "./registration-closed";
+import { useRegEvent } from "./reg-event-context";
 
 /**
  * Mobile registration entry points (Figma hides the inline form card).
@@ -65,6 +66,7 @@ function MobileRegisterModal({
   onClose: () => void;
 }) {
   const titleId = useId();
+  const { name } = useRegEvent();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -106,7 +108,7 @@ function MobileRegisterModal({
           <X className="h-5 w-5" strokeWidth={2.25} />
         </button>
         <span id={titleId} className="sr-only">
-          Register for ExcelR Placement Drive
+          Register for {name}
         </span>
         <div className="overflow-y-auto px-5 py-6 sm:px-6">
           <RegistrationForm bare closed={false} />

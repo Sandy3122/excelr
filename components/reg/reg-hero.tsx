@@ -1,46 +1,46 @@
+"use client";
+
 import Image from "next/image";
 import GlowBlobs from "./glow-blobs";
 import FreeBadge from "./free-badge";
 import { MobileHeroRegisterButton } from "./mobile-register";
-import { EVENT } from "@/lib/reg-content";
+import { useRegEvent } from "./reg-event-context";
+import type { HeroBadge, HeroHeadingLine } from "@/lib/reg-event";
 
 /**
- * Hero — matches the Figma desktop hero screenshot:
- * white nav above, navy/royal gradient + thin circle décor,
- * left copy (lavender "Drive", blue role badge, glow underline, FREE badge),
- * right student cutout. Mobile keeps ice CTA + note.
+ * Hero — white nav above, deep-blue backdrop with thin circle décor,
+ * left copy (heading, role badge, glow underline, FREE badge) and a right-hand
+ * cutout. Mobile keeps the ice CTA + laptop note. All copy comes from the
+ * event config so each drive can supply its own.
  */
 export default function RegHero({ closed = false }: { closed?: boolean }) {
-  return (
-    <section className="relative overflow-hidden bg-[radial-gradient(1200px_640px_at_30%_28%,#1E3F91_0%,#0E1B49_46%,#080D28_100%)] text-white">
-      <GlowBlobs />
+  const { hero, laptopNote } = useRegEvent();
 
-      <div className="relative mx-auto max-w-content px-4 pb-0 pt-14 md:pb-0 md:pt-16 lg:pb-0 lg:pt-16">
+  return (
+    <section
+      className={`relative overflow-hidden text-white ${hero.backgroundClassName}`}
+    >
+      <GlowBlobs variant={hero.decor} />
+
+      <div
+        className={`relative mx-auto px-4 pb-0 ${hero.containerClassName} ${hero.paddingTopClassName}`}
+      >
         <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-8 lg:gap-12">
           {/* LEFT — copy */}
           <div className="relative z-10 animate-fade-up">
-            <h1 className="font-heading font-semibold leading-[1.02] tracking-[-1px] text-[42px] md:text-[56px] md:tracking-[-1.6px] lg:text-[72px]">
-              <span className="block text-white">ExcelR&apos;s</span>
-              <span className="block">
-                <span className="text-white">Placement </span>
-                <span className="bg-gradient-to-r from-[#B4C2FF] to-[#8B9CF7] bg-clip-text text-transparent">
-                  Drive
-                </span>
-              </span>
+            <h1 className="font-heading font-semibold leading-[1.02] tracking-[-1px] md:tracking-[-1.6px]">
+              {hero.headingLines.map((line) => (
+                <HeadingLine key={line.text} line={line} />
+              ))}
             </h1>
 
-            {/* "For Java Full Stack" — indigo badge with subtle border + soft glow */}
-            <div className="mt-5 inline-block rounded-[10px] border border-white/15 bg-gradient-to-b from-[#28499B] to-[#1B346F] px-6 py-2.5 shadow-[0_0_26px_rgba(37,66,148,0.5)] md:mt-6 md:rounded-xl md:px-8 md:py-3">
-              <span className="font-heading text-[22px] font-bold text-white md:text-[32px] lg:text-[40px]">
-                {EVENT.role}
-              </span>
-            </div>
+            <RoleBadge badge={hero.badge} />
 
             {/* Accent underline — bright left → fade right, with glow */}
             <div className="mt-4 h-[3px] w-[180px] rounded-full bg-gradient-to-r from-[#7DD3FC] via-[#3B82F6] to-[#7DD3FC] md:mt-5 md:w-[220px]" />
 
-            <p className="mt-6 max-w-[420px] font-body text-[15px] leading-[1.7] text-white/90 md:text-[17px] md:leading-[1.65]">
-              {EVENT.tagline}
+            <p className="mt-6 max-w-[460px] font-body text-[15px] leading-[1.7] text-white/90 md:text-[17px] md:leading-[1.65]">
+              {hero.tagline}
             </p>
 
             {/* Mobile-only CTA + note */}
@@ -53,33 +53,89 @@ export default function RegHero({ closed = false }: { closed?: boolean }) {
                 <MobileHeroRegisterButton />
               )}
               <p className="mt-5 max-w-sm font-body text-[13px] leading-[1.5] text-slate-400">
-                {EVENT.laptopNote}
+                {laptopNote}
               </p>
             </div>
 
             {/* FREE badge */}
-            <div className="mt-8 mb-12">
-              <FreeBadge className="h-auto w-[210px] drop-shadow-[0_0_20px_rgba(59,130,246,0.35)] md:w-[240px]" />
+            <div className={hero.freeBadgeWrapperClassName}>
+              <FreeBadge className={hero.freeBadgeClassName} />
             </div>
           </div>
 
-          {/* RIGHT — student photo (desktop only) */}
-          <div className="relative mx-auto hidden w-full max-w-[560px] md:block self-end">
-            <div
-              aria-hidden
-              className="absolute left-1/2 top-[40%] h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#3B82F6]/30 blur-3xl"
-            />
+          {/* RIGHT — cutout (desktop only) */}
+          <div
+            className={`relative mx-auto hidden w-full self-end md:block ${hero.imageClassName}`}
+          >
+            {hero.decor === "glow" && (
+              <div
+                aria-hidden
+                className="absolute left-1/2 top-[20%] h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#3B82F6]/30 blur-3xl"
+              />
+            )}
             <Image
-              src="/reg/hero-student.png"
-              alt="Student ready for the placement drive"
-              width={580}
-              height={640}
+              src={hero.image.src}
+              alt={hero.image.alt}
+              width={hero.image.width}
+              height={hero.image.height}
               priority
-              className="relative z-10 mx-auto h-auto w-full max-w-[580px] object-contain object-bottom"
+              className="relative z-10 mx-auto h-auto w-full object-contain object-bottom"
             />
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function HeadingLine({ line }: { line: HeroHeadingLine }) {
+  return (
+    <span className={`block ${line.className}`}>
+      <span className="text-white">{line.text}</span>
+      {line.accent && (
+        <span className="bg-gradient-to-r from-[#B4C2FF] to-[#8B9CF7] bg-clip-text text-transparent">
+          {line.accent}
+        </span>
+      )}
+      {line.small && (
+        <span
+          className={`ml-2 font-normal text-white ${line.smallClassName ?? ""}`}
+        >
+          {line.small}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function RoleBadge({ badge }: { badge: HeroBadge }) {
+  if (badge.variant === "white") {
+    return (
+      <div className="mt-5 inline-block rounded-[10px] bg-white px-6 py-3 text-center shadow-[0_10px_34px_rgba(2,6,60,0.35)] md:mt-6 md:rounded-xl md:px-10 md:py-4">
+        <span className="block font-heading text-[19px] font-bold tracking-[0.1em] text-navy-900 md:text-[26px] lg:text-[30px]">
+          {badge.lines[0]}
+        </span>
+        {badge.lines[1] && (
+          <span className="mt-0.5 block font-heading text-[16px] font-bold text-navy-900 md:text-[21px] lg:text-[24px]">
+            {badge.lines[1]}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-5 inline-block rounded-[10px] border border-white/15 bg-gradient-to-b from-[#28499B] to-[#1B346F] px-6 py-2.5 shadow-[0_0_26px_rgba(37,66,148,0.5)] md:mt-6 md:rounded-xl md:px-8 md:py-3">
+      {badge.lines.map((text, i) => (
+        <span
+          key={text}
+          className={`block font-heading text-[22px] font-bold text-white md:text-[32px] lg:text-[40px] ${
+            i > 0 ? "mt-0.5" : ""
+          }`}
+        >
+          {text}
+        </span>
+      ))}
+    </div>
   );
 }

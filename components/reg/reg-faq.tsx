@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { FAQS } from "@/lib/reg-content";
+import { useRegEvent } from "./reg-event-context";
 
 /** FAQ accordion — matches Figma FAQ frame (first item open by default). */
 export default function RegFaq() {
   const [open, setOpen] = useState<number | null>(0);
+  const { faqs } = useRegEvent();
 
   return (
     <section className="bg-[#F0F3FF] py-16 md:py-20">
@@ -21,7 +22,7 @@ export default function RegFaq() {
         </div>
 
         <div className="mt-10 space-y-4 md:space-y-5">
-          {FAQS.map((item, i) => {
+          {faqs.map((item, i) => {
             const isOpen = open === i;
             return (
               <div
@@ -59,7 +60,7 @@ export default function RegFaq() {
                   }`}
                 >
                   <div className="overflow-hidden">
-                    <p className="px-5 pb-6 font-body text-[14px] leading-[1.7] text-muted md:px-7 md:pb-7 md:text-[15px]">
+                    <p className="whitespace-pre-line px-5 pb-6 font-body text-[14px] leading-[1.7] text-muted md:px-7 md:pb-7 md:text-[15px]">
                       {item.a}
                     </p>
                   </div>
