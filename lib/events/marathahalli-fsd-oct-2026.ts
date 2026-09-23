@@ -106,22 +106,25 @@ export const MARATHAHALLI_FSD_OCT_2026: RegEventConfig = {
       "bg-[radial-gradient(1600px_900px_at_50%_45%,#020F7E_0%,#010C74_100%)]",
     decor: "outline",
     containerClassName: "max-w-content",
-    paddingTopClassName: "pt-14 md:pt-16 lg:pt-16",
+    paddingTopClassName: "pt-14 md:pt-16 pb-4 lg:pt-16",
     freeBadgeWrapperClassName: "mt-8 mb-12",
+    // Three lines in a half-width column, so the scale steps at xl as well as
+    // md/lg — at the full lg size "Placement Drive" wraps below ~1280px.
     headingLines: [
       {
         text: "ExcelR’s",
-        className: "text-[34px] md:text-[46px] lg:text-[60px]",
+        className: "text-[32px] md:text-[36px] lg:text-[46px] xl:text-[60px]",
       },
       {
         text: "Placement Drive",
-        className: "text-[42px] md:text-[56px] lg:text-[72px]",
+        className: "text-[40px] md:text-[44px] lg:text-[56px] xl:text-[72px]",
       },
       {
         text: "in Marathahalli",
         small: "(Bangalore)",
-        className: "text-[30px] md:text-[42px] lg:text-[54px]",
-        smallClassName: "text-[20px] md:text-[28px] lg:text-[36px]",
+        className: "text-[28px] md:text-[32px] lg:text-[42px] xl:text-[54px]",
+        smallClassName:
+          "text-[18px] md:text-[21px] lg:text-[28px] xl:text-[36px]",
       },
     ],
     badge: {
@@ -136,9 +139,16 @@ export const MARATHAHALLI_FSD_OCT_2026: RegEventConfig = {
       height: 742,
       alt: "Student announcing the placement drive — bigger and better",
     },
-    // Landscape artwork, so it needs more width than the portrait cutout on
-    // /reg to read at the same visual weight.
-    imageClassName: "max-w-[640px]",
+    // Landscape artwork, so half the 1152px container leaves it looking small.
+    // Spanning the section's full height top-aligns it with the copy and lets
+    // it run into the page gutter. The box is anchored off 50% — the container
+    // is centred, so that is always where the two grid columns meet. At md it
+    // starts on the column boundary; from xl it crosses into the column's
+    // unused space, which the copy never reaches (the widest line, the h1, ends
+    // 33px short), and that extra width is what gets the artwork to full height.
+    imageLayout: "bleed",
+    imageClassName:
+      "left-[calc(50%+16px)] lg:left-[calc(50%+8px)] xl:left-[calc(50%-30px)]",
     freeBadgeClassName:
       "h-auto w-[170px] drop-shadow-[0_0_20px_rgba(59,130,246,0.35)] md:w-[200px]",
   },

@@ -63,7 +63,14 @@ export type RegEventConfig = {
     badge: HeroBadge;
     tagline: string;
     image: { src: string; width: number; height: number; alt: string };
-    /** Rendered width of the cutout inside the right column. */
+    /**
+     * `column` — the cutout sits inside the right grid column, bottom-aligned.
+     * `bleed`  — it spans the section's full height, anchored to the
+     *            bottom-right corner, so it reads as tall as the copy beside
+     *            it instead of being capped by half the container.
+     */
+    imageLayout: "column" | "bleed";
+    /** Sizing box for the cutout — column max-width, or bleed box width. */
     imageClassName: string;
     /** Rendered width of the "Absolutely FREE for All" badge. */
     freeBadgeClassName: string;
@@ -143,6 +150,7 @@ export const DEFAULT_REG_EVENT: RegEventConfig = {
       height: 580,
       alt: "Student ready for the placement drive",
     },
+    imageLayout: "column",
     imageClassName: "max-w-[580px]",
     freeBadgeClassName:
       "h-auto w-[210px] drop-shadow-[0_0_20px_rgba(59,130,246,0.35)] md:w-[240px]",

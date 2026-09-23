@@ -22,6 +22,24 @@ export default function RegHero({ closed = false }: { closed?: boolean }) {
     >
       <GlowBlobs variant={hero.decor} />
 
+      {/* Bleed layout: the cutout fills the section's height in the bottom-right
+          corner. object-contain keeps it clear of the copy when the viewport is
+          too narrow for the full-height render. */}
+      {hero.imageLayout === "bleed" && (
+        <div
+          className={`absolute inset-y-0 right-0 z-0 hidden md:block ${hero.imageClassName}`}
+        >
+          <Image
+            src={hero.image.src}
+            alt={hero.image.alt}
+            width={hero.image.width}
+            height={hero.image.height}
+            priority
+            className="h-full w-full object-contain object-right-bottom"
+          />
+        </div>
+      )}
+
       <div
         className={`relative mx-auto px-4 pb-0 ${hero.containerClassName} ${hero.paddingTopClassName}`}
       >
@@ -63,25 +81,30 @@ export default function RegHero({ closed = false }: { closed?: boolean }) {
             </div>
           </div>
 
-          {/* RIGHT — cutout (desktop only) */}
-          <div
-            className={`relative mx-auto hidden w-full self-end md:block ${hero.imageClassName}`}
-          >
-            {hero.decor === "glow" && (
-              <div
-                aria-hidden
-                className="absolute left-1/2 top-[20%] h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#3B82F6]/30 blur-3xl"
+          {/* RIGHT — cutout (desktop only). The bleed layout draws it above,
+              outside the grid; the column here just reserves its half. */}
+          {hero.imageLayout === "column" ? (
+            <div
+              className={`relative mx-auto hidden w-full self-end md:block ${hero.imageClassName}`}
+            >
+              {hero.decor === "glow" && (
+                <div
+                  aria-hidden
+                  className="absolute left-1/2 top-[20%] h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#3B82F6]/30 blur-3xl"
+                />
+              )}
+              <Image
+                src={hero.image.src}
+                alt={hero.image.alt}
+                width={hero.image.width}
+                height={hero.image.height}
+                priority
+                className="relative z-10 mx-auto h-auto w-full object-contain object-bottom"
               />
-            )}
-            <Image
-              src={hero.image.src}
-              alt={hero.image.alt}
-              width={hero.image.width}
-              height={hero.image.height}
-              priority
-              className="relative z-10 mx-auto h-auto w-full object-contain object-bottom"
-            />
-          </div>
+            </div>
+          ) : (
+            <div aria-hidden className="hidden md:block" />
+          )}
         </div>
       </div>
     </section>
@@ -111,12 +134,12 @@ function HeadingLine({ line }: { line: HeroHeadingLine }) {
 function RoleBadge({ badge }: { badge: HeroBadge }) {
   if (badge.variant === "white") {
     return (
-      <div className="mt-5 inline-block rounded-[10px] bg-white px-6 py-3 text-center shadow-[0_10px_34px_rgba(2,6,60,0.35)] md:mt-6 md:rounded-xl md:px-10 md:py-4">
-        <span className="block font-heading text-[19px] font-bold tracking-[0.1em] text-navy-900 md:text-[26px] lg:text-[30px]">
+      <div className="mt-5 inline-block rounded-[10px] bg-white px-6 py-3 text-center shadow-[0_10px_34px_rgba(2,6,60,0.35)] md:mt-6 md:rounded-xl md:py-4 lg:px-8 xl:px-10">
+        <span className="block font-heading text-[19px] font-bold tracking-[0.1em] text-navy-900 md:text-[22px] lg:text-[26px] xl:text-[30px]">
           {badge.lines[0]}
         </span>
         {badge.lines[1] && (
-          <span className="mt-0.5 block font-heading text-[16px] font-bold text-navy-900 md:text-[21px] lg:text-[24px]">
+          <span className="mt-0.5 block font-heading text-[16px] font-bold text-navy-900 md:text-[18px] lg:text-[21px] xl:text-[24px]">
             {badge.lines[1]}
           </span>
         )}
