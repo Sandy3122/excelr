@@ -132,14 +132,16 @@ function HeadingLine({ line }: { line: HeroHeadingLine }) {
 }
 
 function RoleBadge({ badge }: { badge: HeroBadge }) {
+  // The white plate scales on the same fluid curve as the heading, so it
+  // shrinks with its column instead of crowding it at smaller breakpoints.
   if (badge.variant === "white") {
     return (
-      <div className="mt-5 inline-block rounded-[10px] bg-white px-6 py-3 text-center shadow-[0_10px_34px_rgba(2,6,60,0.35)] md:mt-6 md:rounded-xl md:py-4 lg:px-8 xl:px-10">
-        <span className="block font-heading text-[19px] font-bold tracking-[0.1em] text-navy-900 md:text-[22px] lg:text-[26px] xl:text-[30px]">
+      <div className="mt-5 inline-block rounded-[10px] bg-white px-6 py-3 text-center shadow-[0_10px_34px_rgba(2,6,60,0.35)] md:mt-6 md:rounded-xl md:py-4 md:px-[clamp(24px,4.2vw_-_8px,40px)]">
+        <span className="block font-heading text-[19px] font-bold tracking-[0.1em] text-navy-900 md:text-[clamp(19px,2.82vw_-_2.5px,30px)]">
           {badge.lines[0]}
         </span>
         {badge.lines[1] && (
-          <span className="mt-0.5 block font-heading text-[16px] font-bold text-navy-900 md:text-[18px] lg:text-[21px] xl:text-[24px]">
+          <span className="mt-0.5 block font-heading text-[16px] font-bold text-navy-900 md:text-[clamp(15px,2.26vw_-_2px,24px)]">
             {badge.lines[1]}
           </span>
         )}

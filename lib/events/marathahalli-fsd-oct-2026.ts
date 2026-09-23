@@ -108,23 +108,25 @@ export const MARATHAHALLI_FSD_OCT_2026: RegEventConfig = {
     containerClassName: "max-w-content",
     paddingTopClassName: "pt-14 md:pt-16 pb-4 lg:pt-16",
     freeBadgeWrapperClassName: "mt-8 mb-12",
-    // Three lines in a half-width column, so the scale steps at xl as well as
-    // md/lg — at the full lg size "Placement Drive" wraps below ~1280px.
+    // Three lines sharing a half-width column, so from md the type scales
+    // fluidly with the viewport instead of jumping at breakpoints — stepped
+    // sizes left 768px cramped and 1024px lurching. Every line rides the same
+    // curve (46px at md up to 72px once the 1152px container is reached),
+    // scaled by its own ratio so the lines stay in proportion and none wraps.
     headingLines: [
       {
         text: "ExcelR’s",
-        className: "text-[32px] md:text-[36px] lg:text-[46px] xl:text-[60px]",
+        className: "text-[32px] md:text-[clamp(38px,5.64vw_-_5px,60px)]",
       },
       {
         text: "Placement Drive",
-        className: "text-[40px] md:text-[44px] lg:text-[56px] xl:text-[72px]",
+        className: "text-[40px] md:text-[clamp(46px,6.77vw_-_6px,72px)]",
       },
       {
         text: "in Marathahalli",
         small: "(Bangalore)",
-        className: "text-[28px] md:text-[32px] lg:text-[42px] xl:text-[54px]",
-        smallClassName:
-          "text-[18px] md:text-[21px] lg:text-[28px] xl:text-[36px]",
+        className: "text-[28px] md:text-[clamp(34px,5.08vw_-_4.5px,54px)]",
+        smallClassName: "text-[18px] md:text-[clamp(23px,3.39vw_-_3px,36px)]",
       },
     ],
     badge: {
@@ -150,7 +152,7 @@ export const MARATHAHALLI_FSD_OCT_2026: RegEventConfig = {
     imageClassName:
       "left-[calc(50%+16px)] lg:left-[calc(50%+8px)] xl:left-[calc(50%-30px)]",
     freeBadgeClassName:
-      "h-auto w-[170px] drop-shadow-[0_0_20px_rgba(59,130,246,0.35)] md:w-[200px]",
+      "h-auto w-[170px] drop-shadow-[0_0_20px_rgba(59,130,246,0.35)] md:w-[clamp(150px,13vw_+_50px,200px)]",
   },
 
   freeBadgeSrc: `${ASSETS}/free-badge.png`,
