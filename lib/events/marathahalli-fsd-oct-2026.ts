@@ -90,7 +90,7 @@ const FAQS: FaqItem[] = [
 
 export const MARATHAHALLI_FSD_OCT_2026: RegEventConfig = {
   href: "/marathahalli-fsd-oct-2026",
-  thankYouHref: "/marathahalli-fsd-oct-2026/thank-you",
+  thankYouHref: "/thank-you",
   name: "ExcelR’s Placement Drive in Marathahalli",
 
   meta: {

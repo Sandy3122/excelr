@@ -30,7 +30,14 @@ export default function RegistrationForm({
   closed?: boolean;
 }) {
   const router = useRouter();
-  const { laptopNote, thankYouHref } = useRegEvent();
+  const {
+    laptopNote,
+    thankYouHref,
+    href,
+    name: driveName,
+    thankYou,
+    footer,
+  } = useRegEvent();
   const [status, setStatus] = useState<Status>("idle");
   const [serverError, setServerError] = useState<string | null>(null);
   const [otpOpen, setOtpOpen] = useState(false);
@@ -75,7 +82,23 @@ export default function RegistrationForm({
         if (!res.ok || !data.ok) {
           throw new Error(data.error || "Something went wrong. Please try again.");
         }
-        const params = new URLSearchParams({ name: values.fullName });
+        // The whole confirmation card is driven off this page's own config —
+        // /thank-you renders whatever facts arrive in the URL, so it never
+        // needs to know which drive submitted, and a new drive never needs a
+        // registry entry.
+        const params = new URLSearchParams({
+          name: values.fullName,
+          event: driveName,
+          date: thankYou.date,
+          venueName: thankYou.venueName,
+          venueArea: thankYou.venueArea,
+          bringNote: thankYou.bringNote,
+          back: href,
+          footerCopyright: footer.copyright,
+          footerLocation: footer.location,
+        });
+        if (thankYou.time) params.set("time", thankYou.time);
+        if (thankYou.note) params.set("note", thankYou.note);
         router.replace(`${thankYouHref}?${params.toString()}`);
       } catch (err) {
         if (keepModal) setOtpOpen(false);
@@ -85,7 +108,7 @@ export default function RegistrationForm({
         );
       }
     },
-    [router, closed, thankYouHref],
+    [router, closed, thankYouHref, driveName, thankYou, href, footer],
   );
 
   const onSubmit = async (values: RegistrationFormInput) => {

@@ -122,7 +122,7 @@ const HERO_HEADING_SIZE = "text-[42px] md:text-[56px] lg:text-[72px]";
 /** The original `/reg` drive. Kept byte-for-byte equivalent to the old page. */
 export const DEFAULT_REG_EVENT: RegEventConfig = {
   href: "/reg",
-  thankYouHref: "/reg/thank-you",
+  thankYouHref: "/thank-you",
   name: EVENT.title,
 
   meta: {
