@@ -23,7 +23,7 @@ const DRIVE = {
 const OTHER_DRIVE = {
   ...DRIVE,
   id: "drive-oct",
-  slug: "marathahalli-fsd-oct-2026",
+  slug: "fsd-oct-2026",
 } as PlacementDrive;
 
 /**

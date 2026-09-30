@@ -110,10 +110,10 @@ describe("toRegistrationRecord", () => {
   it("tags the record with whichever drive owns the page", () => {
     const record = toRegistrationRecord(sample, "2026-10-01T00:00:00.000Z", {
       id: "drive-2",
-      slug: "marathahalli-fsd-oct-2026",
-      eventKey: "marathahalli-fsd-oct-2026",
+      slug: "fsd-oct-2026",
+      eventKey: "fsd-oct-2026",
     });
     expect(record.placementDriveId).toBe("drive-2");
-    expect(record.event).toBe("marathahalli-fsd-oct-2026");
+    expect(record.event).toBe("fsd-oct-2026");
   });
 });

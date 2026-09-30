@@ -94,7 +94,7 @@ To avoid that, list the old slug in `DRIVE_SLUG_ALIASES` in `lib/site.ts`:
 
 ```ts
 export const DRIVE_SLUG_ALIASES = {
-  "fsd-oct-2026": ["marathahalli-fsd-oct-2026"],
+  "fsd-oct-2026": ["fsd-oct-2026"],
 };
 ```
 
@@ -227,7 +227,7 @@ node scripts/migrate-placement-drives.mjs --apply    # perform it
 It is non-destructive (source collections are only read) and idempotent
 (existing targets are skipped), so an interrupted run can simply be repeated —
 batches commit as they go, and progress is printed per batch. Registrations are
-routed by `pageUrl`: anything under `/marathahalli-fsd-oct-2026` goes to the
+routed by `pageUrl`: anything under `/fsd-oct-2026` goes to the
 October drive, everything else to the August drive.
 
 ### Removing the old collections

@@ -19,7 +19,7 @@ const nextConfig = {
     return [
       { source: "/reg/thank-you", destination: "/thank-you", permanent: false },
       {
-        source: "/marathahalli-fsd-oct-2026/thank-you",
+        source: "/fsd-oct-2026/thank-you",
         destination: "/thank-you",
         permanent: false,
       },

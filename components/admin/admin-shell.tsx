@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { notFound, usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
@@ -13,19 +13,28 @@ import {
   Settings,
   Users,
 } from "lucide-react";
-import { HOLD_ADMIN_SETTINGS } from "@/lib/admin/settings-feature";
+import {
+  isAdminPathDisabled,
+  visibleAdminSections,
+  type AdminSectionKey,
+} from "@/lib/admin/sections";
 import { AdminDriveProvider } from "./drive-context";
 import { DriveSelector } from "./drive-selector";
 
-const NAV = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
-  { href: "/admin/leads", label: "Leads", icon: Users },
-  { href: "/admin/automations", label: "Automations", icon: Send },
-  { href: "/admin/drives", label: "Placement Drives", icon: Megaphone },
-  ...(!HOLD_ADMIN_SETTINGS
-    ? [{ href: "/admin/settings", label: "Settings", icon: Settings }]
-    : []),
-];
+/** Which sections exist, and whether each is switched on: lib/admin/sections.ts. */
+const ICONS: Record<AdminSectionKey, typeof LayoutDashboard> = {
+  overview: LayoutDashboard,
+  leads: Users,
+  automations: Send,
+  drives: Megaphone,
+  settings: Settings,
+};
+
+const NAV = visibleAdminSections().map((section) => ({
+  href: section.href,
+  label: section.label,
+  icon: ICONS[section.key],
+}));
 
 const SIDEBAR_KEY = "admin-sidebar-collapsed";
 
@@ -80,6 +89,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       setLogoutOpen(false);
     }
   }
+
+  // Middleware already 404s these on request; this catches the client-side
+  // case — a stale <Link> or a router.push to a section switched off since.
+  // After every hook, so the hook order never changes between renders.
+  if (isAdminPathDisabled(pathname)) notFound();
 
   return (
     <AdminDriveProvider>

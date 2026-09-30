@@ -8,7 +8,7 @@
  *   meta/cronState.cursors           →  placementDrives/{driveId}/meta/cronState
  *
  * Registrations are assigned by `pageUrl`: anything whose path starts with
- * /marathahalli-fsd-oct-2026 goes to the October drive, everything else
+ * /fsd-oct-2026 goes to the October drive, everything else
  * (including rows with no pageUrl) goes to the August drive.
  *
  * Properties:
@@ -156,13 +156,13 @@ const AUG = {
 
 const OCT = {
   name: "Full Stack Placement Drive — Marathahalli, Oct 2026",
-  slug: "marathahalli-fsd-oct-2026",
+  slug: "fsd-oct-2026",
   enabled: true,
   archived: false,
   eventDayIstDate: "2026-10-09",
   dayBeforeIstDate: "2026-10-08",
   registrationClosesAtIso: null,
-  eventKey: "marathahalli-fsd-oct-2026",
+  eventKey: "fsd-oct-2026",
   webhookUrl: "https://excelr.app.n8n.cloud/webhook/java-fsd-registration",
   whatsapp: {
     sender: "",
@@ -286,7 +286,7 @@ function driveSlugForPageUrl(pageUrl) {
   } catch {
     /* not an absolute URL — treat the raw value as a path */
   }
-  return path.startsWith("/marathahalli-fsd-oct-2026") ? OCT.slug : AUG.slug;
+  return path.startsWith("/fsd-oct-2026") ? OCT.slug : AUG.slug;
 }
 
 /** Create or update a drive document plus its slug index entry. */

@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { HOLD_ADMIN_SETTINGS } from "@/lib/admin/settings-feature";
+import { isAdminPathDisabled } from "@/lib/admin/sections";
 import { redirectTargetFor } from "@/lib/site";
-
-const HELD_ADMIN_PATHS = new Set([
-  "/admin/settings",
-  "/api/admin/registration-window",
-]);
 
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  if (HELD_ADMIN_PATHS.has(pathname)) {
-    if (!HOLD_ADMIN_SETTINGS) return NextResponse.next();
+  // A section switched off in lib/admin/sections.ts is unreachable, including
+  // by typing its URL. Runs before anything else so a disabled page never
+  // renders and its APIs never execute.
+  if (isAdminPathDisabled(pathname)) {
     return new NextResponse("Not Found", {
       status: 404,
       headers: { "content-type": "text/plain; charset=utf-8" },
@@ -32,10 +29,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/",
-    "/admin/settings",
-    "/api/admin/registration-window",
-    "/marathahalli-fsd-oct-2026",
-  ],
+  // Next requires literal values here, so this cannot be derived from the
+  // section list — it is deliberately broad, and the per-section decision is
+  // made above.
+  matcher: ["/", "/admin/:path*", "/api/admin/:path*", "/marathahalli-fsd-oct-2026"],
 };

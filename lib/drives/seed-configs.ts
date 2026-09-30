@@ -131,13 +131,13 @@ export const REG_AUG_2026_SEED: PlacementDriveConfig = {
  */
 export const MARATHAHALLI_OCT_2026_SEED: PlacementDriveConfig = {
   name: "Full Stack Placement Drive — BTM, Oct 2026",
-  slug: "marathahalli-fsd-oct-2026",
+  slug: "fsd-oct-2026",
   enabled: true,
   archived: false,
   eventDayIstDate: "2026-10-09",
   dayBeforeIstDate: "2026-10-08",
   registrationClosesAtIso: null,
-  eventKey: "marathahalli-fsd-oct-2026",
+  eventKey: "fsd-oct-2026",
   webhookUrl: "https://excelr.app.n8n.cloud/webhook/java-fsd-registration",
   whatsapp: {
     ...defaultWhatsAppConfig(),

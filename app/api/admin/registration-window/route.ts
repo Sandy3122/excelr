@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminDrive } from "@/lib/admin/drive-context";
-import { HOLD_ADMIN_SETTINGS } from "@/lib/admin/settings-feature";
+import { isAdminSectionEnabled } from "@/lib/admin/sections";
 import { istDateAndTimeToUtcIso } from "@/lib/registration-window";
 import {
   driveWindowStatus,
@@ -14,20 +14,21 @@ export const dynamic = "force-dynamic";
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^\d{2}:\d{2}$/;
 
+/** Middleware already blocks this when Settings is off; belt and braces. */
 function heldNotFound() {
   return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
 }
 
 /** Registration window for one drive. Closing one drive never affects another. */
 export async function GET(req: Request) {
-  if (HOLD_ADMIN_SETTINGS) return heldNotFound();
+  if (!isAdminSectionEnabled("settings")) return heldNotFound();
   const ctx = await requireAdminDrive(req);
   if (!ctx.ok) return ctx.response;
   return NextResponse.json({ ok: true, ...driveWindowStatus(ctx.drive) });
 }
 
 export async function PUT(req: Request) {
-  if (HOLD_ADMIN_SETTINGS) return heldNotFound();
+  if (!isAdminSectionEnabled("settings")) return heldNotFound();
   const ctx = await requireAdminDrive(req);
   if (!ctx.ok) return ctx.response;
   const driveId = ctx.drive.id;
