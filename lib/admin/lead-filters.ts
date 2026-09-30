@@ -35,10 +35,30 @@ export const EMPTY_LEAD_FILTERS: LeadFilters = {
 
 export const QUALIFICATION_FILTER_OPTIONS = QUALIFICATION_OPTIONS;
 
-const EMAIL_KINDS: AutomationKind[] = ["welcome", "reminder_day_before"];
+/**
+ * Which channels an automation uses, and whether it runs at all, for the drive
+ * currently being viewed. Supplied by the caller rather than assumed: the same
+ * automation may be WhatsApp-only on one campaign and WhatsApp + email on
+ * another, and a drive can turn it off entirely.
+ */
+export type DriveAutomationView = Record<
+  AutomationKind,
+  { enabled: boolean; channels: Channel[] }
+>;
 
-export function channelsForKind(kind: AutomationKind): Channel[] {
-  return EMAIL_KINDS.includes(kind) ? ["whatsapp", "email"] : ["whatsapp"];
+/** Fallback when no drive is loaded yet — WhatsApp only, nothing disabled. */
+export const DEFAULT_AUTOMATION_VIEW: DriveAutomationView = Object.fromEntries(
+  AUTOMATION_KINDS.map((kind) => [
+    kind,
+    { enabled: true, channels: ["whatsapp"] as Channel[] },
+  ]),
+) as DriveAutomationView;
+
+export function channelsForKind(
+  kind: AutomationKind,
+  view: DriveAutomationView,
+): Channel[] {
+  return view[kind]?.channels ?? [];
 }
 
 export function leadChannelStatus(
@@ -64,18 +84,35 @@ export function rollupStatus(
 export function statusesForKind(
   reg: StoredRegistration,
   kind: AutomationKind,
+  view: DriveAutomationView,
 ): MessageStatus[] {
-  return channelsForKind(kind).map((channel) =>
+  return channelsForKind(kind, view).map((channel) =>
     leadChannelStatus(reg, kind, channel),
   );
+}
+
+/** Channel + status pairs for one automation, ready to render. */
+export function deliveriesForKind(
+  reg: StoredRegistration,
+  kind: AutomationKind,
+  view: DriveAutomationView,
+): { channel: Channel; status: MessageStatus }[] {
+  return channelsForKind(kind, view).map((channel) => ({
+    channel,
+    status: leadChannelStatus(reg, kind, channel),
+  }));
 }
 
 export function kindMatchesStatus(
   reg: StoredRegistration,
   kind: AutomationKind,
   status: DeliveryFilter,
+  view: DriveAutomationView,
 ): boolean {
-  const rolled = statusesForKind(reg, kind).map(rollupStatus);
+  // A disabled automation has no delivery to match on.
+  if (!view[kind]?.enabled) return false;
+  const rolled = statusesForKind(reg, kind, view).map(rollupStatus);
+  if (rolled.length === 0) return false;
   if (status === "pending") {
     return rolled.some((s) => s === "pending" || s === "sending");
   }
@@ -87,6 +124,7 @@ export function kindMatchesStatus(
 export function matchesLeadFilters(
   reg: StoredRegistration,
   filters: LeadFilters,
+  view: DriveAutomationView,
   lockedKind?: AutomationKind,
 ): boolean {
   const needle = filters.q.trim().toLowerCase();
@@ -114,7 +152,9 @@ export function matchesLeadFilters(
       ? filters.statusKinds
       : [...AUTOMATION_KINDS];
   return kinds.some((kind) =>
-    filters.statuses.some((status) => kindMatchesStatus(reg, kind, status)),
+    filters.statuses.some((status) =>
+      kindMatchesStatus(reg, kind, status, view),
+    ),
   );
 }
 
@@ -153,9 +193,44 @@ export function uniqueQualifications(leads: StoredRegistration[]): string[] {
 export function idsMatching(
   leads: StoredRegistration[],
   filters: LeadFilters,
+  view: DriveAutomationView,
   lockedKind?: AutomationKind,
 ): string[] {
   return leads
-    .filter((reg) => matchesLeadFilters(reg, filters, lockedKind))
+    .filter((reg) => matchesLeadFilters(reg, filters, view, lockedKind))
     .map((reg) => reg.id);
+}
+
+/**
+ * How one automation's delivery should be shown for a lead.
+ *
+ * `single` when every channel reads the same — two identical "Sent" pills carry
+ * no more information than one. `split` when they genuinely differ, in which
+ * case each badge needs its channel named, because "Sent / Failed" alone gives
+ * no clue which channel failed.
+ *
+ * Statuses are compared by display label, so `sent` and `legacy` (both shown as
+ * "Sent") collapse together.
+ */
+export type DeliverySummary =
+  | { kind: "disabled" }
+  | { kind: "none" }
+  | { kind: "single"; status: MessageStatus; channels: Channel[] }
+  | { kind: "split"; entries: { channel: Channel; status: MessageStatus }[] };
+
+export function summariseDelivery(
+  entries: { channel: Channel; status: MessageStatus }[],
+  options: { enabled: boolean; label: (status: MessageStatus) => string },
+): DeliverySummary {
+  if (!options.enabled) return { kind: "disabled" };
+  if (entries.length === 0) return { kind: "none" };
+  const labels = new Set(entries.map((e) => options.label(e.status)));
+  if (labels.size === 1) {
+    return {
+      kind: "single",
+      status: entries[0].status,
+      channels: entries.map((e) => e.channel),
+    };
+  }
+  return { kind: "split", entries };
 }

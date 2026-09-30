@@ -11,6 +11,28 @@ export interface RegistrationWindow {
 export interface RegistrationWindowStatus extends RegistrationWindow {
   closed: boolean;
   closesAtLabel: string | null;
+  /** Why it is closed, when it is. */
+  closedReason: "scheduled" | "event_passed" | null;
+}
+
+/**
+ * A drive stops taking registrations once its event day is over, whether or
+ * not anyone remembered to schedule a close time. Nobody can attend a drive
+ * that already happened, and leaving a finished campaign open is how stale
+ * pages keep collecting leads.
+ *
+ * The cutoff is the end of the event day in IST, so same-day signups still
+ * work. A drive that needs to stay open past that (or close earlier) sets an
+ * explicit close time, which always wins.
+ */
+export function hasEventPassed(
+  eventDayIstDate: string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!eventDayIstDate) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDayIstDate)) return false;
+  const endOfEventDay = istWallClockToUtc(`${eventDayIstDate}T23:59:59`);
+  return now.getTime() > endOfEventDay.getTime();
 }
 
 export function isRegistrationClosed(
@@ -31,13 +53,17 @@ export function formatClosesAtLabel(closesAtIso: string | null): string | null {
 }
 
 export function toWindowStatus(
-  win: RegistrationWindow,
+  win: RegistrationWindow & { eventDayIstDate?: string | null },
   now: Date = new Date(),
 ): RegistrationWindowStatus {
+  const scheduled = isRegistrationClosed(win.closesAtIso, now);
+  const eventPassed = hasEventPassed(win.eventDayIstDate, now);
   return {
-    ...win,
-    closed: isRegistrationClosed(win.closesAtIso, now),
+    closesAtIso: win.closesAtIso,
+    updatedAt: win.updatedAt,
+    closed: scheduled || eventPassed,
     closesAtLabel: formatClosesAtLabel(win.closesAtIso),
+    closedReason: scheduled ? "scheduled" : eventPassed ? "event_passed" : null,
   };
 }
 

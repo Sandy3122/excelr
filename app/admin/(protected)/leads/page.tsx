@@ -2,15 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
-import { StatusBadge } from "@/components/admin/status-badge";
+import { DeliveryBadge } from "@/components/admin/delivery-badge";
 import { AdminPagination } from "@/components/admin/pagination";
 import { LeadsPageSkeleton, TableRowSkeleton } from "@/components/admin/skeleton";
 import { LeadFilterBar } from "@/components/admin/lead-filter-bar";
 import { SortableTh, TableSortSelect } from "@/components/admin/sortable-th";
 import { useAllLeads } from "@/components/admin/use-all-leads";
+import { useAdminDrive, withDrive } from "@/components/admin/drive-context";
 import {
   EMPTY_LEAD_FILTERS,
+  deliveriesForKind,
   leadChannelStatus,
+  DEFAULT_AUTOMATION_VIEW,
+  type DriveAutomationView,
   matchesLeadFilters,
   uniqueColleges,
   uniqueQualifications,
@@ -48,15 +52,16 @@ const LEAD_SORT_OPTIONS: { key: LeadSortKey; label: string }[] = [
   { key: "registered", label: "Registered" },
   { key: "welcome", label: "Welcome" },
   { key: "carry", label: "Carry" },
-  { key: "reminder21", label: "21 Aug" },
-  { key: "reminder22", label: "22 Aug" },
+  { key: "reminder21", label: "Day before" },
+  { key: "reminder22", label: "Event day" },
 ];
 
+/** Column headings. Dates belong to the drive, so the labels stay generic. */
 const KIND_SHORT = {
   welcome: "Welcome",
   things_to_carry: "Carry",
-  reminder_day_before: "21 Aug",
-  reminder_event_day: "22 Aug",
+  reminder_day_before: "Day before",
+  reminder_event_day: "Event day",
 } as const;
 
 function leadSortValue(reg: StoredRegistration, key: LeadSortKey): unknown {
@@ -83,17 +88,22 @@ function registeredLabel(reg: StoredRegistration) {
 }
 
 export default function AdminLeadsPage() {
+  const { driveId, drive } = useAdminDrive();
   const { leads, loading, error } = useAllLeads();
   const [filters, setFilters] = useState<LeadFilters>(EMPTY_LEAD_FILTERS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [sort, setSort] = useState<TableSortState<LeadSortKey>>(emptyTableSort());
 
+  // Which channels each automation uses comes from the selected drive, so a
+  // campaign with email switched off never renders an email badge.
+  const automationView = drive?.automations ?? DEFAULT_AUTOMATION_VIEW;
+
   const colleges = useMemo(() => uniqueColleges(leads), [leads]);
   const qualifications = useMemo(() => uniqueQualifications(leads), [leads]);
   const filtered = useMemo(
-    () => leads.filter((reg) => matchesLeadFilters(reg, filters)),
-    [leads, filters],
+    () => leads.filter((reg) => matchesLeadFilters(reg, filters, automationView)),
+    [leads, filters, automationView],
   );
   const sorted = useMemo(
     () => sortRows(filtered, sort, leadSortValue),
@@ -127,7 +137,7 @@ export default function AdminLeadsPage() {
           </p>
         </div>
         <a
-          href="/api/admin/leads/export"
+          href={withDrive("/api/admin/leads/export", driveId)}
           className="hidden items-center gap-2 rounded-full bg-navy-900 px-4 py-2 text-sm font-semibold text-white lg:inline-flex"
         >
           <Download className="h-4 w-4" />
@@ -151,7 +161,7 @@ export default function AdminLeadsPage() {
               onClear={() => setSort(emptyTableSort())}
             />
             <a
-              href="/api/admin/leads/export"
+              href={withDrive("/api/admin/leads/export", driveId)}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white"
             >
               <Download className="h-4 w-4" />
@@ -175,6 +185,7 @@ export default function AdminLeadsPage() {
                 key={r.id}
                 lead={r}
                 serial={(safePage - 1) * pageSize + i + 1}
+                automationView={automationView}
               />
             ))}
         {!loading && filtered.length === 0 ? (
@@ -232,12 +243,10 @@ export default function AdminLeadsPage() {
                       </td>
                       {AUTOMATION_KINDS.map((kind) => (
                         <td key={kind} className="px-4 py-3">
-                          <div className="flex flex-col gap-1">
-                            <StatusBadge status={leadChannelStatus(r, kind, "whatsapp")} />
-                            {kind === "welcome" || kind === "reminder_day_before" ? (
-                              <StatusBadge status={leadChannelStatus(r, kind, "email")} />
-                            ) : null}
-                          </div>
+                          <DeliveryBadge
+                            enabled={automationView[kind]?.enabled ?? true}
+                            entries={deliveriesForKind(r, kind, automationView)}
+                          />
                         </td>
                       ))}
                     </tr>
@@ -267,9 +276,11 @@ export default function AdminLeadsPage() {
 function LeadMobileCard({
   lead,
   serial,
+  automationView,
 }: {
   lead: StoredRegistration;
   serial: number;
+  automationView: DriveAutomationView;
 }) {
   return (
     <article className="rounded-2xl bg-white p-4 shadow-card">
@@ -308,10 +319,10 @@ function LeadMobileCard({
               {KIND_SHORT[kind]}
             </div>
             <div className="mt-1 flex flex-wrap gap-1">
-              <StatusBadge status={leadChannelStatus(lead, kind, "whatsapp")} />
-              {kind === "welcome" || kind === "reminder_day_before" ? (
-                <StatusBadge status={leadChannelStatus(lead, kind, "email")} />
-              ) : null}
+              <DeliveryBadge
+                enabled={automationView[kind]?.enabled ?? true}
+                entries={deliveriesForKind(lead, kind, automationView)}
+              />
             </div>
           </div>
         ))}

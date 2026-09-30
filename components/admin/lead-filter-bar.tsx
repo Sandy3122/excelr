@@ -17,8 +17,8 @@ import { AUTOMATION_KINDS, type AutomationKind } from "@/lib/automations/types";
 const KIND_LABELS: Record<AutomationKind, string> = {
   welcome: "Welcome",
   things_to_carry: "Things to carry",
-  reminder_day_before: "Reminder 21 Aug",
-  reminder_event_day: "Reminder 22 Aug",
+  reminder_day_before: "Reminder — day before",
+  reminder_event_day: "Reminder — event day",
 };
 
 const STATUS_LABELS: Record<(typeof DELIVERY_FILTER_VALUES)[number], string> = {

@@ -10,7 +10,11 @@ export interface RegistrationRecord {
   qualification: string;
   pageUrl: string;
   submittedAtIso: string;
+  /** Campaign key echoed to the webhook; comes from the drive's `eventKey`. */
   event: string;
+  /** Owning placement drive. Stored on the document as well as implied by path. */
+  placementDriveId: string;
+  placementDriveSlug: string;
 }
 
 export interface StoredRegistration extends RegistrationRecord {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { confirmOtp } from "@/lib/whatsapp-otp/service";
 import { VERIFY_MESSAGES, verifyStatus } from "@/lib/whatsapp-otp/http";
+import { resolvePublicDrive } from "@/lib/drives/request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,22 @@ export async function POST(req: Request) {
     );
   }
 
-  const obj = (body ?? {}) as { phoneNumber?: unknown; otp?: unknown };
+  const obj = (body ?? {}) as {
+    phoneNumber?: unknown;
+    otp?: unknown;
+    driveSlug?: unknown;
+  };
+
+  // The verified marker is stored per drive, so the code must be checked
+  // against the campaign that issued it.
+  const resolved = await resolvePublicDrive(obj.driveSlug);
+  if (!resolved.ok) {
+    return NextResponse.json(
+      { success: false, message: resolved.error },
+      { status: resolved.status },
+    );
+  }
+
   if (typeof obj.phoneNumber !== "string") {
     return NextResponse.json(
       { success: false, message: VERIFY_MESSAGES.INVALID_PHONE },
@@ -24,7 +40,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = await confirmOtp(obj.phoneNumber, obj.otp);
+  const result = await confirmOtp(resolved.drive, obj.phoneNumber, obj.otp);
 
   return NextResponse.json(
     {

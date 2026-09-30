@@ -1,4 +1,4 @@
-import { getInfobipConfig, type InfobipConfig } from "./config";
+import type { InfobipSendConfig } from "./config";
 
 /**
  * Infobip WhatsApp template send service (server-side only).
@@ -26,14 +26,16 @@ export type SendResult =
   | { ok: true; providerMessageId?: string }
   | { ok: false; error: string };
 
-/** OTP template `fsd_website_otp_11082026` — body placeholder + URL button. */
+/** OTP template — body placeholder plus a URL button carrying the code. */
 export function buildTemplatePayload(
-  cfg: InfobipConfig,
+  cfg: InfobipSendConfig,
   toInfobip: string,
   otp: string,
+  templateName: string,
+  urlButtonParam: string,
 ): InfobipTemplatePayload {
   const parameter =
-    cfg.urlButtonParam.toLowerCase() === "otp" ? otp : cfg.urlButtonParam;
+    urlButtonParam.toLowerCase() === "otp" ? otp : urlButtonParam;
 
   return {
     messages: [
@@ -41,7 +43,7 @@ export function buildTemplatePayload(
         from: cfg.sender,
         to: toInfobip,
         content: {
-          templateName: cfg.templateName,
+          templateName,
           templateData: {
             body: { placeholders: [otp] },
             buttons: [{ type: "URL", parameter }],
@@ -53,54 +55,8 @@ export function buildTemplatePayload(
   };
 }
 
-/**
- * Confirmation template `fsd_placement_drive_confirmation_message_a`
- * (template ID 2283037602514705) — body placeholder only, no buttons.
- */
-export function buildConfirmationPayload(
-  cfg: InfobipConfig,
-  toInfobip: string,
-  firstName: string,
-): InfobipTemplatePayload {
-  return {
-    messages: [
-      {
-        from: cfg.sender,
-        to: toInfobip,
-        content: {
-          templateName: cfg.confirmationTemplateName,
-          templateData: {
-            body: { placeholders: [firstName] },
-          },
-          language: cfg.language,
-        },
-      },
-    ],
-  };
-}
-
-export async function sendWhatsAppOtp(
-  toInfobip: string,
-  otp: string,
-): Promise<SendResult> {
-  const cfg = getInfobipConfig();
-  return postTemplate(cfg, buildTemplatePayload(cfg, toInfobip, otp), "otp");
-}
-
-export async function sendRegistrationConfirmationWhatsApp(
-  toInfobip: string,
-  firstName: string,
-): Promise<SendResult> {
-  const cfg = getInfobipConfig();
-  return postTemplate(
-    cfg,
-    buildConfirmationPayload(cfg, toInfobip, firstName),
-    "confirmation",
-  );
-}
-
 export function buildNamedTemplatePayload(
-  cfg: InfobipConfig,
+  cfg: InfobipSendConfig,
   toInfobip: string,
   firstName: string,
   templateName: string,
@@ -123,7 +79,7 @@ export function buildNamedTemplatePayload(
 }
 
 export function buildNamedTemplateBatchPayload(
-  cfg: InfobipConfig,
+  cfg: InfobipSendConfig,
   recipients: Array<{ to: string; firstName: string }>,
   templateName: string,
 ): InfobipTemplatePayload {
@@ -142,12 +98,26 @@ export function buildNamedTemplateBatchPayload(
   };
 }
 
+export async function sendWhatsAppOtp(
+  cfg: InfobipSendConfig,
+  toInfobip: string,
+  otp: string,
+  templateName: string,
+  urlButtonParam: string,
+): Promise<SendResult> {
+  return postTemplate(
+    cfg,
+    buildTemplatePayload(cfg, toInfobip, otp, templateName, urlButtonParam),
+    "otp",
+  );
+}
+
 export async function sendNamedWhatsAppTemplate(
+  cfg: InfobipSendConfig,
   toInfobip: string,
   firstName: string,
   templateName: string,
 ): Promise<SendResult> {
-  const cfg = getInfobipConfig();
   return postTemplate(
     cfg,
     buildNamedTemplatePayload(cfg, toInfobip, firstName, templateName),
@@ -165,12 +135,14 @@ export type BatchSendItem = {
  * Results are aligned to the input order; a rejected member does not fail the rest.
  */
 export async function sendNamedWhatsAppTemplateBatch(
+  cfg: InfobipSendConfig,
   recipients: Array<{ to: string; firstName: string }>,
   templateName: string,
 ): Promise<BatchSendItem[]> {
   if (recipients.length === 0) return [];
   if (recipients.length === 1) {
     const result = await sendNamedWhatsAppTemplate(
+      cfg,
       recipients[0].to,
       recipients[0].firstName,
       templateName,
@@ -178,7 +150,6 @@ export async function sendNamedWhatsAppTemplateBatch(
     return [{ to: recipients[0].to, result }];
   }
 
-  const cfg = getInfobipConfig();
   const payload = buildNamedTemplateBatchPayload(cfg, recipients, templateName);
   const parsed = await postTemplateRaw(cfg, payload, templateName);
   if (!parsed.ok) {
@@ -232,7 +203,7 @@ type PostTemplateRaw =
   | { ok: true; messages: InfobipMessageStatus[] };
 
 async function postTemplateRaw(
-  cfg: InfobipConfig,
+  cfg: InfobipSendConfig,
   payload: InfobipTemplatePayload,
   kind: string,
 ): Promise<PostTemplateRaw> {
@@ -298,7 +269,7 @@ async function postTemplateRaw(
 }
 
 async function postTemplate(
-  cfg: InfobipConfig,
+  cfg: InfobipSendConfig,
   payload: InfobipTemplatePayload,
   kind: string,
 ): Promise<SendResult> {

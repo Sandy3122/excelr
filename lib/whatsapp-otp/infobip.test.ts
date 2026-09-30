@@ -1,26 +1,32 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  buildConfirmationPayload,
   buildNamedTemplatePayload,
   buildTemplatePayload,
-  sendRegistrationConfirmationWhatsApp,
+  sendNamedWhatsAppTemplate,
   sendWhatsAppOtp,
 } from "./infobip";
-import type { InfobipConfig } from "./config";
+import type { InfobipSendConfig } from "./config";
 
-const baseCfg: InfobipConfig = {
+/** Account credentials plus the drive's sender and language. */
+const baseCfg: InfobipSendConfig = {
   baseUrl: "https://example.api.infobip.com",
   apiKey: "test-api-key",
   sender: "918050162541",
-  templateName: "fsd_website_otp_11082026",
-  confirmationTemplateName: "fsd_placement_drive_confirmation_message_a",
   language: "en_IN",
-  urlButtonParam: "otp",
 };
+
+const OTP_TEMPLATE = "fsd_website_otp_11082026";
+const CONFIRMATION_TEMPLATE = "fsd_placement_drive_confirmation_message_a";
 
 describe("buildTemplatePayload", () => {
   it("matches fsd_website_otp_11082026: OTP in body + URL button", () => {
-    const payload = buildTemplatePayload(baseCfg, "919876543210", "483921");
+    const payload = buildTemplatePayload(
+      baseCfg,
+      "919876543210",
+      "483921",
+      OTP_TEMPLATE,
+      "otp",
+    );
     expect(payload).toEqual({
       messages: [
         {
@@ -40,8 +46,13 @@ describe("buildTemplatePayload", () => {
   });
 
   it("sends a literal button suffix when configured with a fixed value", () => {
-    const cfg = { ...baseCfg, urlButtonParam: "verify" };
-    const payload = buildTemplatePayload(cfg, "919876543210", "483921");
+    const payload = buildTemplatePayload(
+      baseCfg,
+      "919876543210",
+      "483921",
+      OTP_TEMPLATE,
+      "verify",
+    );
     expect(payload.messages[0].content.templateData.buttons).toEqual([
       { type: "URL", parameter: "verify" },
     ]);
@@ -74,9 +85,14 @@ describe("buildNamedTemplatePayload", () => {
   });
 });
 
-describe("buildConfirmationPayload", () => {
-  it("matches fsd_placement_drive_confirmation_message_a: name placeholder, no buttons", () => {
-    const payload = buildConfirmationPayload(baseCfg, "919876543210", "Sandeep");
+describe("confirmation template payload", () => {
+  it("matches the drive's confirmation template: name placeholder, no buttons", () => {
+    const payload = buildNamedTemplatePayload(
+      baseCfg,
+      "919876543210",
+      "Sandeep",
+      CONFIRMATION_TEMPLATE,
+    );
     expect(payload).toEqual({
       messages: [
         {
@@ -117,13 +133,20 @@ describe("sendWhatsAppOtp", () => {
       );
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const res = await sendWhatsAppOtp("919876543210", "483921");
+    const res = await sendWhatsAppOtp(
+      baseCfg,
+      "919876543210",
+      "483921",
+      OTP_TEMPLATE,
+      "otp",
+    );
     expect(res.ok).toBe(true);
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://example.api.infobip.com/whatsapp/1/message/template");
     const headers = (init as RequestInit).headers as Record<string, string>;
-    expect(headers.Authorization).toBe("App secret-key");
+    // Credentials come from the resolved config, not from the environment.
+    expect(headers.Authorization).toBe("App test-api-key");
 
     // The OTP must never be logged.
     for (const call of errSpy.mock.calls) {
@@ -154,7 +177,13 @@ describe("sendWhatsAppOtp", () => {
       ),
     );
 
-    const res = await sendWhatsAppOtp("917989175345", "483921");
+    const res = await sendWhatsAppOtp(
+      baseCfg,
+      "917989175345",
+      "483921",
+      OTP_TEMPLATE,
+      "otp",
+    );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe("WHATSAPP_SEND_FAILED");
   });
@@ -167,7 +196,13 @@ describe("sendWhatsAppOtp", () => {
       new Response(JSON.stringify({ requestError: {} }), { status: 401 }),
     );
 
-    const res = await sendWhatsAppOtp("919876543210", "483921");
+    const res = await sendWhatsAppOtp(
+      baseCfg,
+      "919876543210",
+      "483921",
+      OTP_TEMPLATE,
+      "otp",
+    );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe("WHATSAPP_SEND_FAILED");
   });
@@ -176,9 +211,6 @@ describe("sendWhatsAppOtp", () => {
     process.env.INFOBIP_API_KEY = "secret-key";
     process.env.INFOBIP_BASE_URL = "https://example.api.infobip.com";
     process.env.INFOBIP_WHATSAPP_SENDER = "918050162541";
-    process.env.INFOBIP_CONFIRMATION_TEMPLATE_NAME =
-      "fsd_placement_drive_confirmation_message_a";
-
     const fetchMock = vi.spyOn(global, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ messages: [{ messageId: "conf-1" }] }), {
         status: 200,
@@ -186,7 +218,12 @@ describe("sendWhatsAppOtp", () => {
       }),
     );
 
-    const res = await sendRegistrationConfirmationWhatsApp("919876543210", "Sandeep");
+    const res = await sendNamedWhatsAppTemplate(
+      baseCfg,
+      "919876543210",
+      "Sandeep",
+      CONFIRMATION_TEMPLATE,
+    );
     expect(res.ok).toBe(true);
 
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);

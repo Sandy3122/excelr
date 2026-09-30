@@ -12,6 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, ShieldCheck, X } from "lucide-react";
+import { useRegEvent } from "./reg-event-context";
 
 const OTP_LENGTH = 6;
 const DEFAULT_COOLDOWN = 60;
@@ -41,6 +42,8 @@ export default function OtpVerificationModal({
   onPhoneChange: (phone: string) => void;
 }) {
   const titleId = useId();
+  // Every OTP call is scoped to the drive this landing page belongs to.
+  const { driveSlug } = useRegEvent();
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<Mode>("otp");
   const [phone, setPhone] = useState(initialPhone);
@@ -72,7 +75,10 @@ export default function OtpVerificationModal({
       const res = await fetch("/api/auth/whatsapp/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber: `+91${phoneDigits}` }),
+        body: JSON.stringify({
+          driveSlug,
+          phoneNumber: `+91${phoneDigits}`,
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         success?: boolean;
@@ -97,7 +103,7 @@ export default function OtpVerificationModal({
     } finally {
       setSending(false);
     }
-  }, []);
+  }, [driveSlug]);
 
   // Snapshot phone + auto-send only when the modal opens (not when parent syncs phone edits).
   useEffect(() => {
@@ -155,7 +161,7 @@ export default function OtpVerificationModal({
         const res = await fetch("/api/auth/whatsapp/verify-otp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phoneNumber: e164, otp: code }),
+          body: JSON.stringify({ driveSlug, phoneNumber: e164, otp: code }),
         });
         const data = (await res.json().catch(() => ({}))) as {
           success?: boolean;
@@ -178,7 +184,7 @@ export default function OtpVerificationModal({
         setVerifying(false);
       }
     },
-    [e164, phone, onVerified],
+    [e164, phone, onVerified, driveSlug],
   );
 
   const setDigit = (index: number, char: string) => {

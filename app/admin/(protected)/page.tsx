@@ -6,6 +6,7 @@ import { Calendar, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { OverviewSkeleton, Skeleton, TableRowSkeleton } from "@/components/admin/skeleton";
 import { fetchAdminJson } from "@/components/admin/fetch-json";
+import { useAdminDrive, withDrive } from "@/components/admin/drive-context";
 import { SortableTh, TableSortSelect } from "@/components/admin/sortable-th";
 import {
   emptyTableSort,
@@ -60,16 +61,23 @@ function primaryCounts(item: AutomationOverview): ChannelCounts {
 }
 
 export default function AdminOverviewPage() {
+  const { driveId, drive } = useAdminDrive();
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!driveId) return;
     let cancelled = false;
+    setError("");
+    // Clear first: showing the previous drive's numbers under a new drive's
+    // name, even briefly, reads as real data for the wrong campaign.
+    setData(null);
     (async () => {
       try {
-        const json = await fetchAdminJson<OverviewResponse>("/api/admin/automations", {
-          fresh: true,
-        });
+        const json = await fetchAdminJson<OverviewResponse>(
+          withDrive("/api/admin/automations", driveId),
+          { fresh: true },
+        );
         if (!json.ok) {
           if (!cancelled) setError(json.error || "Could not load dashboard.");
           return;
@@ -82,7 +90,7 @@ export default function AdminOverviewPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [driveId]);
 
   if (error) {
     return (
@@ -121,7 +129,9 @@ export default function AdminOverviewPage() {
       <div>
         <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">Overview</h1>
         <p className="mt-1 text-sm text-muted sm:text-base">
-          Java Full Stack Placement Drive — 22 August 2026, Marathahalli
+          {drive
+            ? `${drive.name}${drive.eventDayIstDate ? ` — ${drive.eventDayIstDate}` : ""}`
+            : "Select a placement drive"}
         </p>
       </div>
 
@@ -190,19 +200,30 @@ export default function AdminOverviewPage() {
         </div>
       </section>
 
-      <RunsByDay days={data.runDays ?? []} />
+      <RunsByDay days={data.runDays ?? []} driveId={driveId} />
     </div>
   );
 }
 
-function RunsByDay({ days }: { days: string[] }) {
+/**
+ * Automation runs for one IST day. `days` only ever contains days that actually
+ * have runs for the selected drive, so the picker cannot offer an empty date.
+ */
+function RunsByDay({ days, driveId }: { days: string[]; driveId: string }) {
   const [selectedDay, setSelectedDay] = useState(days[0] ?? "");
   const [runs, setRuns] = useState<AutomationRun[]>([]);
   const [loading, setLoading] = useState(days.length > 0);
   const [loadError, setLoadError] = useState("");
   const [runSort, setRunSort] = useState<TableSortState<RunSortKey>>(emptyTableSort());
+  // Keyed by drive as well as day — otherwise switching campaigns would serve
+  // the previous drive's runs out of cache.
   const cacheRef = useRef<Record<string, AutomationRun[]>>({});
   const requestRef = useRef(0);
+
+  // A different drive has a different set of run days; jump to its newest.
+  useEffect(() => {
+    setSelectedDay(days[0] ?? "");
+  }, [driveId, days]);
 
   useEffect(() => {
     if (!selectedDay) {
@@ -211,7 +232,8 @@ function RunsByDay({ days }: { days: string[] }) {
       return;
     }
 
-    const cached = cacheRef.current[selectedDay];
+    const cacheKey = `${driveId}:${selectedDay}`;
+    const cached = cacheRef.current[cacheKey];
     if (cached) {
       setRuns(cached);
       setLoading(false);
@@ -228,7 +250,10 @@ function RunsByDay({ days }: { days: string[] }) {
     (async () => {
       try {
         const json = await fetchAdminJson<DayRunsResponse>(
-          `/api/admin/automations/runs?date=${encodeURIComponent(selectedDay)}`,
+          withDrive(
+            `/api/admin/automations/runs?date=${encodeURIComponent(selectedDay)}`,
+            driveId,
+          ),
           { fresh: true },
         );
         if (cancelled || requestId !== requestRef.current) return;
@@ -238,7 +263,7 @@ function RunsByDay({ days }: { days: string[] }) {
           return;
         }
         const next = json.runs ?? [];
-        cacheRef.current[selectedDay] = next;
+        cacheRef.current[cacheKey] = next;
         setRuns(next);
       } catch {
         if (cancelled || requestId !== requestRef.current) return;
@@ -252,7 +277,7 @@ function RunsByDay({ days }: { days: string[] }) {
     return () => {
       cancelled = true;
     };
-  }, [selectedDay]);
+  }, [selectedDay, driveId]);
 
   const dayIndex = days.indexOf(selectedDay);
   const newerDay = dayIndex > 0 ? days[dayIndex - 1] : null;

@@ -31,6 +31,28 @@ export type HeroHeadingLine = {
   smallClassName?: string;
 };
 
+/**
+ * Announcement-style hero copy: a yellow display headline, a script wordmark
+ * with the role beside it, an edition bar, and a claim line. Supply this
+ * instead of `headingLines` + `badge` when a drive uses that treatment.
+ */
+export type HeroAnnounce = {
+  /** Small line above the headline, e.g. "ExcelR's". */
+  eyebrow: string;
+  /** Large yellow display word, e.g. "PLACEMENT". */
+  headline: string;
+  /** Script wordmark rendered beneath it, e.g. "Drive". */
+  script: string;
+  /** Role, stacked to the right of the script word. */
+  roleLines: readonly string[];
+  /** Filled bar under the wordmark, e.g. "BTM EDITION". */
+  edition: string;
+  /** Small word between the rules, e.g. "Now". */
+  nowLabel: string;
+  /** Closing claim, e.g. "BIGGER & BETTER". */
+  claim: string;
+};
+
 export type HeroBadge = {
   /** `indigo` = the original glowing blue plate, `white` = solid white plate. */
   variant: "indigo" | "white";
@@ -39,6 +61,12 @@ export type HeroBadge = {
 };
 
 export type RegEventConfig = {
+  /**
+   * Placement drive this page belongs to. The admin creates a drive with this
+   * slug and configures every automation, template and limit against it — the
+   * page itself carries no campaign behaviour, only its identity.
+   */
+  driveSlug: string;
   /** Route the page is mounted at, e.g. `/reg`. Used for "Back to Home". */
   href: string;
   /** Route of this event's post-registration page. */
@@ -59,9 +87,14 @@ export type RegEventConfig = {
     paddingTopClassName: string;
     /** Margin around the FREE badge — sets the gap to the hero's bottom edge. */
     freeBadgeWrapperClassName: string;
-    headingLines: readonly HeroHeadingLine[];
-    badge: HeroBadge;
-    tagline: string;
+    /** Stacked heading. Omit when `announce` is supplied. */
+    headingLines?: readonly HeroHeadingLine[];
+    /** Role plate under the heading. Omit when `announce` is supplied. */
+    badge?: HeroBadge;
+    /** Announcement treatment; replaces `headingLines` + `badge`. */
+    announce?: HeroAnnounce;
+    /** Supporting sentence. Omit on designs that do not carry one. */
+    tagline?: string;
     image: { src: string; width: number; height: number; alt: string };
     /**
      * `column` — the cutout sits inside the right grid column, bottom-aligned.
@@ -75,15 +108,6 @@ export type RegEventConfig = {
     /** Rendered width of the "Absolutely FREE for All" badge. */
     freeBadgeClassName: string;
   };
-
-  /**
-   * `global`  — honours the shared `meta/registrationWindow` close time.
-   * `open`    — ignores it; this drive has no close time of its own yet.
-   *
-   * NOTE: the close time is a single global Firestore document, not per-drive.
-   * A drive set to `global` closes as soon as any other drive's window lapses.
-   */
-  registrationWindow: "global" | "open";
 
   /** "Absolutely FREE for All" artwork for this event. */
   freeBadgeSrc: string;
@@ -121,6 +145,7 @@ const HERO_HEADING_SIZE = "text-[42px] md:text-[56px] lg:text-[72px]";
 
 /** The original `/reg` drive. Kept byte-for-byte equivalent to the old page. */
 export const DEFAULT_REG_EVENT: RegEventConfig = {
+  driveSlug: "reg",
   href: "/reg",
   thankYouHref: "/thank-you",
   name: EVENT.title,
@@ -157,8 +182,6 @@ export const DEFAULT_REG_EVENT: RegEventConfig = {
   },
 
   freeBadgeSrc: "/reg/free-badge.png",
-
-  registrationWindow: "global",
 
   details: {
     heading: "Event Details",

@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useState } from "react";
 import { CalendarClock } from "lucide-react";
 import { fetchAdminJson } from "@/components/admin/fetch-json";
+import { useAdminDrive, withDrive } from "@/components/admin/drive-context";
 import { utcIsoToIstDateTime } from "@/lib/registration-window";
 
 interface WindowResponse {
@@ -14,6 +17,7 @@ interface WindowResponse {
 }
 
 export default function AdminSettingsPage() {
+  const { driveId } = useAdminDrive();
   const [date, setDate] = useState("");
   const [time, setTime] = useState("18:00");
   const [status, setStatus] = useState<WindowResponse | null>(null);
@@ -21,12 +25,14 @@ export default function AdminSettingsPage() {
   const [busy, setBusy] = useState<"load" | "schedule" | "close" | "open" | "">("load");
 
   async function load() {
+    if (!driveId) return;
     setBusy("load");
     setError("");
     try {
-      const json = await fetchAdminJson<WindowResponse>("/api/admin/registration-window", {
-        fresh: true,
-      });
+      const json = await fetchAdminJson<WindowResponse>(
+        withDrive("/api/admin/registration-window", driveId),
+        { fresh: true },
+      );
       if (!json.ok) {
         setError(json.error || "Could not load settings.");
         return;
@@ -46,7 +52,8 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driveId]);
 
   async function save(action: "schedule" | "close-now" | "open") {
     if (action === "schedule" && (!date || !time)) {
@@ -56,7 +63,7 @@ export default function AdminSettingsPage() {
     setBusy(action === "close-now" ? "close" : action === "open" ? "open" : "schedule");
     setError("");
     try {
-      const res = await fetch("/api/admin/registration-window", {
+      const res = await fetch(withDrive("/api/admin/registration-window", driveId), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
@@ -90,10 +97,25 @@ export default function AdminSettingsPage() {
           Settings
         </h1>
         <p className="mt-1 text-sm text-muted sm:text-base">
-          Close online registrations at a chosen IST date and time. The public
-          site and form update automatically.
+          Close online registrations for the selected drive at a chosen IST date
+          and time. The public site and form update automatically.
         </p>
       </div>
+
+      {driveId ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
+          <p className="text-sm text-muted">
+            Looking for WhatsApp templates, send timing, OTP limits or quiet
+            hours? Those are per drive.
+          </p>
+          <Link
+            href={`/admin/drives/${driveId}`}
+            className="shrink-0 rounded-full bg-navy-900 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Open drive settings
+          </Link>
+        </div>
+      ) : null}
 
       <section className="rounded-2xl bg-white p-5 shadow-card sm:p-6">
         <div className="flex items-start gap-3">

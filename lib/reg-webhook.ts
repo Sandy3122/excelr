@@ -1,25 +1,29 @@
 import { firstNameFrom } from "@/lib/first-name";
 import type { RegistrationInput } from "@/lib/reg-schema";
-
-export const DEFAULT_REGISTRATION_N8N_WEBHOOK_URL =
-  "https://excelr.app.n8n.cloud/webhook/java-fsd-registration";
+import type { PlacementDrive } from "@/lib/drives/types";
 
 const WEBHOOK_TIMEOUT_MS = 4_000;
 
-export function registrationN8nWebhookUrl(): string {
-  const fromEnv = process.env.REGISTRATION_N8N_WEBHOOK_URL?.trim();
-  if (fromEnv === "") return "";
-  return fromEnv || DEFAULT_REGISTRATION_N8N_WEBHOOK_URL;
+/**
+ * Where a drive's new registrations are posted. Configured per drive; an empty
+ * value disables the webhook for that campaign.
+ */
+export function registrationWebhookUrl(drive: PlacementDrive): string {
+  return drive.webhookUrl.trim();
 }
 
 export function buildRegistrationWebhookPayload(input: {
+  drive: Pick<PlacementDrive, "id" | "slug" | "name" | "eventKey">;
   id: string;
   data: RegistrationInput;
   submittedAt: string;
 }) {
   return {
     source: "excelr-placement-drive",
-    event: "java-fullstack-placement-drive",
+    event: input.drive.eventKey,
+    placementDriveId: input.drive.id,
+    placementDriveSlug: input.drive.slug,
+    placementDriveName: input.drive.name,
     id: input.id,
     fullName: input.data.fullName,
     firstName: firstNameFrom(input.data.fullName),
@@ -33,15 +37,16 @@ export function buildRegistrationWebhookPayload(input: {
 }
 
 /**
- * Notify n8n of a new registration. Failures are logged only — they must not
- * block Firestore, email, or WhatsApp.
+ * Notify the drive's webhook of a new registration. Failures are logged only —
+ * they must not block Firestore, email, or WhatsApp.
  */
 export async function notifyRegistrationWebhook(input: {
+  drive: PlacementDrive;
   id: string;
   data: RegistrationInput;
   submittedAt: string;
 }): Promise<void> {
-  const url = registrationN8nWebhookUrl();
+  const url = registrationWebhookUrl(input.drive);
   if (!url) return;
 
   const payload = buildRegistrationWebhookPayload(input);
@@ -58,17 +63,10 @@ export async function notifyRegistrationWebhook(input: {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.warn(
-        "[reg] n8n webhook failed:",
-        res.status,
-        body.slice(0, 300),
-      );
+      console.warn("[reg] webhook failed:", res.status, body.slice(0, 300));
     }
   } catch (err) {
-    console.warn(
-      "[reg] n8n webhook error:",
-      err instanceof Error ? err.message : err,
-    );
+    console.warn("[reg] webhook error:", err instanceof Error ? err.message : err);
   } finally {
     clearTimeout(timer);
   }

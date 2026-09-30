@@ -33,6 +33,7 @@ export default function RegistrationForm({
   const {
     laptopNote,
     thankYouHref,
+    driveSlug,
     href,
     name: driveName,
     thankYou,
@@ -67,6 +68,7 @@ export default function RegistrationForm({
       setServerError(null);
       const payload: RegistrationInput = {
         ...values,
+        driveSlug,
         pageUrl: currentPageUrl(),
       };
       try {
@@ -108,7 +110,7 @@ export default function RegistrationForm({
         );
       }
     },
-    [router, closed, thankYouHref, driveName, thankYou, href, footer],
+    [router, closed, thankYouHref, driveSlug, driveName, thankYou, href, footer],
   );
 
   const onSubmit = async (values: RegistrationFormInput) => {

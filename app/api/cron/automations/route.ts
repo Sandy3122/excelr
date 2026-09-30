@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 import { isAdminAuthorized } from "@/lib/admin/authorize";
 import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
 import { CRON_AUTOMATION_KINDS } from "@/lib/automations/catalog";
-import { isScheduledAutomationDue } from "@/lib/automations/schedule";
+import {
+  driveScheduleContext,
+  isScheduledAutomationDue,
+} from "@/lib/automations/schedule";
 import { runAutomation } from "@/lib/automations/runner";
 import { invalidateOverviewCache } from "@/lib/automations/overview";
+import { listRunnableDrives } from "@/lib/drives/store";
+import { driveWindowStatus } from "@/lib/registration-window-store";
 import {
   CRON_HANDLER_BUDGET_MS,
   CRON_MAX_SEND_BATCHES,
@@ -22,9 +27,10 @@ export const maxDuration = 60;
 
 /**
  * Pinged by cron-job.org every 10 minutes (30s timeout is a hard cap).
- * Each tick sends at most one WhatsApp batch (~40 leads) per due automation
- * and returns within ~18s so the job is 200 OK. Remaining due leads continue
- * on the next 10-minute tick.
+ *
+ * Each tick walks every enabled placement drive and, for each of that drive's
+ * due automations, sends at most one WhatsApp batch (~40 leads). Whatever is
+ * left continues on the next tick from the drive's saved cursor.
  *
  * Auth: Authorization: Bearer $CRON_SECRET
  */
@@ -57,24 +63,47 @@ export async function GET(req: Request) {
     }
 
     const runs: AutomationRun[] = [];
+    const drivesTicked: string[] = [];
+
     try {
-      for (const kind of CRON_AUTOMATION_KINDS) {
-        if (kind !== "things_to_carry" && !isScheduledAutomationDue(kind, now)) {
-          continue;
+      const drives = await listRunnableDrives();
+
+      for (const drive of drives) {
+        if (deadline - Date.now() < 5_000) break;
+
+        const ctx = driveScheduleContext(drive);
+        // A closed drive keeps running its automations — the window only stops
+        // new registrations, not messages to people already signed up.
+        void driveWindowStatus(drive, now);
+        drivesTicked.push(drive.slug);
+
+        for (const kind of CRON_AUTOMATION_KINDS) {
+          const automation = drive.automations[kind];
+          if (!automation?.enabled) continue;
+          if (
+            automation.schedule.type === "at" &&
+            !isScheduledAutomationDue(ctx, kind, now)
+          ) {
+            continue;
+          }
+
+          const remaining = deadline - Date.now();
+          if (remaining < 5_000) break;
+
+          runs.push(
+            await runAutomation({
+              drive,
+              kind,
+              triggeredBy: "cron",
+              force: false,
+              retryFailed: false,
+              timeBudgetMs: remaining,
+              startCursor: await getCronCursor(drive.id, kind),
+              maxSendBatches: CRON_MAX_SEND_BATCHES,
+              persistCursor: true,
+            }),
+          );
         }
-        const remaining = deadline - Date.now();
-        if (remaining < 5_000) break;
-        const run = await runAutomation({
-          kind,
-          triggeredBy: "cron",
-          force: false,
-          retryFailed: false,
-          timeBudgetMs: remaining,
-          startCursor: await getCronCursor(kind),
-          maxSendBatches: CRON_MAX_SEND_BATCHES,
-          persistCursor: true,
-        });
-        runs.push(run);
       }
     } finally {
       await releaseCronLock(lockOwner);
@@ -83,6 +112,7 @@ export async function GET(req: Request) {
     invalidateOverviewCache();
     return NextResponse.json({
       ok: true,
+      drives: drivesTicked,
       ran: runs.length,
       more: runs.some((run) => Boolean(run.cursor)),
       durationMs: Date.now() - handlerStarted,

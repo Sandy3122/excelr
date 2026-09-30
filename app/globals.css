@@ -5,6 +5,7 @@
 :root {
   --font-poppins: "Poppins", system-ui, sans-serif;
   --font-inter: "Inter", system-ui, sans-serif;
+  --font-script: "Great Vibes", cursive;
 }
 
 html {

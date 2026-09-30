@@ -16,6 +16,8 @@ export const SEND_MESSAGES: Record<SendCode, string> = {
   SEND_FAILED: "We couldn't send the OTP right now. Please try again shortly.",
   NOT_CONFIGURED:
     "WhatsApp verification is temporarily unavailable. Please try again later.",
+  STORE_UNAVAILABLE:
+    "We couldn't start verification right now. Please try again shortly.",
 };
 
 /** User-facing copy for verify-otp outcomes (spec §15). */
@@ -28,6 +30,8 @@ export const VERIFY_MESSAGES: Record<VerifyCode, string> = {
   TOO_MANY_ATTEMPTS:
     "Too many incorrect attempts. Please request a new OTP.",
   INCORRECT: "Invalid OTP. Please try again.",
+  STORE_UNAVAILABLE:
+    "We couldn't check that code right now. Please try again shortly.",
 };
 
 /** HTTP status for each send outcome. */
@@ -42,7 +46,8 @@ export function sendStatus(code: SendCode): number {
       return 429;
     case "SEND_FAILED":
     case "NOT_CONFIGURED":
-      return 502;
+    case "STORE_UNAVAILABLE":
+      return 503;
   }
 }
 
@@ -60,5 +65,7 @@ export function verifyStatus(code: VerifyCode): number {
       return 400;
     case "TOO_MANY_ATTEMPTS":
       return 429;
+    case "STORE_UNAVAILABLE":
+      return 503;
   }
 }

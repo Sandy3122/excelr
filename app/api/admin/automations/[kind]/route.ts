@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAdminAuthorized } from "@/lib/admin/authorize";
-import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
-import { isAutomationKind, getAutomation } from "@/lib/automations/catalog";
+import { requireAdminDrive } from "@/lib/admin/drive-context";
+import { isAutomationKind } from "@/lib/automations/catalog";
 import { getAutomationOverview, invalidateOverviewCache } from "@/lib/automations/overview";
 import { listRecentRuns } from "@/lib/automations/store";
 import { runAutomation } from "@/lib/automations/runner";
@@ -23,31 +22,27 @@ export async function GET(
   req: Request,
   { params }: { params: { kind: string } },
 ) {
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
   if (!isAutomationKind(params.kind)) {
     return NextResponse.json({ ok: false, error: "Unknown automation." }, { status: 404 });
   }
-  if (!hasFirebaseAdminConfig()) {
-    return NextResponse.json(
-      { ok: false, error: "Registration storage is not configured." },
-      { status: 503 },
-    );
-  }
+
+  const ctx = await requireAdminDrive(req);
+  if (!ctx.ok) return ctx.response;
+  const drive = ctx.drive;
 
   try {
     const fresh = new URL(req.url).searchParams.get("fresh") === "1";
     const [overview, recentRuns] = await Promise.all([
-      getAutomationOverview({ fresh }),
-      listRecentRuns(params.kind, 8),
+      getAutomationOverview(drive, { fresh }),
+      listRecentRuns(drive.id, params.kind, 8),
     ]);
     const automation = overview.automations.find((a) => a.kind === params.kind);
-    const def = getAutomation(params.kind);
     return NextResponse.json({
       ok: true,
+      placementDriveId: drive.id,
       automation,
-      templateName: def.whatsappTemplateName,
+      config: drive.automations[params.kind],
+      templateName: drive.automations[params.kind].whatsappTemplateName,
       recentRuns,
       totalLeads: overview.totalLeads,
     });
@@ -64,16 +59,18 @@ export async function POST(
   req: Request,
   { params }: { params: { kind: string } },
 ) {
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
   if (!isAutomationKind(params.kind)) {
     return NextResponse.json({ ok: false, error: "Unknown automation." }, { status: 404 });
   }
-  if (!hasFirebaseAdminConfig()) {
+
+  const ctx = await requireAdminDrive(req);
+  if (!ctx.ok) return ctx.response;
+  const drive = ctx.drive;
+
+  if (!drive.automations[params.kind].enabled) {
     return NextResponse.json(
-      { ok: false, error: "Registration storage is not configured." },
-      { status: 503 },
+      { ok: false, error: "This automation is turned off for the selected drive." },
+      { status: 409 },
     );
   }
 
@@ -90,6 +87,7 @@ export async function POST(
 
   try {
     const run = await runAutomation({
+      drive,
       kind: params.kind,
       triggeredBy: "admin",
       force: parsed.data.force ?? true,
@@ -101,7 +99,7 @@ export async function POST(
       registrationIds: parsed.data.registrationIds,
       includeEmail: parsed.data.includeEmail,
     });
-    invalidateOverviewCache();
+    invalidateOverviewCache(drive.id);
     return NextResponse.json({ ok: true, run });
   } catch (err) {
     console.error("[admin/automations/kind] POST failed:", err);

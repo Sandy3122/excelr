@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { StoredRegistration } from "@/lib/firebase/registration-types";
+import { useAdminDrive, withDrive } from "./drive-context";
 
 interface LeadsResponse {
   ok: boolean;
@@ -10,7 +11,9 @@ interface LeadsResponse {
   total?: number;
 }
 
-let memoryCache: { leads: StoredRegistration[]; at: number } | null = null;
+/** Cached per drive — one campaign's leads must never be served for another. */
+let memoryCache: { driveId: string; leads: StoredRegistration[]; at: number } | null =
+  null;
 const CACHE_MS = 15_000;
 
 export function invalidateLeadsCache() {
@@ -18,16 +21,25 @@ export function invalidateLeadsCache() {
 }
 
 export function useAllLeads() {
+  const { driveId } = useAdminDrive();
   const [leads, setLeads] = useState<StoredRegistration[]>(
-    memoryCache?.leads ?? [],
+    memoryCache?.driveId === driveId ? memoryCache.leads : [],
   );
-  const [loading, setLoading] = useState(!memoryCache);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(async (fresh = false) => {
+    if (!driveId) {
+      setLeads([]);
+      setLoading(false);
+      return [];
+    }
+    // Never leave another drive's leads on screen while this one loads.
+    if (memoryCache?.driveId !== driveId) setLeads([]);
     if (
       !fresh &&
       memoryCache &&
+      memoryCache.driveId === driveId &&
       Date.now() - memoryCache.at < CACHE_MS
     ) {
       setLeads(memoryCache.leads);
@@ -38,12 +50,12 @@ export function useAllLeads() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/leads?all=1");
+      const res = await fetch(withDrive("/api/admin/leads?all=1", driveId));
       const json = (await res.json()) as LeadsResponse;
       if (!res.ok || !json.ok) {
         throw new Error(json.error || "Could not load leads.");
       }
-      memoryCache = { leads: json.registrations, at: Date.now() };
+      memoryCache = { driveId, leads: json.registrations, at: Date.now() };
       setLeads(json.registrations);
       return json.registrations;
     } catch (err) {
@@ -54,7 +66,7 @@ export function useAllLeads() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [driveId]);
 
   useEffect(() => {
     void load().catch(() => {

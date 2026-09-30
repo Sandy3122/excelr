@@ -6,6 +6,8 @@ export const SEND_CHUNK_SIZE = 40;
 export type SendAction = "run" | "retry_failed" | "resend";
 
 interface SendBatchesOptions {
+  /** Drive the send belongs to — the API refuses an unscoped request. */
+  driveId: string;
   kind: string;
   ids: string[];
   action: SendAction;
@@ -15,6 +17,7 @@ interface SendBatchesOptions {
 }
 
 export async function sendAutomationBatches({
+  driveId,
   kind,
   ids,
   action,
@@ -53,7 +56,9 @@ export async function sendAutomationBatches({
     };
     onProgress(progress);
 
-    const res = await fetch(`/api/admin/automations/${kind}`, {
+    const res = await fetch(
+      `/api/admin/automations/${kind}?driveId=${encodeURIComponent(driveId)}`,
+      {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -62,7 +67,8 @@ export async function sendAutomationBatches({
         includeEmail,
         registrationIds: chunk,
       }),
-    });
+      },
+    );
     const json = (await res.json()) as {
       ok?: boolean;
       error?: string;

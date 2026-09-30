@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   LogOut,
+  Megaphone,
   PanelLeftClose,
   PanelLeftOpen,
   Send,
@@ -13,11 +14,14 @@ import {
   Users,
 } from "lucide-react";
 import { HOLD_ADMIN_SETTINGS } from "@/lib/admin/settings-feature";
+import { AdminDriveProvider } from "./drive-context";
+import { DriveSelector } from "./drive-selector";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/leads", label: "Leads", icon: Users },
   { href: "/admin/automations", label: "Automations", icon: Send },
+  { href: "/admin/drives", label: "Placement Drives", icon: Megaphone },
   ...(!HOLD_ADMIN_SETTINGS
     ? [{ href: "/admin/settings", label: "Settings", icon: Settings }]
     : []),
@@ -78,6 +82,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <AdminDriveProvider>
     <div className="flex h-dvh overflow-hidden bg-[#F4F6FB] text-ink">
       <aside
         className={`hidden h-full shrink-0 flex-col border-r border-white/10 bg-navy-900 text-white lg:flex ${
@@ -165,6 +170,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             Log out
           </button>
         </header>
+        {/* Active campaign context for every page below. */}
+        <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4 lg:px-6 xl:px-8">
+          <DriveSelector />
+        </div>
         <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200 bg-white px-2 py-2 lg:hidden">
           {NAV.map((item) => {
             const active =
@@ -228,5 +237,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
     </div>
+    </AdminDriveProvider>
   );
 }

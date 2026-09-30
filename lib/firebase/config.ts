@@ -4,22 +4,14 @@ import { join } from "path";
 /**
  * Firebase configuration for this project.
  *
- * Server writes/reads go through the Admin SDK (service account). The public
- * `firebaseConfig` values (NEXT_PUBLIC_*) are optional and never grant data
- * access — Firestore rules deny all client traffic.
+ * Server writes/reads go through the Admin SDK (service account). Firestore
+ * rules deny all client traffic, so there is no client SDK configuration.
+ *
+ * Collection names are no longer configurable: everything a campaign owns
+ * lives under `placementDrives/{driveId}` (see lib/drives/store.ts).
  *
  * This module is server-only. Do not import it from a "use client" file.
  */
-
-export const FIRESTORE_REGISTRATIONS_COLLECTION =
-  process.env.FIRESTORE_REGISTRATIONS_COLLECTION || "registrations";
-
-export const FIRESTORE_AUTOMATION_RUNS_COLLECTION =
-  process.env.FIRESTORE_AUTOMATION_RUNS_COLLECTION || "automationRuns";
-
-/** Email → registration id lookup so uniqueness is a document get(), not a query. */
-export const FIRESTORE_REGISTRATION_EMAILS_COLLECTION =
-  process.env.FIRESTORE_REGISTRATION_EMAILS_COLLECTION || "registrationEmails";
 
 export interface FirebaseServiceAccount {
   projectId: string;

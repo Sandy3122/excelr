@@ -1,3 +1,11 @@
+/**
+ * Dashboard statistics for one placement drive.
+ *
+ * Counts are computed by scanning that drive's registration subcollection only,
+ * and cached per drive so one campaign's numbers can never be served for
+ * another.
+ */
+
 import { AUTOMATION_KINDS } from "./types";
 import {
   emptyCounts,
@@ -6,17 +14,21 @@ import {
   type ChannelCounts,
   type MessageStatus,
 } from "./types";
-import { getAutomation, scheduledSendAt } from "./catalog";
-import { isScheduledAutomationDue } from "./schedule";
-import { getAdminFirestore } from "@/lib/firebase/admin";
-import { FIRESTORE_REGISTRATIONS_COLLECTION } from "@/lib/firebase/config";
+import { automationMeta } from "./catalog";
+import {
+  driveScheduleContext,
+  isScheduledAutomationDue,
+  scheduledSendAt,
+} from "./schedule";
+import { driveMetaDoc, driveRegistrationsCol } from "@/lib/drives/store";
+import type { PlacementDrive } from "@/lib/drives/types";
 import { formatIst } from "./ist";
 import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 
 const STATS_TTL_MS = 60_000;
 const SCAN_PAGE_SIZE = 500;
-const CACHE_COLLECTION = "meta";
 const CACHE_DOC = "automationOverview";
+const CACHE_WRITE_MS = 4_000;
 
 type CountsMap = Record<
   (typeof AUTOMATION_KINDS)[number],
@@ -29,21 +41,23 @@ interface CachedPayload {
   computedAt: number;
 }
 
-let memoryCache: CachedPayload | null = null;
-let inFlight: Promise<{
+export interface DriveOverview {
   totalLeads: number;
   automations: AutomationOverview[];
-}> | null = null;
+}
+
+const memoryCache = new Map<string, CachedPayload>();
+const inFlight = new Map<string, Promise<DriveOverview>>();
 
 function emptyTotals(): CountsMap {
   return Object.fromEntries(
-    AUTOMATION_KINDS.map((kind) => {
-      const def = getAutomation(kind);
-      const counts = Object.fromEntries(
-        def.channels.map((ch) => [ch, emptyCounts()]),
-      ) as Record<Channel, ChannelCounts>;
-      return [kind, counts] as const;
-    }),
+    AUTOMATION_KINDS.map((kind) => [
+      kind,
+      { whatsapp: emptyCounts(), email: emptyCounts() } as Record<
+        Channel,
+        ChannelCounts
+      >,
+    ]),
   ) as CountsMap;
 }
 
@@ -67,29 +81,31 @@ function bumpStatus(counts: ChannelCounts, status: MessageStatus | undefined) {
   }
 }
 
-function toOverview(payload: CachedPayload): {
-  totalLeads: number;
-  automations: AutomationOverview[];
-} {
+function toOverview(drive: PlacementDrive, payload: CachedPayload): DriveOverview {
+  const ctx = driveScheduleContext(drive);
   const now = new Date();
+
   const automations: AutomationOverview[] = AUTOMATION_KINDS.map((kind) => {
-    const def = getAutomation(kind);
-    const sendAt = scheduledSendAt(kind);
+    const config = drive.automations[kind];
+    const meta = automationMeta(kind);
+    const sendAt = scheduledSendAt(ctx, kind);
     const counts = Object.fromEntries(
       (["whatsapp", "email"] as Channel[]).map((ch) => [
         ch,
-        def.channels.includes(ch) ? payload.counts[kind][ch] : null,
+        config.channels.includes(ch) ? payload.counts[kind][ch] : null,
       ]),
     ) as Record<Channel, ChannelCounts | null>;
 
     return {
       kind,
-      title: def.title,
-      description: def.description,
-      channels: def.channels,
-      scheduleLabel: def.scheduleLabel,
+      title: meta.title,
+      description: meta.description,
+      enabled: config.enabled,
+      channels: config.channels,
+      scheduleLabel: config.scheduleLabel,
+      whatsappTemplateName: config.whatsappTemplateName,
       sendAtIso: sendAt ? sendAt.toISOString() : null,
-      isDue: isScheduledAutomationDue(kind, now),
+      isDue: isScheduledAutomationDue(ctx, kind, now),
       counts,
     };
   });
@@ -97,17 +113,17 @@ function toOverview(payload: CachedPayload): {
   return { totalLeads: payload.totalLeads, automations };
 }
 
-function cacheRef() {
-  return getAdminFirestore().collection(CACHE_COLLECTION).doc(CACHE_DOC);
+function cacheRef(driveId: string) {
+  return driveMetaDoc(driveId, CACHE_DOC);
 }
 
 function isFresh(computedAt: number): boolean {
   return Date.now() - computedAt < STATS_TTL_MS;
 }
 
-async function readFirestoreCache(): Promise<CachedPayload | null> {
+async function readFirestoreCache(driveId: string): Promise<CachedPayload | null> {
   try {
-    const snap = await cacheRef().get();
+    const snap = await cacheRef(driveId).get();
     if (!snap.exists) return null;
     const d = snap.data() || {};
     if (!d.counts || typeof d.computedAt !== "number") return null;
@@ -121,31 +137,29 @@ async function readFirestoreCache(): Promise<CachedPayload | null> {
   }
 }
 
-const CACHE_WRITE_MS = 4_000;
-
-async function writeFirestoreCache(payload: CachedPayload): Promise<void> {
+async function writeFirestoreCache(
+  driveId: string,
+  payload: CachedPayload,
+): Promise<void> {
   try {
     await Promise.race([
-      cacheRef().set(payload),
+      cacheRef(driveId).set(payload),
       new Promise<never>((_, reject) => {
-        setTimeout(
-          () => reject(new Error("cache_write_timeout")),
-          CACHE_WRITE_MS,
-        );
+        setTimeout(() => reject(new Error("cache_write_timeout")), CACHE_WRITE_MS);
       }),
     ]);
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown";
-    // Cache is optional. A hung gRPC commit can burn ~80s of retries and is
-    // not a billing/quota failure — skip it rather than blocking the dashboard.
+    // Cache is optional. A hung gRPC commit can burn ~80s of retries and is not
+    // a billing/quota failure — skip it rather than blocking the dashboard.
     console.warn("[overview] Stats cache not persisted:", message);
   }
 }
 
 /** Scan only the `messages` field in large pages — used when the cache is cold. */
-async function scanCounts(): Promise<CachedPayload> {
+async function scanCounts(drive: PlacementDrive): Promise<CachedPayload> {
   const totals = emptyTotals();
-  const col = getAdminFirestore().collection(FIRESTORE_REGISTRATIONS_COLLECTION);
+  const col = driveRegistrationsCol(drive.id);
   let last: QueryDocumentSnapshot | undefined;
   let scanned = 0;
 
@@ -164,8 +178,7 @@ async function scanCounts(): Promise<CachedPayload> {
         | Record<string, Record<string, { status?: MessageStatus }>>
         | undefined;
       for (const kind of AUTOMATION_KINDS) {
-        const def = getAutomation(kind);
-        for (const channel of def.channels) {
+        for (const channel of drive.automations[kind].channels) {
           const status = messages?.[kind]?.[channel]?.status;
           const effective: MessageStatus | undefined =
             status ?? (kind === "welcome" ? "legacy" : "pending");
@@ -178,59 +191,57 @@ async function scanCounts(): Promise<CachedPayload> {
     if (snap.size < SCAN_PAGE_SIZE) break;
   }
 
-  return {
-    totalLeads: scanned,
-    counts: totals,
-    computedAt: Date.now(),
-  };
+  return { totalLeads: scanned, counts: totals, computedAt: Date.now() };
 }
 
-export async function getAutomationOverview(options?: {
-  fresh?: boolean;
-}): Promise<{
-  totalLeads: number;
-  automations: AutomationOverview[];
-}> {
-  if (!options?.fresh) {
-    if (memoryCache && isFresh(memoryCache.computedAt)) {
-      return toOverview(memoryCache);
-    }
-  }
+export async function getAutomationOverview(
+  drive: PlacementDrive,
+  options?: { fresh?: boolean },
+): Promise<DriveOverview> {
+  const driveId = drive.id;
 
-  if (inFlight && !options?.fresh) return inFlight;
+  if (!options?.fresh) {
+    const cached = memoryCache.get(driveId);
+    if (cached && isFresh(cached.computedAt)) return toOverview(drive, cached);
+    const pending = inFlight.get(driveId);
+    if (pending) return pending;
+  }
 
   const run = (async () => {
     if (!options?.fresh) {
-      const stored = await readFirestoreCache();
+      const stored = await readFirestoreCache(driveId);
       if (stored && isFresh(stored.computedAt)) {
-        memoryCache = stored;
-        return toOverview(stored);
+        memoryCache.set(driveId, stored);
+        return toOverview(drive, stored);
       }
     }
 
-    const payload = await scanCounts();
-    memoryCache = payload;
-    await writeFirestoreCache(payload);
-    return toOverview(payload);
+    const payload = await scanCounts(drive);
+    memoryCache.set(driveId, payload);
+    await writeFirestoreCache(driveId, payload);
+    return toOverview(drive, payload);
   })();
 
-  inFlight = run;
+  inFlight.set(driveId, run);
   try {
     return await run;
   } finally {
-    if (inFlight === run) inFlight = null;
+    if (inFlight.get(driveId) === run) inFlight.delete(driveId);
   }
 }
 
 /** Drop cached stats so the next dashboard load recomputes (e.g. after a send). */
-export function invalidateOverviewCache(): void {
-  memoryCache = null;
+export function invalidateOverviewCache(driveId?: string): void {
+  if (driveId) memoryCache.delete(driveId);
+  else memoryCache.clear();
 }
 
-export async function invalidateOverviewCachePersisted(): Promise<void> {
-  memoryCache = null;
+export async function invalidateOverviewCachePersisted(
+  driveId: string,
+): Promise<void> {
+  memoryCache.delete(driveId);
   try {
-    await cacheRef().delete();
+    await cacheRef(driveId).delete();
   } catch {
     /* ignore */
   }

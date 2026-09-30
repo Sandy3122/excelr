@@ -1,36 +1,21 @@
 /**
- * Server-side configuration for WhatsApp OTP verification.
+ * Account-level Infobip settings.
  *
- * All values are read from environment variables and are ONLY ever used on the
- * server. None of these are prefixed with NEXT_PUBLIC_, so Infobip credentials
- * can never leak into the client bundle.
+ * These belong to the Infobip *account*, not to any one campaign: the API key,
+ * base URL, the WhatsApp sender, the template language, and the OTP template.
+ * Swapping Infobip accounts is an environment change, not a data migration.
  *
- * This module must never be imported from a "use client" component.
+ * Campaign-shaped values — which automations run, when they fire, which
+ * template each one sends, expiry, cooldowns and rate limits — live on the
+ * placement drive and are edited in the admin panel.
+ *
+ * Where the two overlap, a drive that leaves a field blank inherits the
+ * account default, so a new campaign works immediately and can still override.
+ *
+ * Server-only. Never import from a "use client" component.
  */
 
-function num(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-/** OTP lifecycle knobs. Defaults match the spec (§10–§12). */
-export const OTP_EXPIRY_SECONDS = num("WHATSAPP_OTP_EXPIRY_SECONDS", 300);
-export const OTP_RESEND_COOLDOWN_SECONDS = num(
-  "WHATSAPP_OTP_RESEND_COOLDOWN_SECONDS",
-  60,
-);
-export const OTP_MAX_ATTEMPTS = num("WHATSAPP_OTP_MAX_ATTEMPTS", 5);
-/** Max OTP sends allowed per phone number within a rolling hour. */
-export const OTP_MAX_SENDS_PER_HOUR = num("WHATSAPP_OTP_MAX_SENDS_PER_HOUR", 5);
-/** Max OTP send requests allowed per client IP within a rolling hour. */
-export const OTP_MAX_SENDS_PER_IP_PER_HOUR = num(
-  "WHATSAPP_OTP_MAX_SENDS_PER_IP_PER_HOUR",
-  20,
-);
-/** How long a successful verification stays valid so /api/reg can consume it. */
-export const VERIFIED_TTL_SECONDS = num("WHATSAPP_OTP_VERIFIED_TTL_SECONDS", 900);
+import { AUTOMATION_KINDS, type AutomationKind } from "@/lib/automations/types";
 
 /** Default region used to parse local (non-E.164) phone numbers. */
 export const DEFAULT_COUNTRY = (
@@ -53,31 +38,19 @@ export function getHashSecret(): string {
   return secret;
 }
 
-export type InfobipConfig = {
+export type InfobipAccount = {
   baseUrl: string;
   apiKey: string;
-  sender: string;
-  templateName: string;
-  confirmationTemplateName: string;
-  language: string;
-  /**
-   * Dynamic URL-button suffix for `fsd_website_otp_11082026`.
-   * Empty / "otp" → send the generated OTP (required by the approved template).
-   * Any other value is sent literally.
-   */
-  urlButtonParam: string;
+  /** Account default sender; a drive may override it. */
+  defaultSender: string;
 };
 
 /**
- * Reads and validates the Infobip configuration required to SEND a message.
- *
  * Note on `accountKey`: Infobip's WhatsApp send endpoint authenticates purely
  * with the API key (`Authorization: App <apiKey>`). INFOBIP_ACCOUNT_KEY is NOT
- * part of the send request, so it is intentionally not read here. Keeping it in
- * the environment is fine (some Infobip tooling references it), but forcing it
- * into the request would be incorrect.
+ * part of the send request, so it is intentionally not read here.
  */
-export function getInfobipConfig(): InfobipConfig {
+export function getInfobipAccount(): InfobipAccount {
   const apiKey = process.env.INFOBIP_API_KEY;
   const baseUrlRaw = process.env.INFOBIP_BASE_URL;
   if (!apiKey) throw new Error("Missing INFOBIP_API_KEY.");
@@ -87,21 +60,10 @@ export function getInfobipConfig(): InfobipConfig {
   let baseUrl = baseUrlRaw.trim().replace(/\/+$/, "");
   if (!/^https?:\/\//i.test(baseUrl)) baseUrl = `https://${baseUrl}`;
 
-  const buttonParamRaw = (
-    process.env.INFOBIP_TEMPLATE_URL_BUTTON_PARAM || ""
-  ).trim();
-
   return {
     baseUrl,
     apiKey,
-    sender: process.env.INFOBIP_WHATSAPP_SENDER || "918050162541",
-    templateName:
-      process.env.INFOBIP_TEMPLATE_NAME || "fsd_website_otp_11082026",
-    confirmationTemplateName:
-      process.env.INFOBIP_CONFIRMATION_TEMPLATE_NAME ||
-      "fsd_placement_drive_confirmation_message_a",
-    language: process.env.INFOBIP_TEMPLATE_LANGUAGE || "en_IN",
-    urlButtonParam: buttonParamRaw === "" ? "otp" : buttonParamRaw,
+    defaultSender: (process.env.INFOBIP_WHATSAPP_SENDER || "").trim(),
   };
 }
 
@@ -109,3 +71,52 @@ export function getInfobipConfig(): InfobipConfig {
 export function hasInfobipConfig(): boolean {
   return Boolean(process.env.INFOBIP_API_KEY && process.env.INFOBIP_BASE_URL);
 }
+
+const env = (name: string): string => (process.env[name] || "").trim();
+
+/**
+ * Account-wide WhatsApp defaults. A drive inherits any of these it leaves
+ * blank, and a newly created drive is seeded from them so the admin sees real
+ * values rather than empty boxes.
+ */
+export type WhatsAppAccountDefaults = {
+  sender: string;
+  language: string;
+  otpTemplateName: string;
+  otpUrlButtonParam: string;
+  /** Starting template per automation, used when a drive is created. */
+  automationTemplates: Record<AutomationKind, string>;
+};
+
+export function whatsappAccountDefaults(): WhatsAppAccountDefaults {
+  return {
+    sender: env("INFOBIP_WHATSAPP_SENDER"),
+    language: env("INFOBIP_TEMPLATE_LANGUAGE") || "en_IN",
+    otpTemplateName: env("INFOBIP_TEMPLATE_NAME"),
+    otpUrlButtonParam: env("INFOBIP_TEMPLATE_URL_BUTTON_PARAM") || "otp",
+    automationTemplates: {
+      welcome: env("INFOBIP_CONFIRMATION_TEMPLATE_NAME"),
+      things_to_carry: env("INFOBIP_THINGS_TO_CARRY_TEMPLATE_NAME"),
+      reminder_day_before: env("INFOBIP_REMINDER_DAY_BEFORE_TEMPLATE_NAME"),
+      reminder_event_day: env("INFOBIP_REMINDER_EVENT_DAY_TEMPLATE_NAME"),
+    },
+  };
+}
+
+/** Names of the account-level variables, for the admin panel's read-out. */
+export const ACCOUNT_DEFAULT_ENV_VARS = {
+  sender: "INFOBIP_WHATSAPP_SENDER",
+  language: "INFOBIP_TEMPLATE_LANGUAGE",
+  otpTemplateName: "INFOBIP_TEMPLATE_NAME",
+  otpUrlButtonParam: "INFOBIP_TEMPLATE_URL_BUTTON_PARAM",
+} as const;
+
+export { AUTOMATION_KINDS };
+
+/** Resolved per-send configuration: account credentials + drive settings. */
+export type InfobipSendConfig = {
+  baseUrl: string;
+  apiKey: string;
+  sender: string;
+  language: string;
+};

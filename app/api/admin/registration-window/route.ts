@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthorized } from "@/lib/admin/authorize";
+import { requireAdminDrive } from "@/lib/admin/drive-context";
 import { HOLD_ADMIN_SETTINGS } from "@/lib/admin/settings-feature";
-import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
 import { istDateAndTimeToUtcIso } from "@/lib/registration-window";
 import {
-  getRegistrationWindowStatus,
+  driveWindowStatus,
   setRegistrationWindow,
 } from "@/lib/registration-window-store";
+import { getDriveById } from "@/lib/drives/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,40 +18,19 @@ function heldNotFound() {
   return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
 }
 
+/** Registration window for one drive. Closing one drive never affects another. */
 export async function GET(req: Request) {
   if (HOLD_ADMIN_SETTINGS) return heldNotFound();
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
-  if (!hasFirebaseAdminConfig()) {
-    return NextResponse.json(
-      { ok: false, error: "Registration storage is not configured." },
-      { status: 503 },
-    );
-  }
-  try {
-    const status = await getRegistrationWindowStatus();
-    return NextResponse.json({ ok: true, ...status });
-  } catch (err) {
-    console.error("[admin/registration-window] get failed:", err);
-    return NextResponse.json(
-      { ok: false, error: "Could not load registration settings." },
-      { status: 500 },
-    );
-  }
+  const ctx = await requireAdminDrive(req);
+  if (!ctx.ok) return ctx.response;
+  return NextResponse.json({ ok: true, ...driveWindowStatus(ctx.drive) });
 }
 
 export async function PUT(req: Request) {
   if (HOLD_ADMIN_SETTINGS) return heldNotFound();
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
-  if (!hasFirebaseAdminConfig()) {
-    return NextResponse.json(
-      { ok: false, error: "Registration storage is not configured." },
-      { status: 503 },
-    );
-  }
+  const ctx = await requireAdminDrive(req);
+  if (!ctx.ok) return ctx.response;
+  const driveId = ctx.drive.id;
 
   let body: unknown;
   try {
@@ -60,40 +39,36 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
   }
 
-  const action =
-    body && typeof body === "object" && "action" in body
-      ? String((body as { action?: unknown }).action || "")
-      : "";
+  const payload = (body ?? {}) as {
+    action?: unknown;
+    date?: unknown;
+    time?: unknown;
+  };
+  const action = String(payload.action || "");
+
+  const respond = async (closesAtIso: string | null) => {
+    await setRegistrationWindow(driveId, closesAtIso);
+    const updated = await getDriveById(driveId);
+    return NextResponse.json({
+      ok: true,
+      ...(updated ? driveWindowStatus(updated) : {}),
+    });
+  };
 
   try {
-    if (action === "open") {
-      const status = await setRegistrationWindow(null);
-      return NextResponse.json({ ok: true, ...status });
-    }
-
-    if (action === "close-now") {
-      const status = await setRegistrationWindow(new Date().toISOString());
-      return NextResponse.json({ ok: true, ...status });
-    }
+    if (action === "open") return await respond(null);
+    if (action === "close-now") return await respond(new Date().toISOString());
 
     if (action === "schedule") {
-      const date =
-        body && typeof body === "object" && "date" in body
-          ? String((body as { date?: unknown }).date || "")
-          : "";
-      const time =
-        body && typeof body === "object" && "time" in body
-          ? String((body as { time?: unknown }).time || "")
-          : "";
+      const date = String(payload.date || "");
+      const time = String(payload.time || "");
       if (!DATE.test(date) || !TIME.test(time)) {
         return NextResponse.json(
           { ok: false, error: "Choose a valid IST date and time." },
           { status: 400 },
         );
       }
-      const closesAtIso = istDateAndTimeToUtcIso(date, time);
-      const status = await setRegistrationWindow(closesAtIso);
-      return NextResponse.json({ ok: true, ...status });
+      return await respond(istDateAndTimeToUtcIso(date, time));
     }
 
     return NextResponse.json({ ok: false, error: "Unknown action." }, { status: 400 });

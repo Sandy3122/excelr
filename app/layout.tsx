@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Poppins, Inter } from "next/font/google";
+import { Poppins, Inter, Great_Vibes } from "next/font/google";
 import "./globals.css";
 
 const GTM_ID = "GTM-NQPCH86";
@@ -10,6 +10,14 @@ const poppins = Poppins({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
   variable: "--font-poppins",
+  display: "swap",
+});
+
+/** Script face used for the "Drive" wordmark on announcement heroes. */
+const greatVibes = Great_Vibes({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-script",
   display: "swap",
 });
 
@@ -32,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${poppins.variable} ${inter.variable}`}>
+    <html lang="en" className={`${poppins.variable} ${inter.variable} ${greatVibes.variable}`}>
       <head>
         {/* Google Tag Manager — as high as possible in <head> */}
         <Script id="gtm" strategy="beforeInteractive">

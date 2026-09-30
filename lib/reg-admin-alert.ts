@@ -1,10 +1,14 @@
 import nodemailer from "nodemailer";
-import { APPLICANT_EMAIL } from "./reg-email";
 
 /**
  * Lightweight admin alert mailer for registration-pipeline failures.
  * Uses the same SMTP config as successful registration emails.
  */
+
+/** Sender display name. Account-level, not campaign-level. */
+const MAIL_FROM_NAME = (
+  process.env.REG_MAIL_FROM_NAME || "ExcelR Placement Team"
+).trim();
 
 let cachedTransporter: nodemailer.Transporter | null = null;
 
@@ -38,7 +42,7 @@ function adminInbox(): string {
 
 function fromAddress(): string {
   const user = process.env.SMTP_USER || "";
-  return process.env.SMTP_FROM || `${APPLICANT_EMAIL.fromName} <${user}>`;
+  return process.env.SMTP_FROM || `${MAIL_FROM_NAME} <${user}>`;
 }
 
 export type AdminFailureAlert = {

@@ -34,10 +34,16 @@ export const registrationFormSchema = z.object({
 export type RegistrationFormInput = z.infer<typeof registrationFormSchema>;
 
 /**
- * Full registration payload — form fields + the page URL (with query params)
- * where the user submitted. Re-validated on the server.
+ * Full registration payload — form fields, the placement drive the page belongs
+ * to, and the page URL (with query params). Re-validated on the server, which
+ * resolves the drive itself rather than trusting anything else in the body.
  */
 export const registrationSchema = registrationFormSchema.extend({
+  driveSlug: z
+    .string()
+    .trim()
+    .min(2, "Placement drive is required")
+    .max(80, "Placement drive is too long"),
   pageUrl: z
     .string()
     .trim()

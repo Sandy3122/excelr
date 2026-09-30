@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthorized } from "@/lib/admin/authorize";
-import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
-import { isAutomationKind, getAutomation } from "@/lib/automations/catalog";
+import { requireAdminDrive } from "@/lib/admin/drive-context";
+import { isAutomationKind } from "@/lib/automations/catalog";
 import { listAllRegistrations } from "@/lib/firebase/registrations";
 import { toCsv } from "@/lib/csv";
 
@@ -13,30 +12,25 @@ export async function GET(
   req: Request,
   { params }: { params: { kind: string } },
 ) {
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
   if (!isAutomationKind(params.kind)) {
     return NextResponse.json({ ok: false, error: "Unknown automation." }, { status: 404 });
   }
   const kind = params.kind;
-  if (!hasFirebaseAdminConfig()) {
-    return NextResponse.json(
-      { ok: false, error: "Registration storage is not configured." },
-      { status: 503 },
-    );
-  }
+
+  const ctx = await requireAdminDrive(req);
+  if (!ctx.ok) return ctx.response;
+  const drive = ctx.drive;
 
   try {
-    const def = getAutomation(kind);
-    const leads = await listAllRegistrations();
+    const channels = drive.automations[kind].channels;
+    const leads = await listAllRegistrations(drive.id);
     const headers = [
       "id",
       "firstName",
       "fullName",
       "email",
       "phone",
-      ...def.channels.flatMap((ch) => [
+      ...channels.flatMap((ch) => [
         `${ch}_status`,
         `${ch}_sentAt`,
         `${ch}_error`,
@@ -45,7 +39,7 @@ export async function GET(
     ];
     const rows = leads.map((r) => {
       const base = [r.id, r.firstName, r.fullName, r.email, r.phone];
-      const rest = def.channels.flatMap((ch) => {
+      const rest = channels.flatMap((ch) => {
         const d = r.messages?.[kind]?.[ch];
         const status =
           d?.status || (kind === "welcome" ? "legacy" : "pending");
@@ -64,7 +58,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${kind}-delivery.csv"`,
+        "Content-Disposition": `attachment; filename="${drive.slug}-${kind}-delivery.csv"`,
         "Cache-Control": "no-store",
       },
     });

@@ -1,31 +1,30 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthorized } from "@/lib/admin/authorize";
-import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
+import { requireAdminDrive } from "@/lib/admin/drive-context";
 import { getAutomationOverview } from "@/lib/automations/overview";
 import { listAutomationRunDays } from "@/lib/automations/store";
+import { driveWhatsAppIssues } from "@/lib/drives/whatsapp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req: Request) {
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
-  if (!hasFirebaseAdminConfig()) {
-    return NextResponse.json(
-      { ok: false, error: "Registration storage is not configured." },
-      { status: 503 },
-    );
-  }
+  const ctx = await requireAdminDrive(req);
+  if (!ctx.ok) return ctx.response;
 
   try {
     const fresh = new URL(req.url).searchParams.get("fresh") === "1";
     const [overview, runDays] = await Promise.all([
-      getAutomationOverview({ fresh }),
-      listAutomationRunDays(),
+      getAutomationOverview(ctx.drive, { fresh }),
+      listAutomationRunDays(ctx.drive.id),
     ]);
-    return NextResponse.json({ ok: true, ...overview, runDays });
+    return NextResponse.json({
+      ok: true,
+      placementDriveId: ctx.drive.id,
+      ...overview,
+      runDays,
+      issues: driveWhatsAppIssues(ctx.drive),
+    });
   } catch (err) {
     console.error("[admin/automations] failed:", err);
     return NextResponse.json(

@@ -6,8 +6,25 @@ import {
   requestOtp,
 } from "./service";
 import { __resetStoreForTests } from "./store";
+import { REG_AUG_2026_SEED } from "@/lib/drives/seed-configs";
+import type { PlacementDrive } from "@/lib/drives/types";
 
 const PHONE = "9876543210"; // Indian local; normalizes to +919876543210
+
+/** OTP behaviour is driven by the drive, so every call names one. */
+const DRIVE = {
+  id: "drive-aug",
+  ...REG_AUG_2026_SEED,
+  createdAt: null,
+  updatedAt: null,
+} as PlacementDrive;
+
+/** A second drive, to prove OTP state does not leak between campaigns. */
+const OTHER_DRIVE = {
+  ...DRIVE,
+  id: "drive-oct",
+  slug: "marathahalli-fsd-oct-2026",
+} as PlacementDrive;
 
 /**
  * Mock Infobip so no real WhatsApp message is ever sent, and capture the OTP
@@ -32,6 +49,7 @@ beforeEach(() => {
   process.env.INFOBIP_API_KEY = "secret-key";
   process.env.INFOBIP_BASE_URL = "https://example.api.infobip.com";
   process.env.WHATSAPP_OTP_HASH_SECRET = "test-secret";
+  process.env.INFOBIP_WHATSAPP_SENDER = "918050162541";
 });
 
 afterEach(() => {
@@ -41,7 +59,7 @@ afterEach(() => {
 describe("requestOtp", () => {
   it("sends an OTP and never returns it in the result", async () => {
     mockInfobip();
-    const res = await requestOtp(PHONE, null);
+    const res = await requestOtp(DRIVE, PHONE, null);
     expect(res.ok).toBe(true);
     expect(res.code).toBe("SENT");
     expect(res.phone?.e164).toBe("+919876543210");
@@ -49,23 +67,23 @@ describe("requestOtp", () => {
   });
 
   it("rejects an invalid phone number", async () => {
-    const res = await requestOtp("123", null);
+    const res = await requestOtp(DRIVE, "123", null);
     expect(res.code).toBe("INVALID_PHONE");
   });
 
   it("reports NOT_CONFIGURED when Infobip env is missing", async () => {
     delete process.env.INFOBIP_API_KEY;
     delete process.env.INFOBIP_BASE_URL;
-    const res = await requestOtp(PHONE, null);
+    const res = await requestOtp(DRIVE, PHONE, null);
     expect(res.code).toBe("NOT_CONFIGURED");
   });
 
   it("enforces the resend cooldown", async () => {
     mockInfobip();
     const t = 1_000_000;
-    const first = await requestOtp(PHONE, null, t);
+    const first = await requestOtp(DRIVE, PHONE, null, t);
     expect(first.ok).toBe(true);
-    const second = await requestOtp(PHONE, null, t + 5_000); // 5s later
+    const second = await requestOtp(DRIVE, PHONE, null, t + 5_000); // 5s later
     expect(second.code).toBe("COOLDOWN");
     expect(second.retryAfterSeconds).toBeGreaterThan(0);
   });
@@ -74,65 +92,65 @@ describe("requestOtp", () => {
 describe("confirmOtp", () => {
   it("verifies a correct OTP and writes a one-time verified marker", async () => {
     const cap = mockInfobip();
-    await requestOtp(PHONE, null);
+    await requestOtp(DRIVE, PHONE, null);
 
-    const res = await confirmOtp(PHONE, cap.otp);
+    const res = await confirmOtp(DRIVE, PHONE, cap.otp);
     expect(res.ok).toBe(true);
     expect(res.code).toBe("VERIFIED");
 
     // Marker is present, and can be consumed exactly once.
-    expect((await isPhoneVerified(PHONE)).verified).toBe(true);
-    expect((await consumePhoneVerification(PHONE)).verified).toBe(true);
-    expect((await consumePhoneVerification(PHONE)).verified).toBe(false);
+    expect((await isPhoneVerified(DRIVE, PHONE)).verified).toBe(true);
+    expect((await consumePhoneVerification(DRIVE, PHONE)).verified).toBe(true);
+    expect((await consumePhoneVerification(DRIVE, PHONE)).verified).toBe(false);
   });
 
   it("rejects an incorrect OTP and counts down attempts", async () => {
     const cap = mockInfobip();
-    await requestOtp(PHONE, null);
+    await requestOtp(DRIVE, PHONE, null);
     const wrong = cap.otp === "000000" ? "000001" : "000000";
 
-    const res = await confirmOtp(PHONE, wrong);
+    const res = await confirmOtp(DRIVE, PHONE, wrong);
     expect(res.code).toBe("INCORRECT");
     expect(res.attemptsRemaining).toBe(4);
   });
 
   it("invalidates the OTP after the maximum attempts", async () => {
     const cap = mockInfobip();
-    await requestOtp(PHONE, null);
+    await requestOtp(DRIVE, PHONE, null);
     const wrong = cap.otp === "000000" ? "000001" : "000000";
 
     let last;
-    for (let i = 0; i < 5; i++) last = await confirmOtp(PHONE, wrong);
+    for (let i = 0; i < 5; i++) last = await confirmOtp(DRIVE, PHONE, wrong);
     expect(last!.code).toBe("TOO_MANY_ATTEMPTS");
 
     // Even the correct OTP no longer works — record was destroyed.
-    const after = await confirmOtp(PHONE, cap.otp);
+    const after = await confirmOtp(DRIVE, PHONE, cap.otp);
     expect(after.code).toBe("NO_OTP");
   });
 
   it("rejects an expired OTP", async () => {
     const cap = mockInfobip();
     const t = 2_000_000;
-    await requestOtp(PHONE, null, t);
-    const res = await confirmOtp(PHONE, cap.otp, t + 301_000); // > 300s
+    await requestOtp(DRIVE, PHONE, null, t);
+    const res = await confirmOtp(DRIVE, PHONE, cap.otp, t + 301_000); // > 300s
     expect(res.code).toBe("EXPIRED");
   });
 
   it("prevents OTP reuse after a successful verification", async () => {
     const cap = mockInfobip();
-    await requestOtp(PHONE, null);
-    expect((await confirmOtp(PHONE, cap.otp)).ok).toBe(true);
+    await requestOtp(DRIVE, PHONE, null);
+    expect((await confirmOtp(DRIVE, PHONE, cap.otp)).ok).toBe(true);
     // Second use of the same code fails — it was single-use.
-    expect((await confirmOtp(PHONE, cap.otp)).code).toBe("NO_OTP");
+    expect((await confirmOtp(DRIVE, PHONE, cap.otp)).code).toBe("NO_OTP");
   });
 
   it("rejects malformed OTP input", async () => {
-    const res = await confirmOtp(PHONE, "12ab");
+    const res = await confirmOtp(DRIVE, PHONE, "12ab");
     expect(res.code).toBe("INVALID_FORMAT");
   });
 
   it("returns NO_OTP when nothing was requested", async () => {
-    const res = await confirmOtp(PHONE, "123456");
+    const res = await confirmOtp(DRIVE, PHONE, "123456");
     expect(res.code).toBe("NO_OTP");
   });
 });
@@ -141,19 +159,65 @@ describe("resend invalidates the previous OTP", () => {
   it("makes the old code unusable after a resend", async () => {
     const cap = mockInfobip();
     const t = 3_000_000;
-    await requestOtp(PHONE, null, t);
+    await requestOtp(DRIVE, PHONE, null, t);
     const firstOtp = cap.otp;
     // Resend after the cooldown window.
-    await requestOtp(PHONE, null, t + 61_000);
+    await requestOtp(DRIVE, PHONE, null, t + 61_000);
     const secondOtp = cap.otp;
 
     // Old OTP should no longer verify (unless the CSPRNG produced the same
     // 6 digits, which we guard against).
     if (firstOtp !== secondOtp) {
-      expect((await confirmOtp(PHONE, firstOtp, t + 62_000)).code).toBe(
+      expect((await confirmOtp(DRIVE, PHONE, firstOtp, t + 62_000)).code).toBe(
         "INCORRECT",
       );
     }
-    expect((await confirmOtp(PHONE, secondOtp, t + 62_000)).ok).toBe(true);
+    expect((await confirmOtp(DRIVE, PHONE, secondOtp, t + 62_000)).ok).toBe(true);
+  });
+});
+
+describe("drive isolation", () => {
+  it("does not let a verification on one drive satisfy another", async () => {
+    const cap = mockInfobip();
+    await requestOtp(DRIVE, PHONE, null);
+    expect((await confirmOtp(DRIVE, PHONE, cap.otp)).ok).toBe(true);
+
+    expect((await isPhoneVerified(DRIVE, PHONE)).verified).toBe(true);
+    expect((await isPhoneVerified(OTHER_DRIVE, PHONE)).verified).toBe(false);
+  });
+
+  it("keeps per-phone send counters separate per drive", async () => {
+    mockInfobip();
+    const t = 5_000_000;
+    // Exhaust the hourly cap on one drive.
+    for (let i = 0; i < 5; i++) {
+      await requestOtp(DRIVE, PHONE, null, t + i * 61_000);
+    }
+    expect((await requestOtp(DRIVE, PHONE, null, t + 400_000)).code).toBe(
+      "RATE_LIMITED",
+    );
+    // The other drive still has its own budget.
+    expect((await requestOtp(OTHER_DRIVE, PHONE, null, t + 400_000)).ok).toBe(
+      true,
+    );
+  });
+
+  it("honours the drive's own limits", async () => {
+    mockInfobip();
+    const strict = {
+      ...DRIVE,
+      id: "drive-strict",
+      whatsapp: {
+        ...DRIVE.whatsapp,
+        limits: { ...DRIVE.whatsapp.limits, maxVerifyAttempts: 2 },
+      },
+    } as PlacementDrive;
+    const cap = mockInfobip();
+    await requestOtp(strict, PHONE, null);
+    const wrong = cap.otp === "000000" ? "000001" : "000000";
+    expect((await confirmOtp(strict, PHONE, wrong)).attemptsRemaining).toBe(1);
+    expect((await confirmOtp(strict, PHONE, wrong)).code).toBe(
+      "TOO_MANY_ATTEMPTS",
+    );
   });
 });

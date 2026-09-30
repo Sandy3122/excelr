@@ -30,6 +30,17 @@ function lead(
   };
 }
 
+/**
+ * Stand-in for the selected drive: welcome and the day-before reminder carry
+ * email as well as WhatsApp, the other two are WhatsApp only.
+ */
+const VIEW: DriveAutomationView = {
+  welcome: { enabled: true, channels: ["whatsapp", "email"] },
+  things_to_carry: { enabled: true, channels: ["whatsapp"] },
+  reminder_day_before: { enabled: true, channels: ["whatsapp", "email"] },
+  reminder_event_day: { enabled: true, channels: ["whatsapp"] },
+};
+
 describe("leadChannelStatus", () => {
   it("treats missing welcome as legacy", () => {
     expect(leadChannelStatus(lead({ id: "1" }), "welcome", "whatsapp")).toBe(
@@ -68,10 +79,10 @@ describe("matchesLeadFilters", () => {
 
   it("matches search across name and college", () => {
     expect(
-      matchesLeadFilters(ada, { ...EMPTY_LEAD_FILTERS, q: "nitk" }),
+      matchesLeadFilters(ada, { ...EMPTY_LEAD_FILTERS, q: "nitk" }, VIEW),
     ).toBe(true);
     expect(
-      matchesLeadFilters(bob, { ...EMPTY_LEAD_FILTERS, q: "nitk" }),
+      matchesLeadFilters(bob, { ...EMPTY_LEAD_FILTERS, q: "nitk" }, VIEW),
     ).toBe(false);
   });
 
@@ -81,19 +92,19 @@ describe("matchesLeadFilters", () => {
         ...EMPTY_LEAD_FILTERS,
         qualifications: ["B.E / B.Tech", "MCA"],
         colleges: ["NITK"],
-      }),
+      }, VIEW),
     ).toBe(true);
     expect(
       matchesLeadFilters(ada, {
         ...EMPTY_LEAD_FILTERS,
         qualifications: ["MCA"],
-      }),
+      }, VIEW),
     ).toBe(false);
     expect(
       matchesLeadFilters(bob, {
         ...EMPTY_LEAD_FILTERS,
         qualifications: ["B.E / B.Tech", "MCA"],
-      }),
+      }, VIEW),
     ).toBe(true);
   });
 
@@ -103,14 +114,14 @@ describe("matchesLeadFilters", () => {
         ...EMPTY_LEAD_FILTERS,
         statuses: ["failed"],
         statusKinds: ["welcome"],
-      }),
+      }, VIEW),
     ).toBe(true);
     expect(
       matchesLeadFilters(ada, {
         ...EMPTY_LEAD_FILTERS,
         statuses: ["failed"],
         statusKinds: ["welcome"],
-      }),
+      }, VIEW),
     ).toBe(false);
   });
 });
@@ -140,9 +151,62 @@ describe("kindMatchesStatus", () => {
         },
       },
     });
-    expect(kindMatchesStatus(mixed, "reminder_day_before", "pending")).toBe(
+    expect(kindMatchesStatus(mixed, "reminder_day_before", "pending", VIEW)).toBe(
       true,
     );
-    expect(kindMatchesStatus(mixed, "reminder_day_before", "sent")).toBe(false);
+    expect(kindMatchesStatus(mixed, "reminder_day_before", "sent", VIEW)).toBe(false);
+  });
+});
+
+describe("drive-driven channels", () => {
+  it("ignores email when the drive runs the automation on WhatsApp only", () => {
+    const waOnly: DriveAutomationView = {
+      ...VIEW,
+      reminder_day_before: { enabled: true, channels: ["whatsapp"] },
+    };
+    const mixed = lead({
+      id: "4",
+      messages: {
+        reminder_day_before: {
+          whatsapp: {
+            status: "sent",
+            sentAt: "2026-08-21T06:30:00.000Z",
+            claimedAt: null,
+            error: null,
+            providerMessageId: null,
+            skippedReason: null,
+          },
+          email: {
+            status: "failed",
+            sentAt: null,
+            claimedAt: null,
+            error: "boom",
+            providerMessageId: null,
+            skippedReason: null,
+          },
+        },
+      },
+    });
+    // The drive does not send this one by email, so a stale email failure
+    // must not make the lead look failed.
+    expect(kindMatchesStatus(mixed, "reminder_day_before", "failed", waOnly)).toBe(
+      false,
+    );
+    expect(kindMatchesStatus(mixed, "reminder_day_before", "sent", waOnly)).toBe(
+      true,
+    );
+  });
+
+  it("matches nothing for an automation the drive has disabled", () => {
+    const off: DriveAutomationView = {
+      ...VIEW,
+      things_to_carry: { enabled: false, channels: ["whatsapp"] },
+    };
+    const anyLead = lead({ id: "5" });
+    for (const status of ["pending", "sent", "failed", "skipped"] as const) {
+      expect(kindMatchesStatus(anyLead, "things_to_carry", status, off)).toBe(
+        false,
+      );
+    }
   });
 });

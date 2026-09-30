@@ -36,6 +36,7 @@ const config: Config = {
       fontFamily: {
         heading: ["var(--font-poppins)", "system-ui", "sans-serif"],
         body: ["var(--font-inter)", "system-ui", "sans-serif"],
+        script: ["var(--font-script)", "cursive"],
       },
       borderRadius: {
         "4xl": "24px",

@@ -1,158 +1,270 @@
-import { getIstParts, istDateKey, istWallClockToUtc } from "./ist";
-import {
-  DAY_BEFORE_IST_DATE,
-  EVENT_DAY_IST_DATE,
-  REMINDER_DAY_BEFORE_LATE_DELAY_MS,
-  REMINDER_EVENT_DAY_LATE_DELAY_MS,
-  TTC_DELAY_MS,
-  TTC_LAST_CHANCE_DELAY_MS,
-  TTC_LATE_DELAY_MS,
-  getAutomation,
-  scheduledSendAt,
-  thingsToCarryCutoff,
-} from "./catalog";
-import type { AutomationKind, Channel, MessageStatus } from "./types";
+/**
+ * When an automation is allowed to send, for one placement drive.
+ *
+ * Every timing decision reads from the drive's configuration — event dates,
+ * per-automation schedule, cutoffs, quiet hours. Nothing here knows about a
+ * specific campaign.
+ */
 
-/** Do not send WhatsApp between 9:00 PM and 8:00 AM IST. */
-export const WHATSAPP_QUIET_START_HOUR_IST = 21;
-export const WHATSAPP_QUIET_END_HOUR_IST = 8;
+import { getIstParts, istDateKey, istWallClockToUtc } from "./ist";
+import type { AutomationKind, Channel, MessageStatus } from "./types";
+import type {
+  DriveAutomationConfig,
+  DriveAutomations,
+  QuietHours,
+} from "@/lib/drives/types";
+
+/** Everything scheduling needs from a drive, without the whole document. */
+export interface DriveScheduleContext {
+  eventDayIstDate: string | null;
+  dayBeforeIstDate: string | null;
+  quietHours: QuietHours;
+  automations: DriveAutomations;
+}
 
 const STALE_CLAIM_MS = 5 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
 
-export function isWhatsAppQuietHours(date: Date = new Date()): boolean {
+export function driveScheduleContext(drive: {
+  eventDayIstDate: string | null;
+  dayBeforeIstDate: string | null;
+  whatsapp: { quietHours: QuietHours };
+  automations: DriveAutomations;
+}): DriveScheduleContext {
+  return {
+    eventDayIstDate: drive.eventDayIstDate,
+    dayBeforeIstDate: drive.dayBeforeIstDate,
+    quietHours: drive.whatsapp.quietHours,
+    automations: drive.automations,
+  };
+}
+
+// ─── Quiet hours ───────────────────────────────────────────────────────────
+
+export function isWhatsAppQuietHours(
+  ctx: DriveScheduleContext,
+  date: Date = new Date(),
+): boolean {
+  const q = ctx.quietHours;
+  if (!q.enabled) return false;
   const { hour } = getIstParts(date);
-  return hour >= WHATSAPP_QUIET_START_HOUR_IST || hour < WHATSAPP_QUIET_END_HOUR_IST;
-}
-
-/** Event-day morning/afternoon: allow WhatsApp during quiet hours so late 22 Aug signups still get messages. */
-export function shouldBypassWhatsAppQuietHours(date: Date): boolean {
-  if (istDateKey(date) !== EVENT_DAY_IST_DATE) return false;
-  return getIstParts(date).hour < WHATSAPP_QUIET_START_HOUR_IST;
-}
-
-function whatsappBlocked(date: Date): boolean {
-  return isWhatsAppQuietHours(date) && !shouldBypassWhatsAppQuietHours(date);
-}
-
-function thingsToCarryFinished(status?: MessageStatus | null): boolean {
-  return status === "sent" || status === "skipped" || status === "legacy";
-}
-
-/** Next 8:00 AM IST at or after `date` (today if still before 8, else tomorrow). */
-export function nextWhatsAppWindowStart(date: Date): Date {
-  const p = getIstParts(date);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const todayEight = istWallClockToUtc(
-    `${p.year}-${pad(p.month)}-${pad(p.day)}T08:00:00`,
-  );
-  if (date.getTime() <= todayEight.getTime()) return todayEight;
-
-  const next = new Date(todayEight.getTime() + 24 * 60 * 60 * 1000);
-  const n = getIstParts(next);
-  return istWallClockToUtc(
-    `${n.year}-${pad(n.month)}-${pad(n.day)}T08:00:00`,
-  );
-}
-
-function ttcDelayMs(registeredAt: Date): number {
-  const cutoff = thingsToCarryCutoff();
-  const eventDay = istDateKey(registeredAt) === EVENT_DAY_IST_DATE;
-  const lateDayBefore =
-    istDateKey(registeredAt) === DAY_BEFORE_IST_DATE &&
-    registeredAt.getTime() >= (scheduledSendAt("reminder_day_before")?.getTime() || 0);
-
-  if (eventDay) {
-    const tenMin = new Date(registeredAt.getTime() + TTC_LATE_DELAY_MS);
-    if (registeredAt.getTime() < cutoff.getTime() && tenMin.getTime() < cutoff.getTime()) {
-      return TTC_LATE_DELAY_MS;
-    }
-    return TTC_LAST_CHANCE_DELAY_MS;
+  // Windows that wrap midnight (21:00 → 08:00) versus same-day windows.
+  if (q.startHourIst > q.endHourIst) {
+    return hour >= q.startHourIst || hour < q.endHourIst;
   }
-  if (lateDayBefore) return TTC_LATE_DELAY_MS;
-  return TTC_DELAY_MS;
+  return hour >= q.startHourIst && hour < q.endHourIst;
 }
 
 /**
- * When the "things to carry" WhatsApp should go out.
- * Returns null when it should never send.
+ * Event-day daytime overrides quiet hours, so a lead who signs up on the
+ * morning of the drive still gets their messages.
  */
-export function computeThingsToCarryDueAt(registeredAt: Date): Date | null {
-  const cutoff = thingsToCarryCutoff();
-  const delayMs = ttcDelayMs(registeredAt);
-  const lastChance = delayMs === TTC_LAST_CHANCE_DELAY_MS;
-
-  let due = new Date(registeredAt.getTime() + delayMs);
-  if (whatsappBlocked(due)) {
-    due = nextWhatsAppWindowStart(due);
-  }
-  if (!lastChance && due.getTime() >= cutoff.getTime()) return null;
-  return due;
+export function shouldBypassWhatsAppQuietHours(
+  ctx: DriveScheduleContext,
+  date: Date,
+): boolean {
+  if (!ctx.eventDayIstDate) return false;
+  if (istDateKey(date) !== ctx.eventDayIstDate) return false;
+  return getIstParts(date).hour < ctx.quietHours.startHourIst;
 }
 
-/** Null = never send (event-day signups must not get the "tomorrow" reminder). */
-export function computeReminderDayBeforeDueAt(registeredAt: Date): Date | null {
-  if (istDateKey(registeredAt) >= EVENT_DAY_IST_DATE) return null;
-  const scheduled = scheduledSendAt("reminder_day_before");
-  if (!scheduled) return null;
-  if (registeredAt.getTime() < scheduled.getTime()) return scheduled;
-  const due = new Date(registeredAt.getTime() + REMINDER_DAY_BEFORE_LATE_DELAY_MS);
-  if (whatsappBlocked(due)) {
-    const held = nextWhatsAppWindowStart(due);
-    if (istDateKey(held) >= EVENT_DAY_IST_DATE) return null;
-    return held;
-  }
-  if (istDateKey(due) >= EVENT_DAY_IST_DATE) return null;
-  return due;
+function whatsappBlocked(ctx: DriveScheduleContext, date: Date): boolean {
+  return (
+    isWhatsAppQuietHours(ctx, date) && !shouldBypassWhatsAppQuietHours(ctx, date)
+  );
 }
 
-export function computeReminderEventDayDueAt(registeredAt: Date): Date | null {
-  const scheduled = scheduledSendAt("reminder_event_day");
-  if (!scheduled) return null;
-  if (
-    istDateKey(registeredAt) < EVENT_DAY_IST_DATE ||
-    registeredAt.getTime() < scheduled.getTime()
-  ) {
-    return scheduled;
-  }
-  return new Date(registeredAt.getTime() + REMINDER_EVENT_DAY_LATE_DELAY_MS);
+/** Start of the next sending window at or after `date`. */
+export function nextWhatsAppWindowStart(
+  ctx: DriveScheduleContext,
+  date: Date,
+): Date {
+  const resume = ctx.quietHours.endHourIst;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const p = getIstParts(date);
+  const todayResume = istWallClockToUtc(
+    `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(resume)}:00:00`,
+  );
+  if (date.getTime() <= todayResume.getTime()) return todayResume;
+
+  const next = new Date(todayResume.getTime() + 24 * 60 * 60 * 1000);
+  const n = getIstParts(next);
+  return istWallClockToUtc(
+    `${n.year}-${pad(n.month)}-${pad(n.day)}T${pad(resume)}:00:00`,
+  );
 }
 
-export function computeAutomationDueAt(
+// ─── Schedule resolution ───────────────────────────────────────────────────
+
+/** Absolute send time for `at` schedules; null for relative ones. */
+export function scheduledSendAt(
+  ctx: DriveScheduleContext,
   kind: AutomationKind,
-  registeredAt: Date | null,
 ): Date | null {
-  if (kind === "welcome") return registeredAt;
-  if (!registeredAt) return scheduledSendAt(kind);
-  if (kind === "things_to_carry") return computeThingsToCarryDueAt(registeredAt);
-  if (kind === "reminder_day_before") return computeReminderDayBeforeDueAt(registeredAt);
-  if (kind === "reminder_event_day") return computeReminderEventDayDueAt(registeredAt);
+  const schedule = ctx.automations[kind]?.schedule;
+  if (!schedule || schedule.type !== "at") return null;
+  return istWallClockToUtc(schedule.atIst);
+}
+
+export function automationCutoff(
+  ctx: DriveScheduleContext,
+  kind: AutomationKind,
+): Date | null {
+  const cutoffIst = ctx.automations[kind]?.cutoffIst;
+  return cutoffIst ? istWallClockToUtc(cutoffIst) : null;
+}
+
+/**
+ * Whether a registration falls inside the drive's "late" window — the day
+ * before or the day of the event — which shortens relative delays.
+ */
+function lateWindow(
+  ctx: DriveScheduleContext,
+  registeredAt: Date,
+): "event_day" | "day_before" | null {
+  const key = istDateKey(registeredAt);
+  if (ctx.eventDayIstDate && key === ctx.eventDayIstDate) return "event_day";
+  if (ctx.dayBeforeIstDate && key === ctx.dayBeforeIstDate) {
+    // Only counts as late once the day-before reminder has already gone out.
+    const dayBeforeSend = scheduledSendAt(ctx, "reminder_day_before");
+    if (dayBeforeSend && registeredAt.getTime() >= dayBeforeSend.getTime()) {
+      return "day_before";
+    }
+  }
   return null;
 }
 
+/** Delay for a `delay_after_register` automation, honouring the late window. */
+function relativeDelayMs(
+  ctx: DriveScheduleContext,
+  automation: DriveAutomationConfig,
+  registeredAt: Date,
+): { delayMs: number; lastChance: boolean } {
+  const base =
+    automation.schedule.type === "delay_after_register"
+      ? automation.schedule.delayMinutes * MINUTE_MS
+      : 0;
+  const window = lateWindow(ctx, registeredAt);
+  const lateMs =
+    automation.lateWindowDelayMinutes != null
+      ? automation.lateWindowDelayMinutes * MINUTE_MS
+      : null;
+  const lastChanceMs =
+    automation.lastChanceDelayMinutes != null
+      ? automation.lastChanceDelayMinutes * MINUTE_MS
+      : null;
+  const cutoff = automation.cutoffIst
+    ? istWallClockToUtc(automation.cutoffIst)
+    : null;
+
+  if (window === "event_day" && lateMs != null && lastChanceMs != null) {
+    // Prefer the normal late delay while it still lands before the cutoff.
+    if (
+      cutoff &&
+      registeredAt.getTime() < cutoff.getTime() &&
+      registeredAt.getTime() + lateMs < cutoff.getTime()
+    ) {
+      return { delayMs: lateMs, lastChance: false };
+    }
+    return { delayMs: lastChanceMs, lastChance: true };
+  }
+
+  if (window && lateMs != null) return { delayMs: lateMs, lastChance: false };
+  return { delayMs: base, lastChance: false };
+}
+
+/**
+ * When this automation should fire for a lead who registered at `registeredAt`.
+ * Null means it must never send.
+ */
+export function computeAutomationDueAt(
+  ctx: DriveScheduleContext,
+  kind: AutomationKind,
+  registeredAt: Date | null,
+): Date | null {
+  const automation = ctx.automations[kind];
+  if (!automation || !automation.enabled) return null;
+
+  if (!registeredAt) return scheduledSendAt(ctx, kind);
+
+  if (
+    automation.skipOnOrAfterIstDate &&
+    istDateKey(registeredAt) >= automation.skipOnOrAfterIstDate
+  ) {
+    return null;
+  }
+
+  if (automation.schedule.type === "immediate") return registeredAt;
+
+  let due: Date;
+  let lastChance = false;
+
+  if (automation.schedule.type === "delay_after_register") {
+    const resolved = relativeDelayMs(ctx, automation, registeredAt);
+    lastChance = resolved.lastChance;
+    due = new Date(registeredAt.getTime() + resolved.delayMs);
+  } else {
+    const at = istWallClockToUtc(automation.schedule.atIst);
+    due =
+      registeredAt.getTime() < at.getTime()
+        ? at
+        : new Date(
+            registeredAt.getTime() +
+              automation.schedule.lateDelayMinutes * MINUTE_MS,
+          );
+  }
+
+  if (automation.channels.includes("whatsapp") && whatsappBlocked(ctx, due)) {
+    due = nextWhatsAppWindowStart(ctx, due);
+  }
+
+  // Holding for quiet hours can push a send past the day it was meant for.
+  if (
+    automation.skipOnOrAfterIstDate &&
+    istDateKey(due) >= automation.skipOnOrAfterIstDate
+  ) {
+    return null;
+  }
+
+  if (!lastChance && automation.cutoffIst) {
+    const cutoff = istWallClockToUtc(automation.cutoffIst);
+    if (due.getTime() >= cutoff.getTime()) return null;
+  }
+
+  return due;
+}
+
+/** Whether a fixed-time automation has come due for the drive as a whole. */
 export function isScheduledAutomationDue(
+  ctx: DriveScheduleContext,
   kind: AutomationKind,
   now: Date = new Date(),
 ): boolean {
-  if (kind === "reminder_day_before" && istDateKey(now) >= EVENT_DAY_IST_DATE) {
+  const automation = ctx.automations[kind];
+  if (!automation || !automation.enabled) return false;
+  if (
+    automation.skipOnOrAfterIstDate &&
+    istDateKey(now) >= automation.skipOnOrAfterIstDate
+  ) {
     return false;
   }
-  const sendAt = scheduledSendAt(kind);
+  const sendAt = scheduledSendAt(ctx, kind);
   if (!sendAt) return true;
   return now.getTime() >= sendAt.getTime();
 }
 
-export type Eligibility =
-  | { ok: true }
-  | {
-      ok: false;
-      reason:
-        | "not_due"
-        | "already_sent"
-        | "in_flight"
-        | "cutoff"
-        | "quiet_hours"
-        | "not_applicable";
-    };
+// ─── Eligibility ───────────────────────────────────────────────────────────
+
+export type EligibilityReason =
+  | "not_due"
+  | "already_sent"
+  | "in_flight"
+  | "cutoff"
+  | "quiet_hours"
+  | "not_applicable"
+  | "disabled";
+
+export type Eligibility = { ok: true } | { ok: false; reason: EligibilityReason };
 
 export interface ChannelSnapshot {
   status?: MessageStatus | null;
@@ -160,6 +272,7 @@ export interface ChannelSnapshot {
 }
 
 export interface EligibilityInput {
+  ctx: DriveScheduleContext;
   kind: AutomationKind;
   channel: Channel;
   now?: Date;
@@ -169,8 +282,8 @@ export interface EligibilityInput {
   dueAt?: Date | null;
   registeredAt?: Date | null;
   snapshot?: ChannelSnapshot;
-  /** WhatsApp status of things-to-carry; day-before reminder waits until this is done. */
-  thingsToCarryStatus?: MessageStatus | null;
+  /** Status of the automation this one waits on, if any. */
+  waitForStatus?: MessageStatus | null;
 }
 
 export function isClaimStale(
@@ -183,17 +296,29 @@ export function isClaimStale(
   return now.getTime() - t > STALE_CLAIM_MS;
 }
 
+function gateFinished(status?: MessageStatus | null): boolean {
+  return status === "sent" || status === "skipped" || status === "legacy";
+}
+
 export function evaluateEligibility(input: EligibilityInput): Eligibility {
   const now = input.now ?? new Date();
-  const def = getAutomation(input.kind);
+  const automation = input.ctx.automations[input.kind];
   const status = input.snapshot?.status;
   const resend = Boolean(input.resend);
+
+  if (!automation || !automation.enabled) {
+    return { ok: false, reason: "disabled" };
+  }
+  if (!automation.channels.includes(input.channel)) {
+    return { ok: false, reason: "not_applicable" };
+  }
 
   if (status === "sending" && !isClaimStale(input.snapshot?.claimedAt, now)) {
     return { ok: false, reason: "in_flight" };
   }
 
   if (!resend) {
+    // A welcome with no recorded status predates delivery tracking.
     if (!status && input.kind === "welcome") {
       return { ok: false, reason: "already_sent" };
     }
@@ -208,45 +333,47 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
   if (input.force || resend) return { ok: true };
 
   const due =
-    input.dueAt ?? computeAutomationDueAt(input.kind, input.registeredAt ?? null);
+    input.dueAt ??
+    computeAutomationDueAt(input.ctx, input.kind, input.registeredAt ?? null);
 
-  if (input.kind === "things_to_carry") {
-    if (!due) return { ok: false, reason: "cutoff" };
-    if (now.getTime() < due.getTime()) return { ok: false, reason: "not_due" };
-    if (input.channel === "whatsapp" && whatsappBlocked(now)) {
-      return { ok: false, reason: "quiet_hours" };
+  if (!due) {
+    // An immediate automation has no due date of its own — for a lead whose
+    // registration time was never recorded it is simply due now.
+    if (automation.schedule.type !== "immediate") {
+      // A cutoff produces a permanent skip; a skip-date is "not applicable".
+      return {
+        ok: false,
+        reason: automation.cutoffIst ? "cutoff" : "not_applicable",
+      };
     }
-    return { ok: true };
-  }
-
-  if (input.kind === "reminder_day_before") {
-    if (!due) return { ok: false, reason: "not_applicable" };
-    if (now.getTime() < due.getTime()) return { ok: false, reason: "not_due" };
-    if (!thingsToCarryFinished(input.thingsToCarryStatus)) {
-      return { ok: false, reason: "not_due" };
-    }
-    if (input.channel === "whatsapp" && whatsappBlocked(now)) {
-      return { ok: false, reason: "quiet_hours" };
-    }
-    return { ok: true };
-  }
-
-  if (input.kind === "reminder_event_day") {
-    if (!due) return { ok: false, reason: "not_due" };
-    if (now.getTime() < due.getTime()) return { ok: false, reason: "not_due" };
-    if (input.channel === "whatsapp" && whatsappBlocked(now)) {
-      return { ok: false, reason: "quiet_hours" };
-    }
-    return { ok: true };
-  }
-
-  if (def.schedule.type === "at" && !isScheduledAutomationDue(input.kind, now)) {
+  } else if (now.getTime() < due.getTime()) {
     return { ok: false, reason: "not_due" };
   }
 
-  if (input.channel === "whatsapp" && whatsappBlocked(now)) {
+  if (automation.waitForKind && !gateFinished(input.waitForStatus)) {
+    return { ok: false, reason: "not_due" };
+  }
+
+  if (input.channel === "whatsapp" && whatsappBlocked(input.ctx, now)) {
     return { ok: false, reason: "quiet_hours" };
   }
 
   return { ok: true };
+}
+
+/** Reason text stored on a permanently skipped delivery. */
+export function skipReasonFor(
+  ctx: DriveScheduleContext,
+  kind: AutomationKind,
+  reason: EligibilityReason,
+): string {
+  const automation = ctx.automations[kind];
+  if (reason === "cutoff" && automation?.cutoffIst) {
+    return `Past the ${automation.cutoffIst.replace("T", " ")} IST cutoff.`;
+  }
+  if (reason === "not_applicable" && automation?.skipOnOrAfterIstDate) {
+    return `Registrations on or after ${automation.skipOnOrAfterIstDate} do not receive this message.`;
+  }
+  if (reason === "disabled") return "This automation is turned off for the drive.";
+  return "Not applicable for this registration.";
 }

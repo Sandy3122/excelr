@@ -1,9 +1,18 @@
+/**
+ * Automation run history and per-lead delivery state, scoped to one drive.
+ *
+ * Runs, cursors and the stats cache all live under the drive document. The only
+ * genuinely global record is the cron lock, which guards the single cron
+ * endpoint that ticks every drive in turn.
+ */
+
 import { FieldValue, type DocumentData } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import {
-  FIRESTORE_AUTOMATION_RUNS_COLLECTION,
-  FIRESTORE_REGISTRATIONS_COLLECTION,
-} from "@/lib/firebase/config";
+  driveAutomationRunsCol,
+  driveMetaDoc,
+  driveRegistrationsCol,
+} from "@/lib/drives/store";
 import { getRegistrationById } from "@/lib/firebase/registrations";
 import {
   emptyChannelDelivery,
@@ -17,17 +26,20 @@ import {
 } from "./types";
 import { istDateKey, istDayUtcRange } from "./ist";
 
-function runsCol() {
-  return getAdminFirestore().collection(FIRESTORE_AUTOMATION_RUNS_COLLECTION);
+export const CRON_STATE_DOC = "cronState";
+
+function runsCol(driveId: string) {
+  return driveAutomationRunsCol(driveId);
 }
 
-function regsCol() {
-  return getAdminFirestore().collection(FIRESTORE_REGISTRATIONS_COLLECTION);
+function regsCol(driveId: string) {
+  return driveRegistrationsCol(driveId);
 }
 
-function serializeRun(id: string, d: DocumentData): AutomationRun {
+function serializeRun(id: string, d: DocumentData, driveId: string): AutomationRun {
   return {
     id,
+    placementDriveId: String(d.placementDriveId || driveId),
     kind: d.kind,
     status: d.status,
     triggeredBy: d.triggeredBy,
@@ -43,14 +55,16 @@ function serializeRun(id: string, d: DocumentData): AutomationRun {
 }
 
 export async function createAutomationRun(input: {
+  driveId: string;
   kind: AutomationKind;
   triggeredBy: "cron" | "admin";
   force: boolean;
   retryFailed: boolean;
 }): Promise<AutomationRun> {
-  const ref = runsCol().doc();
+  const ref = runsCol(input.driveId).doc();
   const now = new Date().toISOString();
   const data = {
+    placementDriveId: input.driveId,
     kind: input.kind,
     status: "running" as const,
     triggeredBy: input.triggeredBy,
@@ -68,6 +82,7 @@ export async function createAutomationRun(input: {
 }
 
 export async function patchAutomationRun(
+  driveId: string,
   id: string,
   patch: Partial<{
     status: AutomationRun["status"];
@@ -77,35 +92,43 @@ export async function patchAutomationRun(
     completedAt: string | null;
   }>,
 ): Promise<void> {
-  await runsCol()
+  await runsCol(driveId)
     .doc(id)
     .set({ ...patch, updatedAt: new Date().toISOString() }, { merge: true });
 }
 
 export async function getAutomationRun(
+  driveId: string,
   id: string,
 ): Promise<AutomationRun | null> {
-  const snap = await runsCol().doc(id).get();
+  const snap = await runsCol(driveId).doc(id).get();
   if (!snap.exists) return null;
-  return serializeRun(snap.id, snap.data() || {});
+  return serializeRun(snap.id, snap.data() || {}, driveId);
 }
 
 export async function listRecentRuns(
+  driveId: string,
   kind?: AutomationKind,
   limit = 8,
 ): Promise<AutomationRun[]> {
   const fetchLimit = kind ? Math.max(limit * 3, 24) : limit;
-  const snap = await runsCol().orderBy("startedAt", "desc").limit(fetchLimit).get();
-  const runs = snap.docs.map((doc) => serializeRun(doc.id, doc.data() || {}));
+  const snap = await runsCol(driveId)
+    .orderBy("startedAt", "desc")
+    .limit(fetchLimit)
+    .get();
+  const runs = snap.docs.map((doc) =>
+    serializeRun(doc.id, doc.data() || {}, driveId),
+  );
   const filtered = kind ? runs.filter((r) => r.kind === kind) : runs;
   return filtered.slice(0, limit);
 }
 
 /** Distinct IST calendar days that have automation runs (newest first). */
 export async function listAutomationRunDays(
+  driveId: string,
   scanLimit = 2500,
 ): Promise<string[]> {
-  const snap = await runsCol()
+  const snap = await runsCol(driveId)
     .orderBy("startedAt", "desc")
     .select("startedAt")
     .limit(scanLimit)
@@ -127,31 +150,33 @@ export async function listAutomationRunDays(
 
 /** All runs that started during the given IST calendar day (`YYYY-MM-DD`). */
 export async function listRunsOnIstDay(
+  driveId: string,
   dateKey: string,
   limit = 500,
 ): Promise<AutomationRun[]> {
   const { startIso, endIso } = istDayUtcRange(dateKey);
-  const snap = await runsCol()
+  const snap = await runsCol(driveId)
     .where("startedAt", ">=", startIso)
     .where("startedAt", "<", endIso)
     .orderBy("startedAt", "desc")
     .limit(limit)
     .get();
-  return snap.docs.map((doc) => serializeRun(doc.id, doc.data() || {}));
+  return snap.docs.map((doc) => serializeRun(doc.id, doc.data() || {}, driveId));
 }
 
 export async function completeStaleAutomationRuns(
+  driveId: string,
   maxAgeMs = 2 * 60 * 1000,
 ): Promise<number> {
-  const snap = await runsCol().orderBy("startedAt", "desc").limit(30).get();
+  const snap = await runsCol(driveId).orderBy("startedAt", "desc").limit(30).get();
   const now = Date.now();
   let n = 0;
   for (const doc of snap.docs) {
-    const run = serializeRun(doc.id, doc.data() || {});
+    const run = serializeRun(doc.id, doc.data() || {}, driveId);
     if (run.status !== "running") continue;
     const started = run.startedAt ? Date.parse(run.startedAt) : 0;
     if (!Number.isFinite(started) || now - started < maxAgeMs) continue;
-    await patchAutomationRun(run.id, {
+    await patchAutomationRun(driveId, run.id, {
       status: "completed",
       completedAt: new Date().toISOString(),
       error: run.error || "Timed out; the next cron tick continues remaining leads.",
@@ -161,7 +186,9 @@ export async function completeStaleAutomationRuns(
   return n;
 }
 
-function cronStateRef() {
+// ─── Cron lock (global) and cursors (per drive) ────────────────────────────
+
+function globalCronStateRef() {
   return getAdminFirestore().collection("meta").doc("cronState");
 }
 
@@ -171,16 +198,12 @@ export async function acquireCronLock(
 ): Promise<boolean> {
   try {
     return await getAdminFirestore().runTransaction(async (tx) => {
-      const ref = cronStateRef();
+      const ref = globalCronStateRef();
       const snap = await tx.get(ref);
       const now = Date.now();
       const lockUntil = Number(snap.data()?.lockUntil || 0);
       if (lockUntil > now) return false;
-      tx.set(
-        ref,
-        { lockUntil: now + ttlMs, lockOwner: owner },
-        { merge: true },
-      );
+      tx.set(ref, { lockUntil: now + ttlMs, lockOwner: owner }, { merge: true });
       return true;
     });
   } catch (err) {
@@ -195,7 +218,7 @@ export async function acquireCronLock(
 export async function releaseCronLock(owner: string): Promise<void> {
   try {
     await getAdminFirestore().runTransaction(async (tx) => {
-      const ref = cronStateRef();
+      const ref = globalCronStateRef();
       const snap = await tx.get(ref);
       if (String(snap.data()?.lockOwner || "") !== owner) return;
       tx.set(ref, { lockUntil: 0, lockOwner: null }, { merge: true });
@@ -209,10 +232,11 @@ export async function releaseCronLock(owner: string): Promise<void> {
 }
 
 export async function getCronCursor(
+  driveId: string,
   kind: AutomationKind,
 ): Promise<string | undefined> {
   try {
-    const snap = await cronStateRef().get();
+    const snap = await driveMetaDoc(driveId, CRON_STATE_DOC).get();
     const cursor = snap.data()?.cursors?.[kind];
     return typeof cursor === "string" && cursor ? cursor : undefined;
   } catch {
@@ -221,30 +245,30 @@ export async function getCronCursor(
 }
 
 export async function setCronCursor(
+  driveId: string,
   kind: AutomationKind,
   cursor: string | null,
 ): Promise<void> {
-  await cronStateRef().set(
+  await driveMetaDoc(driveId, CRON_STATE_DOC).set(
     { cursors: { [kind]: cursor } },
     { merge: true },
   );
 }
 
+// ─── Per-lead delivery state ───────────────────────────────────────────────
+
 export async function setChannelDelivery(
+  driveId: string,
   registrationId: string,
   kind: AutomationKind,
   channel: Channel,
   delivery: ChannelDelivery,
 ): Promise<void> {
-  await regsCol()
+  await regsCol(driveId)
     .doc(registrationId)
     .set(
       {
-        messages: {
-          [kind]: {
-            [channel]: delivery,
-          },
-        },
+        messages: { [kind]: { [channel]: delivery } },
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
@@ -257,6 +281,7 @@ function wait(ms: number) {
 
 /** Write delivery status with retries so a blip does not leave a lock that later resends. */
 export async function persistChannelDelivery(
+  driveId: string,
   registrationId: string,
   kind: AutomationKind,
   channel: Channel,
@@ -265,7 +290,7 @@ export async function persistChannelDelivery(
   let last: unknown;
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      await setChannelDelivery(registrationId, kind, channel, delivery);
+      await setChannelDelivery(driveId, registrationId, kind, channel, delivery);
       return;
     } catch (err) {
       last = err;
@@ -277,21 +302,18 @@ export async function persistChannelDelivery(
 
 /** Keep an in-flight lock alive if the message went out but status could not be saved. */
 export async function extendChannelClaim(
+  driveId: string,
   registrationId: string,
   kind: AutomationKind,
   channel: Channel,
 ): Promise<void> {
   try {
-    await regsCol()
+    await regsCol(driveId)
       .doc(registrationId)
       .set(
         {
           messages: {
-            [kind]: {
-              [channel]: {
-                claimedAt: new Date().toISOString(),
-              },
-            },
+            [kind]: { [channel]: { claimedAt: new Date().toISOString() } },
           },
           updatedAt: FieldValue.serverTimestamp(),
         },
@@ -303,13 +325,14 @@ export async function extendChannelClaim(
 }
 
 export async function claimChannel(
+  driveId: string,
   registrationId: string,
   kind: AutomationKind,
   channel: Channel,
   nowIso: string,
   opts?: { resend?: boolean; retryFailed?: boolean },
 ): Promise<boolean> {
-  const ref = regsCol().doc(registrationId);
+  const ref = regsCol(driveId).doc(registrationId);
   return getAdminFirestore().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) return false;
@@ -320,9 +343,7 @@ export async function claimChannel(
       if (current === "sent" || current === "skipped" || current === "legacy") {
         return false;
       }
-      if (current === "failed" && !opts?.retryFailed) {
-        return false;
-      }
+      if (current === "failed" && !opts?.retryFailed) return false;
     }
     if (current === "sending") {
       const claimedAt = String(
@@ -336,10 +357,7 @@ export async function claimChannel(
       {
         messages: {
           [kind]: {
-            [channel]: {
-              ...emptyChannelDelivery("sending"),
-              claimedAt: nowIso,
-            },
+            [channel]: { ...emptyChannelDelivery("sending"), claimedAt: nowIso },
           },
         },
       },
@@ -350,10 +368,11 @@ export async function claimChannel(
 }
 
 export async function readChannelStatus(
+  driveId: string,
   registrationId: string,
   kind: AutomationKind,
   channel: Channel,
 ): Promise<ChannelDelivery | undefined> {
-  const reg = await getRegistrationById(registrationId);
+  const reg = await getRegistrationById(driveId, registrationId);
   return reg?.messages?.[kind]?.[channel];
 }

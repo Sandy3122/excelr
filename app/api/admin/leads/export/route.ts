@@ -1,32 +1,23 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthorized } from "@/lib/admin/authorize";
-import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
+import { requireAdminDrive } from "@/lib/admin/drive-context";
 import { listAllRegistrations } from "@/lib/firebase/registrations";
 import { toCsv } from "@/lib/csv";
 import { AUTOMATION_KINDS } from "@/lib/automations/types";
-import { getAutomation } from "@/lib/automations/catalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req: Request) {
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
-  if (!hasFirebaseAdminConfig()) {
-    return NextResponse.json(
-      { ok: false, error: "Registration storage is not configured." },
-      { status: 503 },
-    );
-  }
+  const ctx = await requireAdminDrive(req);
+  if (!ctx.ok) return ctx.response;
+  const drive = ctx.drive;
 
   try {
-    const leads = await listAllRegistrations();
+    const leads = await listAllRegistrations(drive.id);
     const extraHeaders: string[] = [];
     for (const kind of AUTOMATION_KINDS) {
-      const def = getAutomation(kind);
-      for (const channel of def.channels) {
+      for (const channel of drive.automations[kind].channels) {
         extraHeaders.push(`${kind}_${channel}`);
       }
     }
@@ -58,8 +49,7 @@ export async function GET(req: Request) {
       ];
       const statuses: string[] = [];
       for (const kind of AUTOMATION_KINDS) {
-        const def = getAutomation(kind);
-        for (const channel of def.channels) {
+        for (const channel of drive.automations[kind].channels) {
           const status =
             r.messages?.[kind]?.[channel]?.status ||
             (kind === "welcome" ? "legacy" : "pending");
@@ -74,7 +64,7 @@ export async function GET(req: Request) {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="placement-drive-leads.csv"`,
+        "Content-Disposition": `attachment; filename="${drive.slug}-leads.csv"`,
         "Cache-Control": "no-store",
       },
     });

@@ -1,88 +1,44 @@
-import type { AutomationKind, Channel } from "./types";
-import { AUTOMATION_KINDS } from "./types";
-import { istWallClockToUtc } from "./ist";
+/**
+ * The four automations the code knows how to run.
+ *
+ * Only presentation labels live here. Whether an automation is enabled, when it
+ * fires, which channels it uses and which template it sends are all read from
+ * the placement drive document.
+ */
 
-export type ScheduleSpec =
-  | { type: "immediate" }
-  | { type: "delay_after_register"; delayMs: number }
-  | { type: "at"; atIst: string };
+import { AUTOMATION_KINDS, type AutomationKind, type Channel } from "./types";
+import type { DriveAutomationConfig, DriveAutomations } from "@/lib/drives/types";
 
-export interface AutomationDef {
+export interface AutomationMeta {
   kind: AutomationKind;
   title: string;
   description: string;
-  channels: Channel[];
-  schedule: ScheduleSpec;
-  scheduleLabel: string;
-  whatsappTemplateName: string;
-  emailSubject?: string;
-  emailTemplate?: "welcome" | "reminder_day_before";
 }
 
-export const THINGS_TO_CARRY_CUTOFF_IST = "2026-08-22T08:45:00";
-export const REMINDER_DAY_BEFORE_IST = "2026-08-21T12:00:00";
-export const REMINDER_EVENT_DAY_IST = "2026-08-22T08:50:00";
-export const DAY_BEFORE_IST_DATE = "2026-08-21";
-export const EVENT_DAY_IST_DATE = "2026-08-22";
-
-export const TTC_DELAY_MS = 60 * 60 * 1000;
-export const TTC_LATE_DELAY_MS = 10 * 60 * 1000;
-export const TTC_LAST_CHANCE_DELAY_MS = 5 * 60 * 1000;
-export const REMINDER_DAY_BEFORE_LATE_DELAY_MS = 15 * 60 * 1000;
-export const REMINDER_EVENT_DAY_LATE_DELAY_MS = 10 * 60 * 1000;
-
-export const AUTOMATIONS: Record<AutomationKind, AutomationDef> = {
+export const AUTOMATION_META: Record<AutomationKind, AutomationMeta> = {
   welcome: {
     kind: "welcome",
     title: "Welcome",
     description: "As soon as the form is submitted",
-    channels: ["whatsapp", "email"],
-    schedule: { type: "immediate" },
-    scheduleLabel: "Immediately on registration",
-    whatsappTemplateName:
-      process.env.INFOBIP_CONFIRMATION_TEMPLATE_NAME ||
-      "fsd_placement_drive_confirmation_message_a",
-    emailSubject:
-      "You're confirmed: Java Full Stack Placement Drive — 22 Aug, Marathahalli",
-    emailTemplate: "welcome",
   },
   things_to_carry: {
     kind: "things_to_carry",
     title: "Things to carry",
-    description: "1 hour after register; faster for late 21/22 Aug signups",
-    channels: ["whatsapp"],
-    schedule: { type: "delay_after_register", delayMs: TTC_DELAY_MS },
-    scheduleLabel: "1 hour after registration; 10 min if late on 21/22 Aug",
-    whatsappTemplateName:
-      process.env.INFOBIP_THINGS_TO_CARRY_TEMPLATE_NAME ||
-      "fsd_placement_drive_things_2_carry_a",
+    description: "A while after registering, before the drive starts",
   },
   reminder_day_before: {
     kind: "reminder_day_before",
     title: "Reminder — day before",
-    description: "Friday 21 August, 12:00 PM IST",
-    channels: ["whatsapp", "email"],
-    schedule: { type: "at", atIst: REMINDER_DAY_BEFORE_IST },
-    scheduleLabel: "Friday, 21 August 2026 · 12:00 PM IST (15 min later if they register after noon)",
-    whatsappTemplateName:
-      process.env.INFOBIP_REMINDER_21AUG_TEMPLATE_NAME ||
-      "fsd_placement_drive_reminder_message_21aug_a",
-    emailSubject: "Tomorrow, 9:00 AM — your Java Full Stack Placement Drive",
-    emailTemplate: "reminder_day_before",
+    description: "The day before the drive",
   },
   reminder_event_day: {
     kind: "reminder_event_day",
     title: "Reminder — event day",
-    description: "Saturday 22 August, 8:50 AM IST",
-    channels: ["whatsapp"],
-    schedule: { type: "at", atIst: REMINDER_EVENT_DAY_IST },
-    scheduleLabel: "Saturday, 22 August 2026 · 8:50 AM IST (10 min later if they register after 8:50)",
-    whatsappTemplateName:
-      process.env.INFOBIP_REMINDER_22AUG_TEMPLATE_NAME ||
-      "fsd_placement_drive_reminder_message_22aug_a",
+    description: "On the morning of the drive",
   },
 };
 
+/** Automations the cron ticks. `welcome` is sent inline by /api/reg. */
 export const CRON_AUTOMATION_KINDS: AutomationKind[] = [
   "things_to_carry",
   "reminder_day_before",
@@ -93,35 +49,47 @@ export function isAutomationKind(value: string): value is AutomationKind {
   return (AUTOMATION_KINDS as readonly string[]).includes(value);
 }
 
-export function getAutomation(kind: AutomationKind): AutomationDef {
-  return AUTOMATIONS[kind];
+export function automationMeta(kind: AutomationKind): AutomationMeta {
+  return AUTOMATION_META[kind];
 }
 
-export function automationSupportsEmail(kind: AutomationKind): boolean {
-  return getAutomation(kind).channels.includes("email");
+export function getDriveAutomation(
+  automations: DriveAutomations,
+  kind: AutomationKind,
+): DriveAutomationConfig {
+  return automations[kind];
+}
+
+export function automationSupportsEmail(
+  automations: DriveAutomations,
+  kind: AutomationKind,
+): boolean {
+  return automations[kind]?.channels.includes("email") ?? false;
 }
 
 /**
- * Cron always uses the catalog channels. Admin sends WhatsApp by default;
- * email only when `includeEmail` is true and the automation has an email.
+ * Cron uses every channel the drive enables. Admin sends WhatsApp by default and
+ * only adds email when explicitly asked.
  */
 export function channelsForAutomationRun(
+  automations: DriveAutomations,
   kind: AutomationKind,
   options: { triggeredBy: "cron" | "admin"; includeEmail?: boolean },
 ): Channel[] {
-  const allowed = getAutomation(kind).channels;
+  const allowed = automations[kind]?.channels ?? [];
   if (options.triggeredBy === "cron" || options.includeEmail === true) {
     return [...allowed];
   }
   return allowed.filter((channel) => channel === "whatsapp");
 }
 
-export function scheduledSendAt(kind: AutomationKind): Date | null {
-  const spec = AUTOMATIONS[kind].schedule;
-  if (spec.type !== "at") return null;
-  return istWallClockToUtc(spec.atIst);
-}
-
-export function thingsToCarryCutoff(): Date {
-  return istWallClockToUtc(THINGS_TO_CARRY_CUTOFF_IST);
+/**
+ * Template a drive will send for one automation. Empty means the drive has not
+ * been configured — callers must fail loudly rather than guess a template.
+ */
+export function whatsappTemplateFor(
+  automations: DriveAutomations,
+  kind: AutomationKind,
+): string {
+  return (automations[kind]?.whatsappTemplateName || "").trim();
 }

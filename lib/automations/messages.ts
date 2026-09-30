@@ -8,54 +8,52 @@ import {
   type RegistrationMessages,
 } from "./types";
 import {
-  computeReminderDayBeforeDueAt,
-  computeReminderEventDayDueAt,
-  computeThingsToCarryDueAt,
+  computeAutomationDueAt,
+  skipReasonFor,
+  type DriveScheduleContext,
 } from "./schedule";
-import { getAutomation } from "./catalog";
 
-export function buildInitialMessages(registeredAt: Date): {
+/**
+ * Seed the delivery matrix for a new registration: one entry per enabled
+ * automation and channel, pre-resolved due dates, and permanent skips already
+ * marked so the runner never has to reconsider them.
+ */
+export function buildInitialMessages(
+  ctx: DriveScheduleContext,
+  registeredAt: Date,
+): {
   messages: RegistrationMessages;
   thingsToCarryDueAt: Date | null;
 } {
-  const ttcDue = computeThingsToCarryDueAt(registeredAt);
-  const dayBeforeDue = computeReminderDayBeforeDueAt(registeredAt);
-  const eventDayDue = computeReminderEventDayDueAt(registeredAt);
   const messages: RegistrationMessages = {};
+  let thingsToCarryDueAt: Date | null = null;
 
   for (const kind of AUTOMATION_KINDS) {
-    const def = getAutomation(kind);
-    const delivery: AutomationDelivery = {};
-    for (const channel of def.channels) {
-      delivery[channel] = emptyChannelDelivery("pending");
-    }
-    if (kind === "things_to_carry") {
-      delivery.dueAt = ttcDue ? ttcDue.toISOString() : null;
-      if (!ttcDue && delivery.whatsapp) {
-        delivery.whatsapp = {
-          ...emptyChannelDelivery("skipped"),
-          skippedReason: "Past the 8:45 AM IST cutoff on event day.",
-        };
+    const automation = ctx.automations[kind];
+    if (!automation || !automation.enabled) continue;
+
+    const due = computeAutomationDueAt(ctx, kind, registeredAt);
+    if (kind === "things_to_carry") thingsToCarryDueAt = due;
+
+    const delivery: AutomationDelivery = { dueAt: due ? due.toISOString() : null };
+
+    for (const channel of automation.channels) {
+      if (due) {
+        delivery[channel] = emptyChannelDelivery("pending");
+        continue;
       }
+      // Null due date means this lead can never receive it — record why now.
+      const reason = automation.cutoffIst ? "cutoff" : "not_applicable";
+      delivery[channel] = {
+        ...emptyChannelDelivery("skipped"),
+        skippedReason: skipReasonFor(ctx, kind, reason),
+      };
     }
-    if (kind === "reminder_day_before") {
-      delivery.dueAt = dayBeforeDue ? dayBeforeDue.toISOString() : null;
-      if (!dayBeforeDue) {
-        const skipped = {
-          ...emptyChannelDelivery("skipped"),
-          skippedReason: "Event-day registrations do not receive the day-before reminder.",
-        };
-        if (delivery.whatsapp) delivery.whatsapp = skipped;
-        if (delivery.email) delivery.email = { ...skipped };
-      }
-    }
-    if (kind === "reminder_event_day") {
-      delivery.dueAt = eventDayDue ? eventDayDue.toISOString() : null;
-    }
+
     messages[kind] = delivery;
   }
 
-  return { messages, thingsToCarryDueAt: ttcDue };
+  return { messages, thingsToCarryDueAt };
 }
 
 export function parseChannelDelivery(raw: unknown): ChannelDelivery | undefined {

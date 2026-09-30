@@ -5,7 +5,7 @@ import GlowBlobs from "./glow-blobs";
 import FreeBadge from "./free-badge";
 import { MobileHeroRegisterButton } from "./mobile-register";
 import { useRegEvent } from "./reg-event-context";
-import type { HeroBadge, HeroHeadingLine } from "@/lib/reg-event";
+import type { HeroAnnounce, HeroBadge, HeroHeadingLine } from "@/lib/reg-event";
 
 /**
  * Hero — white nav above, deep-blue backdrop with thin circle décor,
@@ -46,20 +46,28 @@ export default function RegHero({ closed = false }: { closed?: boolean }) {
         <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-8 lg:gap-12">
           {/* LEFT — copy */}
           <div className="relative z-10 animate-fade-up">
-            <h1 className="font-heading font-semibold leading-[1.02] tracking-[-1px] md:tracking-[-1.6px]">
-              {hero.headingLines.map((line) => (
-                <HeadingLine key={line.text} line={line} />
-              ))}
-            </h1>
+            {hero.announce ? (
+              <AnnounceCopy announce={hero.announce} />
+            ) : (
+              <>
+                <h1 className="font-heading font-semibold leading-[1.02] tracking-[-1px] md:tracking-[-1.6px]">
+                  {(hero.headingLines ?? []).map((line) => (
+                    <HeadingLine key={line.text} line={line} />
+                  ))}
+                </h1>
 
-            <RoleBadge badge={hero.badge} />
+                {hero.badge ? <RoleBadge badge={hero.badge} /> : null}
 
-            {/* Accent underline — bright left → fade right, with glow */}
-            <div className="mt-4 h-[3px] w-[180px] rounded-full bg-gradient-to-r from-[#7DD3FC] via-[#3B82F6] to-[#7DD3FC] md:mt-5 md:w-[220px]" />
+                {/* Accent underline — bright left → fade right, with glow */}
+                <div className="mt-4 h-[3px] w-[180px] rounded-full bg-gradient-to-r from-[#7DD3FC] via-[#3B82F6] to-[#7DD3FC] md:mt-5 md:w-[220px]" />
+              </>
+            )}
 
-            <p className="mt-6 max-w-[460px] font-body text-[15px] leading-[1.7] text-white/90 md:text-[17px] md:leading-[1.65]">
-              {hero.tagline}
-            </p>
+            {hero.tagline ? (
+              <p className="mt-6 max-w-[460px] font-body text-[15px] leading-[1.7] text-white/90 md:text-[17px] md:leading-[1.65]">
+                {hero.tagline}
+              </p>
+            ) : null}
 
             {/* Mobile-only CTA + note */}
             <div className="md:hidden">
@@ -108,6 +116,64 @@ export default function RegHero({ closed = false }: { closed?: boolean }) {
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Announcement hero copy, built to the approved banner:
+ *
+ *   ExcelR's
+ *   PLACEMENT            (gold display)
+ *   Drive  For Full Stack (script wordmark + role stacked beside it)
+ *          Developers
+ *   [ BTM EDITION ]      (gold bar, navy text)
+ *   ──── Now ────
+ *   BIGGER & BETTER
+ *
+ * Everything scales fluidly from md so the block keeps its proportions in the
+ * hero's half-width column without stepping at breakpoints.
+ */
+function AnnounceCopy({ announce }: { announce: HeroAnnounce }) {
+  return (
+    <div className="font-heading">
+      <p className="text-[26px] font-bold leading-none tracking-[-0.5px] text-white md:text-[clamp(28px,3.1vw_+_4px,44px)]">
+        {announce.eyebrow}
+      </p>
+
+      <p className="mt-1 text-[46px] font-extrabold uppercase leading-[0.95] tracking-[-1px] text-[#FFC629] md:mt-2 md:text-[clamp(52px,6.2vw_-_4px,82px)]">
+        {announce.headline}
+      </p>
+
+      <div className="mt-1 flex items-end gap-3 md:mt-2 md:gap-4">
+        <span className="font-script text-[52px] leading-[0.8] text-white md:text-[clamp(56px,6.1vw_-_2px,80px)]">
+          {announce.script}
+        </span>
+        <span className="pb-1.5 text-[16px] font-bold leading-[1.15] text-white md:pb-2 md:text-[clamp(17px,1.6vw_+_2px,26px)]">
+          {announce.roleLines.map((line) => (
+            <span key={line} className="block">
+              {line}
+            </span>
+          ))}
+        </span>
+      </div>
+
+      <p className="mt-3 inline-block bg-[#FFC629] px-5 py-1.5 text-[18px] font-extrabold uppercase tracking-[0.12em] text-[#0F2050] md:mt-4 md:px-7 md:py-2 md:text-[clamp(19px,1.7vw_+_3px,28px)]">
+        {announce.edition}
+      </p>
+
+      {/* "Now" between two rules that fade out from the word. */}
+      <div className="mt-4 flex items-center gap-3 md:mt-5 md:gap-4">
+        <span className="h-px w-10 bg-gradient-to-l from-white/70 to-transparent md:w-16" />
+        <span className="text-[20px] font-bold text-white md:text-[clamp(21px,1.8vw_+_3px,30px)]">
+          {announce.nowLabel}
+        </span>
+        <span className="h-px w-10 bg-gradient-to-r from-white/70 to-transparent md:w-16" />
+      </div>
+
+      <p className="mt-3 text-[32px] font-extrabold uppercase leading-none tracking-[-0.5px] text-white md:mt-4 md:text-[clamp(34px,4vw_-_2px,54px)]">
+        {announce.claim}
+      </p>
+    </div>
   );
 }
 

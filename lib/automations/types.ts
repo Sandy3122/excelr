@@ -51,6 +51,8 @@ export interface AutomationRunStats {
 
 export interface AutomationRun {
   id: string;
+  /** Drive this run belongs to — every run is campaign-scoped. */
+  placementDriveId: string;
   kind: AutomationKind;
   status: "running" | "completed" | "idle";
   triggeredBy: "cron" | "admin";
@@ -76,8 +78,10 @@ export interface AutomationOverview {
   kind: AutomationKind;
   title: string;
   description: string;
+  enabled: boolean;
   channels: Channel[];
   scheduleLabel: string;
+  whatsappTemplateName: string;
   sendAtIso: string | null;
   isDue: boolean;
   counts: Record<Channel, ChannelCounts | null>;

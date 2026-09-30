@@ -26,23 +26,23 @@ export type OtpRecord = {
   lastSentAt: number; // epoch ms
 };
 
+/**
+ * Keys are supplied by the caller, already namespaced by placement drive, so
+ * this layer stays a dumb key/value store with TTLs.
+ */
 export interface OtpStore {
-  getRecord(phoneE164: string): Promise<OtpRecord | null>;
-  setRecord(
-    phoneE164: string,
-    record: OtpRecord,
-    ttlSeconds: number,
-  ): Promise<void>;
-  deleteRecord(phoneE164: string): Promise<void>;
+  getRecord(key: string): Promise<OtpRecord | null>;
+  setRecord(key: string, record: OtpRecord, ttlSeconds: number): Promise<void>;
+  deleteRecord(key: string): Promise<void>;
 
   /** Increment a counter, setting TTL on first increment. Returns new value. */
   incrementCounter(key: string, ttlSeconds: number): Promise<number>;
 
   /** Verified-phone marker consumed by the registration route. */
-  setVerified(phoneE164: string, ttlSeconds: number): Promise<void>;
-  isVerified(phoneE164: string): Promise<boolean>;
+  setVerified(key: string, ttlSeconds: number): Promise<void>;
+  isVerified(key: string): Promise<boolean>;
   /** Atomically check-and-clear the verified marker. */
-  consumeVerified(phoneE164: string): Promise<boolean>;
+  consumeVerified(key: string): Promise<boolean>;
 }
 
 const nowMs = () => Date.now();
@@ -68,17 +68,17 @@ class InMemoryStore implements OtpStore {
     this.map.set(key, { value, expiresAt: nowMs() + ttlSeconds * 1000 });
   }
 
-  async getRecord(phone: string): Promise<OtpRecord | null> {
-    const raw = this.get(`otp:${phone}`);
+  async getRecord(key: string): Promise<OtpRecord | null> {
+    const raw = this.get(key);
     return raw ? (JSON.parse(raw) as OtpRecord) : null;
   }
 
-  async setRecord(phone: string, record: OtpRecord, ttlSeconds: number) {
-    this.set(`otp:${phone}`, JSON.stringify(record), ttlSeconds);
+  async setRecord(key: string, record: OtpRecord, ttlSeconds: number) {
+    this.set(key, JSON.stringify(record), ttlSeconds);
   }
 
-  async deleteRecord(phone: string) {
-    this.map.delete(`otp:${phone}`);
+  async deleteRecord(key: string) {
+    this.map.delete(key);
   }
 
   async incrementCounter(key: string, ttlSeconds: number): Promise<number> {
@@ -94,17 +94,17 @@ class InMemoryStore implements OtpStore {
     return next;
   }
 
-  async setVerified(phone: string, ttlSeconds: number) {
-    this.set(`verified:${phone}`, "1", ttlSeconds);
+  async setVerified(key: string, ttlSeconds: number) {
+    this.set(key, "1", ttlSeconds);
   }
 
-  async isVerified(phone: string): Promise<boolean> {
-    return this.get(`verified:${phone}`) === "1";
+  async isVerified(key: string): Promise<boolean> {
+    return this.get(key) === "1";
   }
 
-  async consumeVerified(phone: string): Promise<boolean> {
-    const ok = this.get(`verified:${phone}`) === "1";
-    this.map.delete(`verified:${phone}`);
+  async consumeVerified(key: string): Promise<boolean> {
+    const ok = this.get(key) === "1";
+    this.map.delete(key);
     return ok;
   }
 }
@@ -134,22 +134,17 @@ class RedisStore implements OtpStore {
     });
   }
 
-  async getRecord(phone: string): Promise<OtpRecord | null> {
-    const raw = await this.client.get(`otp:${phone}`);
+  async getRecord(key: string): Promise<OtpRecord | null> {
+    const raw = await this.client.get(key);
     return raw ? (JSON.parse(raw) as OtpRecord) : null;
   }
 
-  async setRecord(phone: string, record: OtpRecord, ttlSeconds: number) {
-    await this.client.set(
-      `otp:${phone}`,
-      JSON.stringify(record),
-      "EX",
-      ttlSeconds,
-    );
+  async setRecord(key: string, record: OtpRecord, ttlSeconds: number) {
+    await this.client.set(key, JSON.stringify(record), "EX", ttlSeconds);
   }
 
-  async deleteRecord(phone: string) {
-    await this.client.del(`otp:${phone}`);
+  async deleteRecord(key: string) {
+    await this.client.del(key);
   }
 
   async incrementCounter(key: string, ttlSeconds: number): Promise<number> {
@@ -158,17 +153,17 @@ class RedisStore implements OtpStore {
     return value;
   }
 
-  async setVerified(phone: string, ttlSeconds: number) {
-    await this.client.set(`verified:${phone}`, "1", "EX", ttlSeconds);
+  async setVerified(key: string, ttlSeconds: number) {
+    await this.client.set(key, "1", "EX", ttlSeconds);
   }
 
-  async isVerified(phone: string): Promise<boolean> {
-    return (await this.client.get(`verified:${phone}`)) === "1";
+  async isVerified(key: string): Promise<boolean> {
+    return (await this.client.get(key)) === "1";
   }
 
-  async consumeVerified(phone: string): Promise<boolean> {
+  async consumeVerified(key: string): Promise<boolean> {
     // GETDEL is atomic on Redis >= 6.2.
-    const v = await this.client.getdel(`verified:${phone}`);
+    const v = await this.client.getdel(key);
     return v === "1";
   }
 }
@@ -200,23 +195,17 @@ class UpstashRedisStore implements OtpStore {
     return data.result ?? null;
   }
 
-  async getRecord(phone: string): Promise<OtpRecord | null> {
-    const raw = (await this.cmd(["GET", `otp:${phone}`])) as string | null;
+  async getRecord(key: string): Promise<OtpRecord | null> {
+    const raw = (await this.cmd(["GET", key])) as string | null;
     return raw ? (JSON.parse(raw) as OtpRecord) : null;
   }
 
-  async setRecord(phone: string, record: OtpRecord, ttlSeconds: number) {
-    await this.cmd([
-      "SET",
-      `otp:${phone}`,
-      JSON.stringify(record),
-      "EX",
-      ttlSeconds,
-    ]);
+  async setRecord(key: string, record: OtpRecord, ttlSeconds: number) {
+    await this.cmd(["SET", key, JSON.stringify(record), "EX", ttlSeconds]);
   }
 
-  async deleteRecord(phone: string) {
-    await this.cmd(["DEL", `otp:${phone}`]);
+  async deleteRecord(key: string) {
+    await this.cmd(["DEL", key]);
   }
 
   async incrementCounter(key: string, ttlSeconds: number): Promise<number> {
@@ -227,20 +216,18 @@ class UpstashRedisStore implements OtpStore {
     return value;
   }
 
-  async setVerified(phone: string, ttlSeconds: number) {
-    await this.cmd(["SET", `verified:${phone}`, "1", "EX", ttlSeconds]);
+  async setVerified(key: string, ttlSeconds: number) {
+    await this.cmd(["SET", key, "1", "EX", ttlSeconds]);
   }
 
-  async isVerified(phone: string): Promise<boolean> {
-    const v = (await this.cmd(["GET", `verified:${phone}`])) as string | null;
+  async isVerified(key: string): Promise<boolean> {
+    const v = (await this.cmd(["GET", key])) as string | null;
     return v === "1";
   }
 
-  async consumeVerified(phone: string): Promise<boolean> {
+  async consumeVerified(key: string): Promise<boolean> {
     // GETDEL is atomic on Redis >= 6.2 (Upstash supports it).
-    const v = (await this.cmd(["GETDEL", `verified:${phone}`])) as
-      | string
-      | null;
+    const v = (await this.cmd(["GETDEL", key])) as string | null;
     return v === "1";
   }
 }
@@ -275,6 +262,16 @@ function upstashRestConfigured(): boolean {
   return true;
 }
 
+let announced = false;
+
+/** Say once which backend is live — a silent in-memory fallback on serverless
+ *  is the difference between "OTP not found" and a real bug. */
+function announce(kind: string) {
+  if (announced) return;
+  announced = true;
+  console.info(`[whatsapp-otp] OTP store backend: ${kind}`);
+}
+
 export function getOtpStore(): OtpStore {
   if (store) return store;
 
@@ -282,12 +279,14 @@ export function getOtpStore(): OtpStore {
   //    durable backend.
   const redisUrl = process.env.REDIS_URL;
   if (redisUrl && /^rediss?:\/\//i.test(redisUrl)) {
+    announce("Redis (REDIS_URL)");
     store = new RedisStore(redisUrl);
     return store;
   }
 
   // 2) Upstash REST (https:// URL + REST token) — optional alternative.
   if (upstashRestConfigured()) {
+    announce("Upstash REST");
     store = new UpstashRedisStore(
       process.env.UPSTASH_REDIS_REST_URL as string,
       process.env.UPSTASH_REDIS_REST_TOKEN as string,
@@ -296,6 +295,7 @@ export function getOtpStore(): OtpStore {
   }
 
   // 3) In-memory — local dev / single instance only.
+  announce("in-memory (not durable across instances)");
   store = new InMemoryStore();
   return store;
 }
@@ -309,4 +309,5 @@ export function isDurableStore(): boolean {
 /** Test-only: reset the singleton so a fresh backend is selected. */
 export function __resetStoreForTests() {
   store = null;
+  announced = false;
 }

@@ -1,61 +1,69 @@
-import { getAdminFirestore } from "@/lib/firebase/admin";
+/**
+ * Registration window, per placement drive.
+ *
+ * The close time is stored on the drive document itself, so closing one
+ * campaign has no effect on any other.
+ */
+
 import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
+import { getDriveBySlug, setDriveRegistrationWindow } from "@/lib/drives/store";
+import type { PlacementDrive } from "@/lib/drives/types";
 import {
   toWindowStatus,
-  type RegistrationWindow,
   type RegistrationWindowStatus,
 } from "@/lib/registration-window";
 
-const META_COLLECTION = "meta";
-const META_DOC = "registrationWindow";
-const CACHE_MS = 8_000;
+const OPEN: RegistrationWindowStatus = {
+  closesAtIso: null,
+  updatedAt: null,
+  closed: false,
+  closesAtLabel: null,
+  closedReason: null,
+};
 
-let memoryCache: { at: number; window: RegistrationWindow } | null = null;
-
-function windowRef() {
-  return getAdminFirestore().collection(META_COLLECTION).doc(META_DOC);
+export function driveWindowStatus(
+  drive: PlacementDrive,
+  now: Date = new Date(),
+): RegistrationWindowStatus {
+  return toWindowStatus(
+    {
+      closesAtIso: drive.registrationClosesAtIso,
+      updatedAt: drive.updatedAt,
+      eventDayIstDate: drive.eventDayIstDate,
+    },
+    now,
+  );
 }
 
-export async function getRegistrationWindow(): Promise<RegistrationWindow> {
-  const empty: RegistrationWindow = { closesAtIso: null, updatedAt: null };
-  if (!hasFirebaseAdminConfig()) return empty;
-  if (memoryCache && Date.now() - memoryCache.at < CACHE_MS) {
-    return memoryCache.window;
-  }
-  try {
-    const snap = await windowRef().get();
-    const d = snap.data() || {};
-    const closesAtIso =
-      typeof d.closesAtIso === "string" && d.closesAtIso.trim()
-        ? d.closesAtIso
-        : null;
-    const window: RegistrationWindow = {
-      closesAtIso,
-      updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : null,
-    };
-    memoryCache = { at: Date.now(), window };
-    return window;
-  } catch (err) {
-    console.warn(
-      "[registration-window] Could not load:",
-      err instanceof Error ? err.message : err,
-    );
-    return empty;
-  }
-}
-
-export async function getRegistrationWindowStatus(
+/**
+ * Window for the drive a landing page belongs to. An unknown or disabled drive
+ * reads as closed — a page whose campaign is not configured must not take
+ * registrations.
+ */
+export async function getRegistrationWindowStatusForSlug(
+  slug: string,
   now: Date = new Date(),
 ): Promise<RegistrationWindowStatus> {
-  return toWindowStatus(await getRegistrationWindow(), now);
+  if (!hasFirebaseAdminConfig()) return OPEN;
+  try {
+    const drive = await getDriveBySlug(slug);
+    if (!drive) return { ...OPEN, closed: true, closedReason: "scheduled" };
+    if (!drive.enabled || drive.archived) {
+      return { ...OPEN, closed: true, closedReason: "scheduled" };
+    }
+    return driveWindowStatus(drive, now);
+  } catch (err) {
+    console.warn(
+      "[registration-window] Could not load drive:",
+      err instanceof Error ? err.message : err,
+    );
+    return OPEN;
+  }
 }
 
 export async function setRegistrationWindow(
+  driveId: string,
   closesAtIso: string | null,
-): Promise<RegistrationWindowStatus> {
-  const updatedAt = new Date().toISOString();
-  await windowRef().set({ closesAtIso, updatedAt }, { merge: true });
-  const window: RegistrationWindow = { closesAtIso, updatedAt };
-  memoryCache = { at: Date.now(), window };
-  return toWindowStatus(window);
+): Promise<void> {
+  await setDriveRegistrationWindow(driveId, closesAtIso);
 }

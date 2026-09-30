@@ -1,9 +1,9 @@
 /**
- * ExcelR Placement Drive — Marathahalli, 9th & 10th October 2026.
- * Full Stack roles (Java & Python only). Mounted at /marathahalli-fsd-oct-2026.
+ * ExcelR Placement Drive — BTM Edition, 9th & 10th October 2026.
+ * Full Stack roles (Java & Python only). Mounted at /fsd-oct-2026.
  *
- * Copy and layout follow the approved design mock. Items marked
- * "CONFIRM" below were not legible in the mock and are drafted here.
+ * The hero follows the approved announcement banner and the FAQ copy is the
+ * approved wording.
  */
 
 import type { EventDetail, FaqItem } from "../reg-content";
@@ -60,38 +60,36 @@ const FAQS: FaqItem[] = [
     a: "No. The placement drive is absolutely free for all candidates. There is no registration or participation fee at any stage.",
   },
   {
-    // CONFIRM — adapted from the Java-only drive to cover Java & Python.
     q: "What technologies will the interviews focus on?",
-    a: "Java and Python Full Stack only. Expect core language and OOP fundamentals, Spring / Spring Boot (Java) or Django / Flask (Python), REST APIs, SQL databases, and front-end basics — HTML, CSS, JavaScript and a modern framework.",
+    a: "Java & Python Full Stack only.\nMERN and MEAN Stack are not included in this placement drive.",
   },
   {
     q: "How many companies will be participating?",
-    a: "Multiple hiring partners will be participating across the two days. The final list of companies is shared with registered candidates ahead of the event.",
+    a: "Multiple hiring partners will join the drive.\nRegistered candidates can choose any 2 companies from the final list shared on the event day.",
   },
   {
     q: "Will I get an on-the-spot offer?",
-    a: "Selected candidates may receive offers on the same day, depending on each company's interview process. Some companies may schedule a follow-up round after the drive.",
+    a: "Results will be shared by EOD on October 10th. Candidates who clear all rounds at the ExcelR campus will be referred to the respective companies for the next stage of their selection process.",
   },
   {
     q: "What should I bring on the day?",
-    a: "Please bring your own laptop for the technical round, multiple copies of your updated resume, and a valid photo ID for verification.",
+    a: "Please bring your own laptop and charger, a soft copy of your updated resume, and a valid photo ID for verification.",
   },
   {
-    // CONFIRM — answer drafted; not legible in the mock.
     q: "Can I attend the placement drive on both days?",
-    a: "You will be allotted one of the two days. We confirm your reporting date and time before 8th October, so please attend on the day assigned to you.",
+    a: "Once you register, you will receive your call letter by October 8th. You will be assigned one of the two days — October 9th or 10th along with a specific reporting time. All details will be shared with you via email or WhatsApp by October 8th.\nPlease note: Candidates can attend the drive only once and cannot appear on both days.",
   },
   {
-    // CONFIRM — answer drafted; not legible in the mock.
     q: "Will different companies be present on October 9th and 10th?",
-    a: "Yes. The participating companies differ between the two days. The list for your allotted day is shared with you along with your reporting details.",
+    a: "No. The same set of hiring companies will be participating on both days. Candidates can attend the drive only on their assigned day.",
   },
 ];
 
-export const MARATHAHALLI_FSD_OCT_2026: RegEventConfig = {
-  href: "/marathahalli-fsd-oct-2026",
+export const FSD_OCT_2026: RegEventConfig = {
+  driveSlug: "fsd-oct-2026",
+  href: "/fsd-oct-2026",
   thankYouHref: "/thank-you",
-  name: "ExcelR’s Placement Drive in Marathahalli",
+  name: "ExcelR’s Placement Drive for Full Stack Developers",
 
   meta: {
     title:
@@ -108,33 +106,16 @@ export const MARATHAHALLI_FSD_OCT_2026: RegEventConfig = {
     containerClassName: "max-w-content",
     paddingTopClassName: "pt-14 md:pt-16 pb-4 lg:pt-16",
     freeBadgeWrapperClassName: "mt-8 mb-12",
-    // Three lines sharing a half-width column, so from md the type scales
-    // fluidly with the viewport instead of jumping at breakpoints — stepped
-    // sizes left 768px cramped and 1024px lurching. Every line rides the same
-    // curve (46px at md up to 72px once the 1152px container is reached),
-    // scaled by its own ratio so the lines stay in proportion and none wraps.
-    headingLines: [
-      {
-        text: "ExcelR’s",
-        className: "text-[32px] md:text-[clamp(38px,5.64vw_-_5px,60px)]",
-      },
-      {
-        text: "Placement Drive",
-        className: "text-[40px] md:text-[clamp(46px,6.77vw_-_6px,72px)]",
-      },
-      {
-        text: "in Marathahalli",
-        small: "(Bangalore)",
-        className: "text-[28px] md:text-[clamp(34px,5.08vw_-_4.5px,54px)]",
-        smallClassName: "text-[18px] md:text-[clamp(23px,3.39vw_-_3px,36px)]",
-      },
-    ],
-    badge: {
-      variant: "white",
-      lines: ["For Full Stack Roles", "(Only For Java & Python)"],
+    // Announcement treatment from the approved banner.
+    announce: {
+      eyebrow: "ExcelR\u2019s",
+      headline: "PLACEMENT",
+      script: "Drive",
+      roleLines: ["For Full Stack", "Developers"],
+      edition: "BTM EDITION",
+      nowLabel: "Now",
+      claim: "BIGGER & BETTER",
     },
-    tagline:
-      "Connect with top tech companies, ace your interviews, and launch your career at ExcelR’s Marathahalli Campus.",
     image: {
       src: `${ASSETS}/hero-student.png`,
       width: 924,
@@ -156,11 +137,6 @@ export const MARATHAHALLI_FSD_OCT_2026: RegEventConfig = {
   },
 
   freeBadgeSrc: `${ASSETS}/free-badge.png`,
-
-  // The shared close time in `meta/registrationWindow` belongs to the August
-  // drive — honouring it here would show this page as closed on day one.
-  // Flip to "global" once the window is per-drive (see the backend config work).
-  registrationWindow: "open",
 
   details: {
     heading: "Event Details",

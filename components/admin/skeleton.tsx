@@ -135,8 +135,8 @@ export function LeadsPageSkeleton() {
           "Registered",
           "Welcome",
           "Carry",
-          "21 Aug",
-          "22 Aug",
+          "Day before",
+          "Event day",
         ]}
       />
       <div className="flex justify-between">

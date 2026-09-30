@@ -18,15 +18,35 @@ const LABELS: Record<string, string> = {
   sending: "Sending",
 };
 
-export function StatusBadge({ status }: { status?: MessageStatus | string | null }) {
+/**
+ * Display text for a delivery status. `sent` and `legacy` read the same, which
+ * is what lets the delivery badge collapse them into one pill.
+ */
+export function statusLabel(status?: MessageStatus | string | null): string {
+  const key = status || "pending";
+  return LABELS[key] || key;
+}
+
+export function StatusBadge({
+  status,
+  prefix,
+  title,
+}: {
+  status?: MessageStatus | string | null;
+  /** Short channel marker, shown only when a row's channels disagree. */
+  prefix?: string;
+  title?: string;
+}) {
   const key = status || "pending";
   return (
     <span
-      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset ${
+      title={title}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset ${
         STYLES[key] || STYLES.pending
       }`}
     >
-      {LABELS[key] || key}
+      {prefix ? <span className="opacity-60">{prefix}</span> : null}
+      {statusLabel(status)}
     </span>
   );
 }

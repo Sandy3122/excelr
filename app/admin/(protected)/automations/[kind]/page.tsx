@@ -13,6 +13,7 @@ import { LeadFilterBar } from "@/components/admin/lead-filter-bar";
 import { MobileToolbarButton } from "@/components/admin/mobile-toolbar-button";
 import { RightDrawer } from "@/components/admin/right-drawer";
 import { clearAdminFetchCache, fetchAdminJson } from "@/components/admin/fetch-json";
+import { useAdminDrive, withDrive } from "@/components/admin/drive-context";
 import { invalidateLeadsCache, useAllLeads } from "@/components/admin/use-all-leads";
 import {
   sendAutomationBatches,
@@ -40,6 +41,7 @@ import {
 import {
   EMPTY_LEAD_FILTERS,
   kindMatchesStatus,
+  DEFAULT_AUTOMATION_VIEW,
   leadChannelStatus,
   matchesLeadFilters,
   uniqueColleges,
@@ -96,6 +98,7 @@ const RUN_SORT_OPTIONS: { key: RunSortKey; label: string }[] = [
 export default function AutomationDetailPage() {
   const params = useParams<{ kind: string }>();
   const kind = params.kind as AutomationKind;
+  const { driveId, drive } = useAdminDrive();
   const [meta, setMeta] = useState<KindResponse | null>(null);
   const [metaError, setMetaError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -121,9 +124,12 @@ export default function AutomationDetailPage() {
   const loadMeta = useCallback(
     async (fresh = false) => {
       setMetaError("");
-      const url = fresh
-        ? `/api/admin/automations/${kind}?fresh=1`
-        : `/api/admin/automations/${kind}`;
+      const url = withDrive(
+        fresh
+          ? `/api/admin/automations/${kind}?fresh=1`
+          : `/api/admin/automations/${kind}`,
+        driveId,
+      );
       const json = await fetchAdminJson<KindResponse>(url, { fresh });
       if (!json.ok) {
         setMetaError(json.error || "Could not load this automation.");
@@ -131,12 +137,16 @@ export default function AutomationDetailPage() {
       }
       setMeta(json);
     },
-    [kind],
+    [kind, driveId],
   );
 
   useEffect(() => {
+    if (!driveId) return;
+    // Blank the panel while the newly selected drive's figures load.
+    setMeta(null);
+    setSelected(new Set());
     void loadMeta().catch(() => setMetaError("Could not load this automation."));
-  }, [loadMeta]);
+  }, [loadMeta, driveId]);
 
   useEffect(() => {
     setFilters(EMPTY_LEAD_FILTERS);
@@ -144,11 +154,16 @@ export default function AutomationDetailPage() {
     setPage(1);
   }, [kind]);
 
+  const automationView = drive?.automations ?? DEFAULT_AUTOMATION_VIEW;
+
   const colleges = useMemo(() => uniqueColleges(leads), [leads]);
   const qualifications = useMemo(() => uniqueQualifications(leads), [leads]);
   const filtered = useMemo(
-    () => leads.filter((reg) => matchesLeadFilters(reg, filters, kind)),
-    [leads, filters, kind],
+    () =>
+      leads.filter((reg) =>
+        matchesLeadFilters(reg, filters, automationView, kind),
+      ),
+    [leads, filters, kind, automationView],
   );
   const sorted = useMemo(
     () =>
@@ -192,12 +207,12 @@ export default function AutomationDetailPage() {
     const source = pool();
     if (mode === "pending") {
       return source
-        .filter((r) => kindMatchesStatus(r, kind, "pending"))
+        .filter((r) => kindMatchesStatus(r, kind, "pending", automationView))
         .map((r) => r.id);
     }
     if (mode === "failed") {
       return source
-        .filter((r) => kindMatchesStatus(r, kind, "failed"))
+        .filter((r) => kindMatchesStatus(r, kind, "failed", automationView))
         .map((r) => r.id);
     }
     return source.map((r) => r.id);
@@ -233,6 +248,7 @@ export default function AutomationDetailPage() {
     setNotice("");
     try {
       const result = await sendAutomationBatches({
+      driveId,
         kind,
         ids: opts.ids,
         action: opts.action,
@@ -310,7 +326,7 @@ export default function AutomationDetailPage() {
   const allCount = idsFor("all").length;
   const allLeadIds = leads.map((r) => r.id);
   const allPendingCount = leads.filter((r) =>
-    kindMatchesStatus(r, kind, "pending"),
+    kindMatchesStatus(r, kind, "pending", automationView),
   ).length;
   const sortedRuns = sortRows(meta.recentRuns ?? [], runSort, (run, key) => {
     if (key === "when") return dateSortValue(run.startedAt);
@@ -334,7 +350,7 @@ export default function AutomationDetailPage() {
         </div>
         <div className="hidden flex-wrap gap-2 lg:flex">
           <a
-            href={`/api/admin/automations/${kind}/export`}
+            href={withDrive(`/api/admin/automations/${kind}/export`, driveId)}
             className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold"
           >
             <Download className="h-4 w-4" />
@@ -476,7 +492,7 @@ export default function AutomationDetailPage() {
       <RightDrawer open={actionsOpen} title="Actions" onClose={() => setActionsOpen(false)}>
         <div className="grid grid-cols-1 gap-2">
           <a
-            href={`/api/admin/automations/${kind}/export`}
+            href={withDrive(`/api/admin/automations/${kind}/export`, driveId)}
             className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2.5 text-sm font-semibold"
           >
             <Download className="h-4 w-4" />

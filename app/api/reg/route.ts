@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { registrationSchema, type RegistrationInput } from "@/lib/reg-schema";
-import { APPLICANT_EMAIL, renderApplicantEmailHtml } from "@/lib/reg-email";
+import { renderAutomationEmailHtml, automationEmailText, APPLICANT_REPLY_TO } from "@/lib/reg-email";
 import {
   getRegistrationMailTransporter,
   notifyAdminOfFailure,
@@ -12,9 +12,14 @@ import {
   consumePhoneVerification,
   isPhoneVerified,
 } from "@/lib/whatsapp-otp/service";
-import { sendRegistrationConfirmationWhatsApp } from "@/lib/whatsapp-otp/infobip";
+import { sendNamedWhatsAppTemplate } from "@/lib/whatsapp-otp/infobip";
 import { hasInfobipConfig } from "@/lib/whatsapp-otp/config";
-import { isRegAdminAuthorized } from "@/lib/firebase/admin-auth";
+import {
+  DriveConfigurationError,
+  driveAutomationTemplate,
+  driveSendConfig,
+} from "@/lib/drives/whatsapp";
+import { isAdminAuthorized } from "@/lib/admin/authorize";
 import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
 import {
   DuplicateRegistrationError,
@@ -24,10 +29,14 @@ import {
 } from "@/lib/firebase/registrations";
 import { persistChannelDelivery } from "@/lib/automations/store";
 import { emptyChannelDelivery } from "@/lib/automations/types";
+import { driveScheduleContext } from "@/lib/automations/schedule";
 import { firstNameFrom } from "@/lib/first-name";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/registration-window";
-import { getRegistrationWindowStatus } from "@/lib/registration-window-store";
+import { driveWindowStatus } from "@/lib/registration-window-store";
 import { notifyRegistrationWebhook } from "@/lib/reg-webhook";
+import { resolvePublicDrive } from "@/lib/drives/request";
+import { getDriveById, getDriveBySlug } from "@/lib/drives/store";
+import type { PlacementDrive } from "@/lib/drives/types";
 
 // Nodemailer + Firestore Admin need the Node runtime (not Edge).
 export const runtime = "nodejs";
@@ -37,18 +46,17 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().trim().min(1).max(256).optional(),
   id: z.string().trim().min(1).max(256).optional(),
+  driveId: z.string().trim().min(1).max(256).optional(),
+  driveSlug: z.string().trim().min(1).max(80).optional(),
 });
 
 /**
- * Admin-only listing/read of stored registrations.
+ * Admin-only listing/read of stored registrations for one drive.
  * Header: `Authorization: Bearer <REG_ADMIN_API_KEY>` or `x-admin-key`.
  */
 export async function GET(req: Request) {
-  if (!isRegAdminAuthorized(req)) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized." },
-      { status: 401 },
-    );
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
   if (!hasFirebaseAdminConfig()) {
@@ -63,6 +71,8 @@ export async function GET(req: Request) {
     limit: url.searchParams.get("limit") ?? undefined,
     cursor: url.searchParams.get("cursor") ?? undefined,
     id: url.searchParams.get("id") ?? undefined,
+    driveId: url.searchParams.get("driveId") ?? undefined,
+    driveSlug: url.searchParams.get("driveSlug") ?? undefined,
   });
   if (!parsed.success) {
     return NextResponse.json(
@@ -71,9 +81,22 @@ export async function GET(req: Request) {
     );
   }
 
+  // Reads are always scoped to one drive — there is no cross-campaign listing.
+  const drive = parsed.data.driveId
+    ? await getDriveById(parsed.data.driveId)
+    : parsed.data.driveSlug
+      ? await getDriveBySlug(parsed.data.driveSlug)
+      : null;
+  if (!drive) {
+    return NextResponse.json(
+      { ok: false, error: "Specify a known driveId or driveSlug." },
+      { status: 400 },
+    );
+  }
+
   try {
     if (parsed.data.id) {
-      const registration = await getRegistrationById(parsed.data.id);
+      const registration = await getRegistrationById(drive.id, parsed.data.id);
       if (!registration) {
         return NextResponse.json(
           { ok: false, error: "Registration not found." },
@@ -83,11 +106,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, registration });
     }
 
-    const result = await listRegistrations({
+    const result = await listRegistrations(drive.id, {
       limit: parsed.data.limit ?? 50,
       cursor: parsed.data.cursor,
     });
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, placementDriveId: drive.id, ...result });
   } catch (err) {
     console.error("[reg] Firestore read failed:", err);
     return NextResponse.json(
@@ -116,43 +139,54 @@ export async function POST(req: Request) {
   const data = parsed.data;
   const timestamp = new Date().toISOString();
 
-  const windowStatus = await getRegistrationWindowStatus();
-  if (windowStatus.closed) {
+  const resolved = await resolvePublicDrive(data.driveSlug);
+  if (!resolved.ok) {
+    return NextResponse.json(
+      { ok: false, error: resolved.error, code: resolved.code },
+      { status: resolved.status },
+    );
+  }
+  const drive = resolved.drive;
+
+  if (driveWindowStatus(drive).closed) {
     return NextResponse.json(
       { ok: false, error: REGISTRATION_CLOSED_MESSAGE, code: "REGISTRATIONS_CLOSED" },
       { status: 403 },
     );
   }
 
-  // The WhatsApp number must have been verified via OTP before we accept the
-  // registration. We peek here (non-destructive) and only consume the marker
-  // after the emails go out, so a transient email failure lets the user retry
-  // without re-verifying.
-  const { verified, phone } = await isPhoneVerified(data.phone);
+  // The WhatsApp number must have been verified via OTP *for this drive* before
+  // we accept the registration. We peek here (non-destructive) and only consume
+  // the marker after the emails go out, so a transient email failure lets the
+  // user retry without re-verifying.
+  const { verified, phone } = await isPhoneVerified(drive, data.phone);
   if (!verified) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: "Please verify your WhatsApp number before registering.",
-      },
+      { ok: false, error: "Please verify your WhatsApp number before registering." },
       { status: 403 },
     );
   }
   // Use the normalized E.164 number everywhere downstream.
   if (phone) data.phone = phone.e164;
 
+  const ctx = driveScheduleContext(drive);
+  const alertDetails = {
+    Drive: drive.slug,
+    Name: data.fullName,
+    Email: data.email,
+    Phone: data.phone,
+    "Page URL": data.pageUrl,
+  };
+
   let savedId = "";
   let created = false;
   try {
-    const saved = await saveRegistration(data, timestamp);
+    const saved = await saveRegistration(drive, ctx, data, timestamp);
     savedId = saved.id;
     created = saved.created;
   } catch (err) {
     if (err instanceof DuplicateRegistrationError) {
-      return NextResponse.json(
-        { ok: false, error: err.message },
-        { status: 409 },
-      );
+      return NextResponse.json({ ok: false, error: err.message }, { status: 409 });
     }
     console.error("[reg] Firestore save failed:", err);
     await notifyAdminOfFailure({
@@ -161,18 +195,12 @@ export async function POST(req: Request) {
         err instanceof Error
           ? err.message
           : "Failed to save registration to Firestore.",
-      details: {
-        Name: data.fullName,
-        Email: data.email,
-        Phone: data.phone,
-        "Page URL": data.pageUrl,
-      },
+      details: alertDetails,
     });
     return NextResponse.json(
       {
         ok: false,
-        error:
-          "We couldn't save your registration. Please try again in a moment.",
+        error: "We couldn't save your registration. Please try again in a moment.",
       },
       { status: 500 },
     );
@@ -180,25 +208,35 @@ export async function POST(req: Request) {
 
   if (created) {
     await notifyRegistrationWebhook({
+      drive,
       id: savedId,
       data,
       submittedAt: timestamp,
     });
   }
 
-  const existing = savedId ? await getRegistrationById(savedId).catch(() => null) : null;
+  const welcome = drive.automations.welcome;
+  const existing = savedId
+    ? await getRegistrationById(drive.id, savedId).catch(() => null)
+    : null;
   const welcomeEmailStatus = existing?.messages?.welcome?.email?.status;
   const welcomeWaStatus = existing?.messages?.welcome?.whatsapp?.status;
-  const shouldSendWelcomeEmail =
-    welcomeEmailStatus !== "sent" && welcomeEmailStatus !== "legacy";
-  const shouldSendWelcomeWhatsApp =
-    welcomeWaStatus !== "sent" && welcomeWaStatus !== "legacy";
+  const sendWelcomeEmail =
+    welcome.enabled &&
+    welcome.channels.includes("email") &&
+    welcomeEmailStatus !== "sent" &&
+    welcomeEmailStatus !== "legacy";
+  const sendWelcomeWhatsApp =
+    welcome.enabled &&
+    welcome.channels.includes("whatsapp") &&
+    welcomeWaStatus !== "sent" &&
+    welcomeWaStatus !== "legacy";
 
   // Email is required on every successful registration.
   try {
-    await sendEmails(data, timestamp, { skipApplicant: !shouldSendWelcomeEmail });
-    if (savedId && shouldSendWelcomeEmail) {
-      await persistChannelDelivery(savedId, "welcome", "email", {
+    await sendEmails(drive, data, timestamp, { sendApplicant: sendWelcomeEmail });
+    if (savedId && sendWelcomeEmail) {
+      await persistChannelDelivery(drive.id, savedId, "welcome", "email", {
         ...emptyChannelDelivery("sent"),
         sentAt: timestamp,
       });
@@ -211,12 +249,7 @@ export async function POST(req: Request) {
         err instanceof Error
           ? err.message
           : "Nodemailer failed while sending registration emails.",
-      details: {
-        Name: data.fullName,
-        Email: data.email,
-        Phone: data.phone,
-        "Page URL": data.pageUrl,
-      },
+      details: alertDetails,
     });
     return NextResponse.json(
       {
@@ -234,7 +267,7 @@ export async function POST(req: Request) {
   // the response returns) without stacking the latency.
   const consumePromise = (async () => {
     try {
-      await consumePhoneVerification(data.phone);
+      await consumePhoneVerification(drive, data.phone);
     } catch (err) {
       console.error("[reg] Failed to consume phone verification marker:", err);
       await notifyAdminOfFailure({
@@ -243,16 +276,12 @@ export async function POST(req: Request) {
           err instanceof Error
             ? err.message
             : "Failed to consume WhatsApp verification marker.",
-        details: {
-          Name: data.fullName,
-          Email: data.email,
-          Phone: data.phone,
-        },
+        details: alertDetails,
       });
     }
   })();
-  const whatsappPromise = shouldSendWelcomeWhatsApp
-    ? sendWhatsAppConfirmation(data, phone, savedId)
+  const whatsappPromise = sendWelcomeWhatsApp
+    ? sendWhatsAppConfirmation(drive, data, phone, savedId)
     : Promise.resolve();
 
   await Promise.all([consumePromise, whatsappPromise]);
@@ -261,78 +290,71 @@ export async function POST(req: Request) {
 }
 
 async function sendWhatsAppConfirmation(
+  drive: PlacementDrive,
   data: RegistrationInput,
   phone: Awaited<ReturnType<typeof isPhoneVerified>>["phone"],
   registrationId?: string,
 ) {
   const alertDetails = {
+    Drive: drive.slug,
     Name: data.fullName,
     Email: data.email,
     Phone: phone?.masked || data.phone,
     "Page URL": data.pageUrl,
   };
 
-  if (!hasInfobipConfig()) {
-    console.error(
-      "[reg] WhatsApp confirmation skipped: Infobip is not configured.",
-    );
+  const fail = async (reason: string) => {
+    console.error("[reg] WhatsApp confirmation skipped:", reason);
     if (registrationId) {
-      await persistChannelDelivery(registrationId, "welcome", "whatsapp", {
+      await persistChannelDelivery(drive.id, registrationId, "welcome", "whatsapp", {
         ...emptyChannelDelivery("failed"),
-        error: "Infobip is not configured (missing API key or base URL).",
+        error: reason,
       });
     }
     await notifyAdminOfFailure({
       step: "whatsapp_confirmation",
-      reason: "Infobip is not configured (missing API key or base URL).",
+      reason,
       details: alertDetails,
     });
+  };
+
+  if (!hasInfobipConfig()) {
+    await fail("Infobip is not configured (missing API key or base URL).");
     return;
   }
   if (!phone) {
-    console.error(
-      "[reg] WhatsApp confirmation skipped: normalized phone missing.",
+    await fail("Normalized phone was missing after verification.");
+    return;
+  }
+
+  let sendConfig;
+  let templateName: string;
+  try {
+    sendConfig = driveSendConfig(drive);
+    templateName = driveAutomationTemplate(drive, "welcome");
+  } catch (err) {
+    await fail(
+      err instanceof DriveConfigurationError
+        ? err.message
+        : "Could not resolve the welcome WhatsApp template.",
     );
-    if (registrationId) {
-      await persistChannelDelivery(registrationId, "welcome", "whatsapp", {
-        ...emptyChannelDelivery("failed"),
-        error: "Normalized phone was missing after verification.",
-      });
-    }
-    await notifyAdminOfFailure({
-      step: "whatsapp_confirmation",
-      reason: "Normalized phone was missing after verification.",
-      details: alertDetails,
-    });
     return;
   }
 
   const firstName = firstNameFrom(data.fullName);
   try {
-    const wa = await sendRegistrationConfirmationWhatsApp(
+    const wa = await sendNamedWhatsAppTemplate(
+      sendConfig,
       phone.infobip,
       firstName,
+      templateName,
     );
     if (!wa.ok) {
-      console.error(
-        "[reg] WhatsApp confirmation send failed for",
-        phone.masked,
-      );
-      if (registrationId) {
-        await persistChannelDelivery(registrationId, "welcome", "whatsapp", {
-          ...emptyChannelDelivery("failed"),
-          error: "Infobip rejected or failed the welcome WhatsApp template send.",
-        });
-      }
-      await notifyAdminOfFailure({
-        step: "whatsapp_confirmation",
-        reason: "Infobip rejected or failed the welcome WhatsApp template send.",
-        details: { ...alertDetails, "First name": firstName },
-      });
+      await fail("Infobip rejected or failed the welcome WhatsApp template send.");
       return;
     }
     if (registrationId) {
-      await persistChannelDelivery(registrationId, "welcome", "whatsapp", {
+      await persistChannelDelivery(drive.id, registrationId, "welcome", "whatsapp", {
         ...emptyChannelDelivery("sent"),
         sentAt: new Date().toISOString(),
         providerMessageId: wa.providerMessageId || null,
@@ -344,48 +366,37 @@ async function sendWhatsAppConfirmation(
       wa.providerMessageId ? `(id=${wa.providerMessageId})` : "",
     );
   } catch (err) {
-    console.error("[reg] WhatsApp confirmation send failed:", err);
-    if (registrationId) {
-      await persistChannelDelivery(registrationId, "welcome", "whatsapp", {
-        ...emptyChannelDelivery("failed"),
-        error:
-          err instanceof Error
-            ? err.message
-            : "Unexpected error sending welcome WhatsApp message.",
-      });
-    }
-    await notifyAdminOfFailure({
-      step: "whatsapp_confirmation",
-      reason:
-        err instanceof Error
-          ? err.message
-          : "Unexpected error sending welcome WhatsApp message.",
-      details: { ...alertDetails, "First name": firstName },
-    });
+    await fail(
+      err instanceof Error
+        ? err.message
+        : "Unexpected error sending welcome WhatsApp message.",
+    );
   }
 }
 
 async function sendEmails(
+  drive: PlacementDrive,
   data: RegistrationInput,
   timestamp: string,
-  opts?: { skipApplicant?: boolean },
+  opts: { sendApplicant: boolean },
 ) {
   const from = registrationMailFrom();
   const notifyTo = registrationNotifyTo();
-  const sendApplicantConfirmation =
-    (process.env.REG_SEND_APPLICANT_CONFIRMATION || "true").toLowerCase() ===
-    "true";
+  const applicantEnabled =
+    (process.env.REG_SEND_APPLICANT_CONFIRMATION || "true").toLowerCase() === "true";
 
   const transporter = getRegistrationMailTransporter();
+  const welcome = drive.automations.welcome;
 
   const adminSend = transporter.sendMail({
     from,
     to: notifyTo,
     replyTo: data.email,
-    subject: `New Placement Drive registration — ${data.fullName}`,
+    subject: `New registration — ${drive.name} — ${data.fullName}`,
     text: [
-      "New registration for ExcelR's Java Full Stack Placement Drive:",
+      `New registration for ${drive.name}:`,
       "",
+      `Drive:         ${drive.name} (/${drive.slug})`,
       `Name:          ${data.fullName}`,
       `Email:         ${data.email}`,
       `Phone:         ${data.phone}`,
@@ -394,34 +405,28 @@ async function sendEmails(
       `Page URL:      ${data.pageUrl}`,
       `Submitted:     ${timestamp}`,
     ].join("\n"),
-    html: adminHtml(data, timestamp),
+    html: adminHtml(drive, data, timestamp),
   });
 
   const applicantSend =
-    sendApplicantConfirmation && !opts?.skipApplicant
-    ? renderApplicantEmailHtml(data.fullName).then((html) =>
-        transporter.sendMail({
-          from,
-          to: data.email,
-          replyTo: APPLICANT_EMAIL.replyTo,
-          subject: APPLICANT_EMAIL.subject,
-          text: [
-            `Hi ${data.fullName.split(/\s+/)[0] || "there"},`,
-            "",
-            "Your seat is confirmed for the Java Full Stack Placement Drive.",
-            "",
-            "Date:  Saturday, 22nd August 2026",
-            "Time:  9:00 AM onwards (registration 8:45 – 9:00 AM)",
-            "Venue: ExcelR — Marathahalli Campus, Bengaluru 560037",
-            "",
-            "Please bring your resume copies, photo ID, and laptop (mandatory).",
-            "",
-            "— Team ExcelR, Placement & Career Services",
-          ].join("\n"),
-          html,
-        }),
-      )
-    : Promise.resolve();
+    applicantEnabled && opts.sendApplicant && welcome.emailTemplate
+      ? renderAutomationEmailHtml(welcome.emailTemplate, data.fullName, drive).then(
+          (html) =>
+            transporter.sendMail({
+              from,
+              to: data.email,
+              replyTo: APPLICANT_REPLY_TO,
+              subject:
+                welcome.emailSubject?.trim() || `You're confirmed: ${drive.name}`,
+              text: automationEmailText(
+                welcome.emailTemplate!,
+                data.fullName.split(/\s+/)[0] || "there",
+                drive,
+              ),
+              html,
+            }),
+        )
+      : Promise.resolve();
 
   const results = await Promise.allSettled([adminSend, applicantSend]);
   const adminResult = results[0];
@@ -443,6 +448,7 @@ async function sendEmails(
       step: "applicant_confirmation_email",
       reason,
       details: {
+        Drive: drive.slug,
         Name: data.fullName,
         Email: data.email,
         Phone: data.phone,
@@ -453,14 +459,19 @@ async function sendEmails(
   }
 }
 
-function adminHtml(data: RegistrationInput, timestamp: string) {
+function adminHtml(
+  drive: PlacementDrive,
+  data: RegistrationInput,
+  timestamp: string,
+) {
   const row = (k: string, v: string) =>
     `<tr><td style="padding:6px 12px;color:#62748E;font:600 13px Arial;vertical-align:top">${k}</td>` +
     `<td style="padding:6px 12px;color:#0F172B;font:14px Arial;word-break:break-all">${escapeHtml(v)}</td></tr>`;
   return `
   <div style="font-family:Arial,sans-serif;color:#0F172B">
-    <h2 style="margin:0 0 12px">New Placement Drive registration</h2>
+    <h2 style="margin:0 0 12px">New registration — ${escapeHtml(drive.name)}</h2>
     <table style="border-collapse:collapse">
+      ${row("Drive", `${drive.name} (/${drive.slug})`)}
       ${row("Name", data.fullName)}
       ${row("Email", data.email)}
       ${row("Phone", data.phone)}

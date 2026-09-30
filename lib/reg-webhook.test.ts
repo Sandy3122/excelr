@@ -1,13 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRegistrationWebhookPayload,
-  registrationN8nWebhookUrl,
+  registrationWebhookUrl,
 } from "./reg-webhook";
+import type { PlacementDrive } from "./drives/types";
+
+const DRIVE = {
+  id: "drive-1",
+  slug: "reg",
+  name: "Java Full Stack Placement Drive",
+  eventKey: "java-fullstack-placement-drive",
+  webhookUrl: "https://excelr.app.n8n.cloud/webhook/java-fsd-registration",
+} as PlacementDrive;
 
 describe("buildRegistrationWebhookPayload", () => {
-  it("includes lead fields and a first name", () => {
+  it("includes lead fields, a first name and the owning drive", () => {
     expect(
       buildRegistrationWebhookPayload({
+        drive: DRIVE,
         id: "919876543210",
         submittedAt: "2026-08-21T07:00:00.000Z",
         data: {
@@ -16,12 +26,15 @@ describe("buildRegistrationWebhookPayload", () => {
           phone: "+919876543210",
           college: "ExcelR",
           qualification: "B.E / B.Tech",
+          driveSlug: "reg",
           pageUrl: "https://excelr-placement-drive.vercel.app/reg",
         },
       }),
     ).toMatchObject({
       source: "excelr-placement-drive",
       event: "java-fullstack-placement-drive",
+      placementDriveId: "drive-1",
+      placementDriveSlug: "reg",
       id: "919876543210",
       fullName: "Ada Lovelace",
       firstName: "Ada",
@@ -33,14 +46,14 @@ describe("buildRegistrationWebhookPayload", () => {
   });
 });
 
-describe("registrationN8nWebhookUrl", () => {
-  it("defaults to the ExcelR n8n webhook", () => {
-    const prev = process.env.REGISTRATION_N8N_WEBHOOK_URL;
-    delete process.env.REGISTRATION_N8N_WEBHOOK_URL;
-    expect(registrationN8nWebhookUrl()).toBe(
+describe("registrationWebhookUrl", () => {
+  it("comes from the drive, not the environment", () => {
+    expect(registrationWebhookUrl(DRIVE)).toBe(
       "https://excelr.app.n8n.cloud/webhook/java-fsd-registration",
     );
-    if (prev === undefined) delete process.env.REGISTRATION_N8N_WEBHOOK_URL;
-    else process.env.REGISTRATION_N8N_WEBHOOK_URL = prev;
+  });
+
+  it("is disabled when the drive leaves it empty", () => {
+    expect(registrationWebhookUrl({ ...DRIVE, webhookUrl: "  " })).toBe("");
   });
 });

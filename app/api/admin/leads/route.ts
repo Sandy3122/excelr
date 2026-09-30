@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAdminAuthorized } from "@/lib/admin/authorize";
-import { hasFirebaseAdminConfig } from "@/lib/firebase/config";
+import { requireAdminDrive } from "@/lib/admin/drive-context";
 import {
   countRegistrations,
   getRegistrationById,
@@ -21,15 +20,9 @@ const querySchema = z.object({
 });
 
 export async function GET(req: Request) {
-  if (!isAdminAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
-  if (!hasFirebaseAdminConfig()) {
-    return NextResponse.json(
-      { ok: false, error: "Registration storage is not configured." },
-      { status: 503 },
-    );
-  }
+  const ctx = await requireAdminDrive(req);
+  if (!ctx.ok) return ctx.response;
+  const driveId = ctx.drive.id;
 
   const url = new URL(req.url);
   const parsed = querySchema.safeParse({
@@ -47,7 +40,7 @@ export async function GET(req: Request) {
 
   try {
     if (parsed.data.id) {
-      const registration = await getRegistrationById(parsed.data.id);
+      const registration = await getRegistrationById(driveId, parsed.data.id);
       if (!registration) {
         return NextResponse.json(
           { ok: false, error: "Registration not found." },
@@ -58,22 +51,26 @@ export async function GET(req: Request) {
     }
 
     if (parsed.data.all === "1") {
-      const registrations = await listAllRegistrations();
+      const registrations = await listAllRegistrations(driveId);
       return NextResponse.json({
         ok: true,
+        placementDriveId: driveId,
         registrations,
         nextCursor: null,
         total: registrations.length,
       });
     }
 
-    const result = await listRegistrations({
+    const result = await listRegistrations(driveId, {
       limit: parsed.data.limit ?? 50,
       cursor: parsed.data.cursor,
     });
-    const total = parsed.data.cursor ? undefined : await countRegistrations();
+    const total = parsed.data.cursor
+      ? undefined
+      : await countRegistrations(driveId);
     return NextResponse.json({
       ok: true,
+      placementDriveId: driveId,
       ...result,
       ...(typeof total === "number" ? { total } : {}),
     });
