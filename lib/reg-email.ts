@@ -85,18 +85,25 @@ export const APPLICANT_REPLY_TO = (
  *   {{user["system"]["first_name"] or "Aspirant"}}
  *
  * The key is the plain name, or the last bracketed segment. An `or "…"` suffix
- * supplies the fallback when the value is empty.
+ * supplies the fallback when the value is empty, and takes precedence over
+ * FALLBACKS below so a template can choose its own wording.
  */
 const MERGE_EXPRESSION = /\{\{\s*([^}]+?)\s*\}\}/g;
 const BRACKETED_KEY = /\[\s*["']([^"']+)["']\s*\]\s*$/;
 const OR_DEFAULT = /\s+or\s+["']([^"']*)["']\s*$/;
+
+/** Used when a value is empty and the expression names no default of its own. */
+const FALLBACKS: Record<string, string> = {
+  // Matches firstNameFrom(), so email and WhatsApp greet a nameless lead alike.
+  first_name: "there",
+};
 
 function resolveMergeExpression(
   expression: string,
   values: Record<string, string>,
 ): string {
   let expr = expression;
-  let fallback = "";
+  let fallback: string | null = null;
 
   const withDefault = OR_DEFAULT.exec(expr);
   if (withDefault) {
@@ -109,7 +116,8 @@ function resolveMergeExpression(
   const key = (bracketed ? bracketed[1] : expr).trim();
 
   const value = values[key];
-  return (value && value.trim()) || fallback;
+  if (value && value.trim()) return value;
+  return fallback ?? FALLBACKS[key] ?? "";
 }
 
 function applyEmailMergeFields(
@@ -117,11 +125,12 @@ function applyEmailMergeFields(
   fullName: string,
   drive?: PlacementDrive,
 ): string {
-  const firstName = firstNameFrom(fullName);
+  const trimmed = fullName.trim();
   const values: Record<string, string> = {
-    // Names are escaped: they come from a public form.
-    first_name: escapeHtml(firstName),
-    full_name: escapeHtml(fullName.trim()),
+    // Left empty when there is no name, so the template's own default can win;
+    // FALLBACKS supplies "there" otherwise. Escaped: it comes from a public form.
+    first_name: trimmed ? escapeHtml(firstNameFrom(trimmed)) : "",
+    full_name: escapeHtml(trimmed),
     calendar_link: drive ? buildGoogleCalendarLink(drive) : "",
     drive_name: escapeHtml(drive?.name || ""),
     event_date: drive?.eventDayIstDate || "",
@@ -144,7 +153,9 @@ function applyEmailMergeFields(
 
 /**
  * Render a bundled applicant email.
- * Tokens: {{first_name}}, {{calendar_link}}, we_wk_unsubscribe_link
+ *
+ * Keys: first_name, full_name, calendar_link, drive_name, event_date — in
+ * either mustache or WebEngage form — plus the we_wk_unsubscribe_link token.
  */
 export async function renderAutomationEmailHtml(
   key: EmailTemplateKey,

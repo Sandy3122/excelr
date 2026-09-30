@@ -21,19 +21,23 @@ PREHEADER         : Tomorrow, Saturday 22 August · 9:00 AM · ExcelR Marathahal
 FROM NAME         : ExcelR Placement Team
 REPLY-TO          : enquiry@excelr.com
 
-MERGE FIELDS      : {{first_name}}  {{calendar_link}}
+MERGE FIELDS      : first_name · full_name · calendar_link · drive_name · event_date
                     we_wk_unsubscribe_link  (WebEngage token, in footer)
-                    Only two tokens to map — everything else is hard-coded.
+                    Write each one as a mustache token; everything else is
+                    hard-coded.
 
 PALETTE           : navy #101740 · blue #3B5BF6 · cyan #00AEE6 (from the logo mark)
                     tint #F1F6FF · ink #1F2333 · muted #5C6480 · footer #21243D
                     No green anywhere — the confirmation band now uses the cyan
                     accent from the ExcelR logo mark instead.
 
-NOTE ON SYNTAX    : the {{...}} tokens above use generic mustache syntax.
-                    The footer unsubscribe uses WebEngage's we_wk_unsubscribe_link —
-                    if you are sending from WebEngage, convert the {{...}} tokens to
-                    WebEngage personalisation syntax before scheduling.
+NOTE ON SYNTAX    : lib/reg-email.ts fills the tokens at send time and accepts
+                    both plain mustache (first_name) and the WebEngage form
+                    (user["system"]["first_name"] or "Aspirant"), so a body
+                    exported from WebEngage can be pasted in unchanged. The
+                    or "…" part is the fallback used when the value is empty.
+                    No token is ever delivered unreplaced: an unknown key
+                    renders as its fallback, or as nothing.
 
 HARD-CODED        : venue address, Google Maps link, phone, email, social links.
 ================================================================================
