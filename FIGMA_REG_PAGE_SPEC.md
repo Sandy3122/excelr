@@ -122,7 +122,7 @@ Two-column grid on desktop (1152 wide), single column on mobile.
 - **Form fields** (label + input, each ~46px tall, rounded, 1px slate border, placeholder slate):
   1. **Full Name** — text — placeholder "Name" (mobile "Arjun Sharma")
   2. **Email Address** — email — placeholder "xyz@example.com"
-  3. **Phone Number** — tel — placeholder "+91 00000 00000"
+  3. **Phone Number** — tel — placeholder "+91 12345 67890"
   4. **College / University** — text — placeholder "College Name"
   5. **Highest Qualification** — **select** — placeholder "Select qualification"
 - **Submit:** full-width gradient pill button "Register for Free" + arrow icon (56px tall).

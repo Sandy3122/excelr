@@ -53,6 +53,37 @@ uniqueness are per drive — the same person can register for two drives.
 `placementDriveSlugs` is a uniqueness index: claiming a slug is a transactional
 document write, so two admins cannot save the same path.
 
+## Email bodies
+
+Each landing page keeps its own email HTML beside its route:
+
+```
+app/{slug}/index.html                      welcome
+app/{slug}/email-reminder-day-before.html  day-before reminder
+```
+
+So a new campaign ships its page and its emails together. Anything a page does
+not provide falls back to the shared copies in `public/reg/`, which is what
+`/reg` still uses. The resolved path is logged once per template:
+
+```
+[reg-email] index.html for "fsd-oct-2026" → /…/app/fsd-oct-2026/index.html
+```
+
+Tokens merged at send time:
+
+| Token | Becomes |
+| --- | --- |
+| `{{first_name}}` | The lead's first name, HTML-escaped |
+| `{{calendar_link}}` | Google Calendar link built from the drive's event day |
+| `we_wk_unsubscribe_link` | `mailto:` to the reply-to address |
+
+A template without a token simply renders without it — nothing fails.
+
+These files are read at runtime through a computed path, which Next.js cannot
+infer, so `next.config.mjs` lists them under `outputFileTracingIncludes`. Adding
+a page needs no change there; the glob `./app/**/*.html` already covers it.
+
 ## Renaming a slug
 
 A drive is matched by slug, so renaming a page in code would point it at a

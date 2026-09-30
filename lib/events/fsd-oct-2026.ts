@@ -1,5 +1,5 @@
 /**
- * ExcelR Placement Drive — BTM Edition, 9th & 10th October 2026.
+ * ExcelR Placement Drive — BTM Campus, 9th & 10th October 2026.
  * Full Stack roles (Java & Python only). Mounted at /fsd-oct-2026.
  *
  * The hero follows the approved announcement banner and the FAQ copy is the
@@ -25,10 +25,11 @@ const DETAILS: EventDetail[] = [
     key: "venue",
     icon: "map-pin",
     label: "Venue",
-    title: "ExcelR Marathahalli Campus",
+    title: "ExcelR BTM Campus",
     value:
-      "Next to Meghana Foods, T-2 4th Floor, Raja Ikon, Sy No. 89/1, Munnekollai Village, Marathahalli – Sarjapur Outer Ring Rd, above YES Bank, Bengaluru, Karnataka 560037",
+      "No 10, Safeway Plaza, Ground Floor, 27th Main Rd, Old Madiwala, Jay Bheema Nagar, 1st Stage, BTM 1st Stage, Bengaluru, Karnataka 560068",
     valueStyle: "muted",
+    href: "https://maps.app.goo.gl/pSsNVYGbWbwrMpcT8",
   },
   {
     key: "salary",
@@ -93,9 +94,9 @@ export const FSD_OCT_2026: RegEventConfig = {
 
   meta: {
     title:
-      "Register — ExcelR's Full Stack Placement Drive, Marathahalli (Java & Python)",
+      "Register — ExcelR's Full Stack Placement Drive, BTM (Java & Python)",
     description:
-      "Secure your spot at ExcelR's Full Stack Placement Drive on 9th and 10th October 2026, Marathahalli Campus, Bengaluru. Java & Python roles, salary up to 10 LPA. Absolutely free for all.",
+      "Secure your spot at ExcelR's Full Stack Placement Drive on 9th and 10th October 2026, BTM Campus, Bengaluru. Java & Python roles, salary up to 10 LPA. Absolutely free for all.",
   },
 
   hero: {
@@ -149,23 +150,23 @@ export const FSD_OCT_2026: RegEventConfig = {
 
   footer: {
     copyright: "© 2026 PlaceDrive. All rights reserved.",
-    location: "Marathahalli Campus, Bangalore — 9 & 10 Oct 2026",
+    location: "BTM Campus, Bangalore — 9 & 10 Oct 2026",
   },
 
   laptopNote: LAPTOP_NOTE,
 
   closedNotice:
-    "Online registration for ExcelR’s Full Stack Placement Drive in Marathahalli is no longer being accepted. If you have already registered, your seat remains confirmed.",
+    "Online registration for ExcelR’s Full Stack Placement Drive at BTM is no longer being accepted. If you have already registered, your seat remains confirmed.",
 
   thankYou: {
     meta: {
-      title: "Thank You — ExcelR's Full Stack Placement Drive, Marathahalli",
+      title: "Thank You — ExcelR's Full Stack Placement Drive, BTM",
       description:
         "You're registered for ExcelR's Full Stack Placement Drive on 9th and 10th October 2026. Check your inbox for confirmation details.",
     },
     date: "9th and 10th Oct, 2026",
-    venueName: "ExcelR Marathahalli Campus",
-    venueArea: "Bengaluru, Karnataka 560037",
+    venueName: "ExcelR BTM Campus",
+    venueArea: "BTM 1st Stage, Bengaluru, Karnataka 560068",
     note: "We will confirm your reporting time and date before Oct 8th.",
     bringNote:
       "Please bring your own laptop, resume copies, and a valid photo ID.",

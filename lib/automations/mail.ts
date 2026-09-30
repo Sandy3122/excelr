@@ -36,7 +36,9 @@ export async function sendAutomationEmail(
   const firstName = reg.firstName || firstNameFrom(reg.fullName);
 
   try {
-    const html = await renderAutomationEmailHtml(template, reg.fullName);
+    // Passing the drive resolves its own template folder and fills
+    // {{calendar_link}} from the drive's event day.
+    const html = await renderAutomationEmailHtml(template, reg.fullName, drive);
     await getRegistrationMailTransporter().sendMail({
       from: registrationMailFrom(),
       to: reg.email,

@@ -39,6 +39,11 @@ export type EventDetail = {
    */
   valueStyle?: "strong" | "link" | "muted";
   /**
+   * Makes the value a link — used by Venue to open the map. Opens in a new tab
+   * so a candidate mid-registration does not lose the form.
+   */
+  href?: string;
+  /**
    * 1-based position on mobile. Defaults to the array position, which is also
    * the desktop order.
    */

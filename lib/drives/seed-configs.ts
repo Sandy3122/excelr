@@ -117,7 +117,7 @@ export const REG_AUG_2026_SEED: PlacementDriveConfig = {
 };
 
 /**
- * `/marathahalli-fsd-oct-2026` — Full Stack (Java & Python), 9–10 October 2026.
+ * `/fsd-oct-2026` — Full Stack (Java & Python), BTM campus, 9–10 October 2026.
  *
  * Two deliberate differences from a pure copy of the old behaviour:
  *
@@ -130,7 +130,7 @@ export const REG_AUG_2026_SEED: PlacementDriveConfig = {
  *    still says August. Enable each one after its October template is live.
  */
 export const MARATHAHALLI_OCT_2026_SEED: PlacementDriveConfig = {
-  name: "Full Stack Placement Drive — Marathahalli, Oct 2026",
+  name: "Full Stack Placement Drive — BTM, Oct 2026",
   slug: "marathahalli-fsd-oct-2026",
   enabled: true,
   archived: false,
@@ -150,7 +150,7 @@ export const MARATHAHALLI_OCT_2026_SEED: PlacementDriveConfig = {
       schedule: { type: "immediate" },
       scheduleLabel: "Immediately on registration",
       whatsappTemplateName: TEMPLATES.confirmation,
-      emailSubject: "You're confirmed: Full Stack Placement Drive — Marathahalli",
+      emailSubject: "You're confirmed: Full Stack Placement Drive — BTM",
       emailTemplate: "welcome",
       cutoffIst: null,
       lateWindowDelayMinutes: null,

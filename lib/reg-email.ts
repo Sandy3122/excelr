@@ -7,9 +7,17 @@ import type { PlacementDrive } from "@/lib/drives/types";
 /**
  * Applicant emails.
  *
- * The HTML bodies are bundled files (they carry the brand layout), but every
- * campaign-specific detail in them — dates, venue, calendar link — is filled
- * from the placement drive at send time.
+ * Each landing page keeps its own email bodies next to its route:
+ *
+ *   app/{slug}/index.html                      welcome
+ *   app/{slug}/email-reminder-day-before.html  day-before reminder
+ *
+ * so a new campaign ships its page and its emails together. Anything a drive
+ * does not provide falls back to the shared copies in public/reg, which is
+ * what /reg still uses.
+ *
+ * Campaign-specific details inside the HTML — first name, calendar link,
+ * unsubscribe — are merged in at send time.
  */
 
 export type EmailTemplateKey = "welcome" | "reminder_day_before";
@@ -20,35 +28,118 @@ const TEMPLATE_FILES: Record<EmailTemplateKey, string> = {
 };
 
 const templateCache = new Map<string, string>();
+const announcedTemplates = new Set<string>();
 
-async function loadTemplate(file: string): Promise<string> {
-  const filePath = path.join(process.cwd(), "public", "reg", file);
-  const cached = templateCache.get(filePath);
+/** Matches the drive slug format, so a slug can never escape its directory. */
+const SAFE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Where to look for one email body, most specific first: the page's own folder,
+ * then the shared copy.
+ */
+function templateCandidates(file: string, slug?: string): string[] {
+  const paths: string[] = [];
+  if (slug && SAFE_SLUG.test(slug)) {
+    paths.push(path.join(process.cwd(), "app", slug, file));
+  }
+  paths.push(path.join(process.cwd(), "public", "reg", file));
+  return paths;
+}
+
+async function loadTemplate(file: string, slug?: string): Promise<string> {
+  const candidates = templateCandidates(file, slug);
+  const cacheKey = `${slug || "-"}:${file}`;
+  const cached = templateCache.get(cacheKey);
   if (cached) return cached;
-  const html = await readFile(filePath, "utf8");
-  templateCache.set(filePath, html);
-  return html;
+
+  for (const filePath of candidates) {
+    try {
+      const html = await readFile(filePath, "utf8");
+      templateCache.set(cacheKey, html);
+      if (!announcedTemplates.has(cacheKey)) {
+        announcedTemplates.add(cacheKey);
+        console.info(`[reg-email] ${file} for "${slug || "default"}" → ${filePath}`);
+      }
+      return html;
+    } catch {
+      // Try the next candidate; only the last miss is an error.
+    }
+  }
+
+  throw new Error(
+    `No ${file} for "${slug || "default"}". Looked in: ${candidates.join(", ")}`,
+  );
 }
 
 export const APPLICANT_REPLY_TO = (
   process.env.REG_REPLY_TO || "enquiry@excelr.com"
 ).trim();
 
+/**
+ * Every `{{ … }}` expression in a template, however it is written.
+ *
+ * Two syntaxes are accepted so a body exported from WebEngage can be pasted in
+ * unchanged:
+ *
+ *   {{first_name}}
+ *   {{user["system"]["first_name"] or "Aspirant"}}
+ *
+ * The key is the plain name, or the last bracketed segment. An `or "…"` suffix
+ * supplies the fallback when the value is empty.
+ */
+const MERGE_EXPRESSION = /\{\{\s*([^}]+?)\s*\}\}/g;
+const BRACKETED_KEY = /\[\s*["']([^"']+)["']\s*\]\s*$/;
+const OR_DEFAULT = /\s+or\s+["']([^"']*)["']\s*$/;
+
+function resolveMergeExpression(
+  expression: string,
+  values: Record<string, string>,
+): string {
+  let expr = expression;
+  let fallback = "";
+
+  const withDefault = OR_DEFAULT.exec(expr);
+  if (withDefault) {
+    fallback = withDefault[1];
+    expr = expr.slice(0, withDefault.index).trim();
+  }
+
+  // "user[\"system\"][\"first_name\"]" → first_name; "first_name" stays as is.
+  const bracketed = BRACKETED_KEY.exec(expr);
+  const key = (bracketed ? bracketed[1] : expr).trim();
+
+  const value = values[key];
+  return (value && value.trim()) || fallback;
+}
+
 function applyEmailMergeFields(
   template: string,
   fullName: string,
   drive?: PlacementDrive,
 ): string {
-  const firstName = escapeHtml(firstNameFrom(fullName));
-  const calendarLink = drive ? buildGoogleCalendarLink(drive) : "";
+  const firstName = firstNameFrom(fullName);
+  const values: Record<string, string> = {
+    // Names are escaped: they come from a public form.
+    first_name: escapeHtml(firstName),
+    full_name: escapeHtml(fullName.trim()),
+    calendar_link: drive ? buildGoogleCalendarLink(drive) : "",
+    drive_name: escapeHtml(drive?.name || ""),
+    event_date: drive?.eventDayIstDate || "",
+  };
+
   const unsubscribe = `mailto:${APPLICANT_REPLY_TO}?subject=${encodeURIComponent(
     "Unsubscribe from ExcelR placement emails",
   )}`;
 
-  return template
-    .replaceAll("{{first_name}}", firstName)
-    .replaceAll("{{calendar_link}}", calendarLink)
-    .replaceAll("we_wk_unsubscribe_link", unsubscribe);
+  return (
+    template
+      .replaceAll("we_wk_unsubscribe_link", unsubscribe)
+      // Unknown keys collapse to their fallback, or to nothing — a candidate
+      // must never receive a raw {{ … }} in their email.
+      .replace(MERGE_EXPRESSION, (_match, expression: string) =>
+        resolveMergeExpression(expression, values),
+      )
+  );
 }
 
 /**
@@ -60,7 +151,7 @@ export async function renderAutomationEmailHtml(
   fullName: string,
   drive?: PlacementDrive,
 ): Promise<string> {
-  const template = await loadTemplate(TEMPLATE_FILES[key]);
+  const template = await loadTemplate(TEMPLATE_FILES[key], drive?.slug);
   return applyEmailMergeFields(template, fullName, drive);
 }
 

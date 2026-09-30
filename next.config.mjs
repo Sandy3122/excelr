@@ -3,6 +3,14 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     serverComponentsExternalPackages: ["firebase-admin"],
+    // Email bodies live beside their route (app/{slug}/index.html) and are read
+    // at runtime through a computed path, so tracing cannot infer them. Without
+    // this they are missing from the deployed bundle and every send fails.
+    outputFileTracingIncludes: {
+      "/api/reg": ["./app/**/*.html", "./public/reg/*.html"],
+      "/api/cron/automations": ["./app/**/*.html", "./public/reg/*.html"],
+      "/api/admin/automations/[kind]": ["./app/**/*.html", "./public/reg/*.html"],
+    },
   },
   // The per-drive thank-you routes were replaced by a single /thank-you.
   // Keep old links (bookmarks, and forms loaded before the deploy) working;

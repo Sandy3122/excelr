@@ -18,11 +18,22 @@ export default function EventDetailItem({ detail }: { detail: EventDetail }) {
         {detail.title && (
           <p className="mt-1 font-body text-[15px] font-semibold text-ink">{detail.title}</p>
         )}
-        <p
-          className={`mt-1 font-body text-[15px] leading-[1.5] ${VALUE_CLASS[valueStyle]}`}
-        >
-          {detail.value}
-        </p>
+        {detail.href ? (
+          <a
+            href={detail.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`mt-1 block font-body text-[15px] leading-[1.5] transition-colors hover:text-brand-blue ${VALUE_CLASS[valueStyle]}`}
+          >
+            {detail.value}
+          </a>
+        ) : (
+          <p
+            className={`mt-1 font-body text-[15px] leading-[1.5] ${VALUE_CLASS[valueStyle]}`}
+          >
+            {detail.value}
+          </p>
+        )}
       </div>
     </div>
   );

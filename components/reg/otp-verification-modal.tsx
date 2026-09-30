@@ -318,7 +318,7 @@ export default function OtpVerificationModal({
                   inputMode="numeric"
                   autoComplete="tel-national"
                   maxLength={10}
-                  placeholder="00000 00000"
+                  placeholder="12345 67890"
                   value={phone}
                   onChange={handlePhoneEdit}
                   className="min-w-0 flex-1 bg-transparent px-3 py-3 font-body text-[15px] text-ink outline-none placeholder:text-faint"

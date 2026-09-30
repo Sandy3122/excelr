@@ -348,13 +348,41 @@ export default function DriveConfigPage({
                 <dl className="grid gap-x-6 gap-y-1 rounded-xl bg-[#F7F9FF] p-4 text-sm sm:grid-cols-2">
                   <p className="col-span-full mb-1 font-semibold text-navy-900">
                     What this drive will actually send with
+                    <span className="ml-2 font-normal text-muted">
+                      — updates as you type; press Save to apply
+                    </span>
                   </p>
-                  <Effective label="Sender" value={effective.sender} />
-                  <Effective label="Language" value={effective.language} />
-                  <Effective label="OTP template" value={effective.otpTemplateName} />
+                  <Effective
+                    label="Sender"
+                    value={resolve(
+                      config.whatsapp.sender,
+                      effective.accountDefaults.sender,
+                    )}
+                    saved={effective.sender}
+                  />
+                  <Effective
+                    label="Language"
+                    value={resolve(
+                      config.whatsapp.language,
+                      effective.accountDefaults.language,
+                    )}
+                    saved={effective.language}
+                  />
+                  <Effective
+                    label="OTP template"
+                    value={resolve(
+                      config.whatsapp.otpTemplateName,
+                      effective.accountDefaults.otpTemplateName,
+                    )}
+                    saved={effective.otpTemplateName}
+                  />
                   <Effective
                     label="OTP button param"
-                    value={effective.otpUrlButtonParam}
+                    value={resolve(
+                      config.whatsapp.otpUrlButtonParam,
+                      effective.accountDefaults.otpUrlButtonParam,
+                    )}
+                    saved={effective.otpUrlButtonParam}
                   />
                 </dl>
               ) : null}
@@ -729,24 +757,63 @@ function ScheduleFields({
   );
 }
 
-/** Hint text explaining that a blank field inherits the account value. */
+/**
+ * Hint for an account-level field.
+ *
+ * Blank means it inherits. A value that *differs* from the account default is
+ * called out loudly: a stale override silently shadowing a changed environment
+ * value is exactly how a working OTP send breaks after an Infobip account
+ * swap, with nothing in the UI to show why.
+ */
 function inherited(
   value: string,
   accountValue: string | undefined,
   envVar: string,
 ): string | undefined {
-  if (value.trim()) return undefined;
-  return accountValue
-    ? `Inheriting "${accountValue}" from ${envVar}.`
-    : `Not set here or in ${envVar}.`;
+  const v = value.trim();
+  const account = (accountValue || "").trim();
+  if (!v) {
+    return account
+      ? `Inheriting "${account}" from ${envVar}.`
+      : `Not set here or in ${envVar}.`;
+  }
+  if (account && v !== account) {
+    return `⚠ Overriding the account default "${account}" (${envVar}). This drive will use "${v}". Clear the field to use the account value.`;
+  }
+  return undefined;
 }
 
-function Effective({ label, value }: { label: string; value: string }) {
+/** Drive value if set, otherwise the account default — the same rule the server applies. */
+function resolve(driveValue: string, accountValue: string): string {
+  return (driveValue || accountValue).trim();
+}
+
+/**
+ * One resolved setting. `value` follows the form as you type; `saved` is what
+ * is currently stored. Showing the difference matters — otherwise this panel
+ * still reads the old template while you are looking at a cleared field,
+ * which is exactly when you need to trust it.
+ */
+function Effective({
+  label,
+  value,
+  saved,
+}: {
+  label: string;
+  value: string;
+  saved?: string;
+}) {
+  const pending = saved !== undefined && saved.trim() !== value;
   return (
     <div className="flex gap-2">
-      <dt className="text-muted">{label}:</dt>
+      <dt className="shrink-0 text-muted">{label}:</dt>
       <dd className="min-w-0 break-all font-medium text-ink">
         {value || <span className="text-red-600">not set</span>}
+        {pending ? (
+          <span className="ml-1.5 whitespace-nowrap rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+            unsaved
+          </span>
+        ) : null}
       </dd>
     </div>
   );
@@ -838,7 +905,17 @@ function Text({
           onChange={(e) => onChange(e.target.value)}
         />
       </div>
-      {hint ? <p className="mt-1.5 text-xs text-muted">{hint}</p> : null}
+      {hint ? (
+        <p
+          className={`mt-1.5 text-xs ${
+            hint.startsWith("\u26a0")
+              ? "font-medium text-amber-700"
+              : "text-muted"
+          }`}
+        >
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }
