@@ -31,7 +31,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "ExcelR's Placement Drive — Java Full Stack",
   description:
-    "Register for ExcelR's Java Full Stack Placement Drive at the Marathahalli Campus, Bengaluru. Connect with top tech companies — absolutely free.",
+    "Register for ExcelR's Java Full Stack Placement Drive at the BTM Campus, Bengaluru. Connect with top tech companies — absolutely free.",
 };
 
 export default function RootLayout({

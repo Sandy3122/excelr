@@ -32,7 +32,7 @@ const TEMPLATES = {
  * signups and waits on things-to-carry, and the 08:50 event-day reminder.
  */
 export const REG_AUG_2026_SEED: PlacementDriveConfig = {
-  name: "Java Full Stack Placement Drive — Marathahalli, Aug 2026",
+  name: "Java Full Stack Placement Drive — BTM, Aug 2026",
   slug: "reg",
   enabled: true,
   archived: false,
@@ -53,7 +53,7 @@ export const REG_AUG_2026_SEED: PlacementDriveConfig = {
       scheduleLabel: "Immediately on registration",
       whatsappTemplateName: TEMPLATES.confirmation,
       emailSubject:
-        "You're confirmed: Java Full Stack Placement Drive — 22 Aug, Marathahalli",
+        "You're confirmed: Java Full Stack Placement Drive — 22 Aug, BTM",
       emailTemplate: "welcome",
       cutoffIst: null,
       lateWindowDelayMinutes: null,

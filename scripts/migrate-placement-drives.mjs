@@ -89,7 +89,7 @@ const blank = {
 };
 
 const AUG = {
-  name: "Java Full Stack Placement Drive — Marathahalli, Aug 2026",
+  name: "Java Full Stack Placement Drive — BTM, Aug 2026",
   slug: "reg",
   enabled: true,
   archived: false,
@@ -115,7 +115,7 @@ const AUG = {
       scheduleLabel: "Immediately on registration",
       whatsappTemplateName: T.confirmation,
       emailSubject:
-        "You're confirmed: Java Full Stack Placement Drive — 22 Aug, Marathahalli",
+        "You're confirmed: Java Full Stack Placement Drive — 22 Aug, BTM",
       emailTemplate: "welcome",
     },
     things_to_carry: {
@@ -155,7 +155,7 @@ const AUG = {
 };
 
 const OCT = {
-  name: "Full Stack Placement Drive — Marathahalli, Oct 2026",
+  name: "Full Stack Placement Drive — BTM, Oct 2026",
   slug: "fsd-oct-2026",
   enabled: true,
   archived: false,
@@ -180,7 +180,7 @@ const OCT = {
       schedule: { type: "immediate" },
       scheduleLabel: "Immediately on registration",
       whatsappTemplateName: T.confirmation,
-      emailSubject: "You're confirmed: Full Stack Placement Drive — Marathahalli",
+      emailSubject: "You're confirmed: Full Stack Placement Drive — BTM",
       emailTemplate: "welcome",
     },
     // Reminders start off: the approved Infobip content still says August.

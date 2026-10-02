@@ -153,7 +153,7 @@ export const DEFAULT_REG_EVENT: RegEventConfig = {
   meta: {
     title: "Register — ExcelR's Java Full Stack Placement Drive",
     description:
-      "Secure your spot at ExcelR's Java Full Stack Placement Drive on 22nd August 2026, Marathahalli Campus, Bengaluru. Absolutely free for all.",
+      "Secure your spot at ExcelR's Java Full Stack Placement Drive on 22nd August 2026, BTM Campus, Bengaluru. Absolutely free for all.",
   },
 
   hero: {
@@ -207,7 +207,7 @@ export const DEFAULT_REG_EVENT: RegEventConfig = {
     },
     date: EVENT.date,
     time: "9:00 AM Onwards",
-    venueName: "ExcelR Marathahalli Campus",
+    venueName: "ExcelR BTM Campus",
     venueArea: "Bengaluru, Karnataka 560037",
     bringNote:
       "Please bring your own laptop, resume copies, and a valid photo ID.",

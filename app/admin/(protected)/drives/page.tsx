@@ -97,7 +97,7 @@ export default function DrivesPage() {
               className="field-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Full Stack Placement Drive — Marathahalli, Oct 2026"
+              placeholder="Full Stack Placement Drive — BTM, Oct 2026"
               required
               minLength={2}
             />

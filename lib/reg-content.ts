@@ -9,7 +9,7 @@ export const EVENT = {
   title: "ExcelR's Placement Drive",
   role: "For Java Full Stack",
   tagline:
-    "Connect with top tech companies, ace your interviews, and launch your career — all in one day at ExcelR's Marathahalli Campus.",
+    "Connect with top tech companies, ace your interviews, and launch your career — all in one day at ExcelR's BTM Campus.",
   laptopNote:
     "Note: Candidates are requested to bring their own laptops to complete the technical round.",
   date: "22nd August 2026",
@@ -57,9 +57,9 @@ export const EVENT_DETAILS: EventDetail[] = [
     key: "venue",
     icon: "map-pin",
     label: "Venue",
-    title: "ExcelR Marathahalli Campus",
+    title: "ExcelR BTM Campus",
     value:
-      "T-2 4th Floor, Raja Ikon Sy, No.89/1 Munnekolala, Village, Marathahalli – Sarjapur Outer Ring Rd, above Yes Bank, Marathahalli, Bengaluru, Karnataka 560037",
+      "T-2 4th Floor, Raja Ikon Sy, No.89/1 Munnekolala, Village, BTM – Sarjapur Outer Ring Rd, above Yes Bank, BTM, Bengaluru, Karnataka 560037",
     valueStyle: "link",
   },
   {
@@ -127,5 +127,5 @@ export const FAQS: FaqItem[] = [
 
 export const FOOTER = {
   copyright: "© 2026 PlaceDrive. All rights reserved.",
-  location: "Marathahalli Campus, Bangalore — 22 Aug 2026",
+  location: "BTM Campus, Bangalore — 22 Aug 2026",
 } as const;

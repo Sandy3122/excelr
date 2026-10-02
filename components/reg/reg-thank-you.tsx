@@ -8,7 +8,7 @@ import RegFooter from "./reg-footer";
 export type ThankYouFacts = {
   /** Full name from the registration form; only the first name is shown. */
   name?: string;
-  /** Plain-English event name, e.g. "ExcelR's Placement Drive in Marathahalli". */
+  /** Plain-English event name, e.g. "ExcelR's Placement Drive in BTM". */
   eventName?: string;
   date?: string;
   time?: string;
