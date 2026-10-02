@@ -150,7 +150,7 @@ export const MARATHAHALLI_OCT_2026_SEED: PlacementDriveConfig = {
       schedule: { type: "immediate" },
       scheduleLabel: "Immediately on registration",
       whatsappTemplateName: TEMPLATES.confirmation,
-      emailSubject: "You're confirmed: Full Stack Placement Drive — BTM",
+      emailSubject: "Registration Confirmed: ExcelR Placement Drive",
       emailTemplate: "welcome",
       cutoffIst: null,
       lateWindowDelayMinutes: null,

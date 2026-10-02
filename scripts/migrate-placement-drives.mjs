@@ -180,7 +180,7 @@ const OCT = {
       schedule: { type: "immediate" },
       scheduleLabel: "Immediately on registration",
       whatsappTemplateName: T.confirmation,
-      emailSubject: "You're confirmed: Full Stack Placement Drive — BTM",
+      emailSubject: "Registration Confirmed: ExcelR Placement Drive",
       emailTemplate: "welcome",
     },
     // Reminders start off: the approved Infobip content still says August.
