@@ -3,7 +3,7 @@
  *
  * `/reg` renders `DEFAULT_REG_EVENT` (the original Java Full Stack drive) and
  * every additional drive gets its own config under `lib/events/`, so a new
- * landing page is a config file plus a two-line route — no component forks.
+ * landing page is a config file plus a two-line route - no component forks.
  */
 
 import {
@@ -63,7 +63,7 @@ export type HeroBadge = {
 export type RegEventConfig = {
   /**
    * Placement drive this page belongs to. The admin creates a drive with this
-   * slug and configures every automation, template and limit against it — the
+   * slug and configures every automation, template and limit against it - the
    * page itself carries no campaign behaviour, only its identity.
    */
   driveSlug: string;
@@ -85,7 +85,7 @@ export type RegEventConfig = {
     containerClassName: string;
     /** Top padding of the hero container. */
     paddingTopClassName: string;
-    /** Margin around the FREE badge — sets the gap to the hero's bottom edge. */
+    /** Margin around the FREE badge - sets the gap to the hero's bottom edge. */
     freeBadgeWrapperClassName: string;
     /** Stacked heading. Omit when `announce` is supplied. */
     headingLines?: readonly HeroHeadingLine[];
@@ -97,13 +97,13 @@ export type RegEventConfig = {
     tagline?: string;
     image: { src: string; width: number; height: number; alt: string };
     /**
-     * `column` — the cutout sits inside the right grid column, bottom-aligned.
-     * `bleed`  — it spans the section's full height, anchored to the
+     * `column` - the cutout sits inside the right grid column, bottom-aligned.
+     * `bleed`  - it spans the section's full height, anchored to the
      *            bottom-right corner, so it reads as tall as the copy beside
      *            it instead of being capped by half the container.
      */
     imageLayout: "column" | "bleed";
-    /** Sizing box for the cutout — column max-width, or bleed box width. */
+    /** Sizing box for the cutout - column max-width, or bleed box width. */
     imageClassName: string;
     /** Rendered width of the "Absolutely FREE for All" badge. */
     freeBadgeClassName: string;
@@ -151,7 +151,7 @@ export const DEFAULT_REG_EVENT: RegEventConfig = {
   name: EVENT.title,
 
   meta: {
-    title: "Register — ExcelR's Java Full Stack Placement Drive",
+    title: "Register - ExcelR's Java Full Stack Placement Drive",
     description:
       "Secure your spot at ExcelR's Java Full Stack Placement Drive on 22nd August 2026, BTM Campus, Bengaluru. Absolutely free for all.",
   },
@@ -201,7 +201,7 @@ export const DEFAULT_REG_EVENT: RegEventConfig = {
 
   thankYou: {
     meta: {
-      title: "Thank You — ExcelR's Java Full Stack Placement Drive",
+      title: "Thank You - ExcelR's Java Full Stack Placement Drive",
       description:
         "You're registered for ExcelR's Java Full Stack Placement Drive. Check your inbox for confirmation details.",
     },

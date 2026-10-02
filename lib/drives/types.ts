@@ -1,7 +1,7 @@
 /**
  * Placement drive (campaign) configuration.
  *
- * The code knows *how* to run an automation — schedule it, respect quiet hours,
+ * The code knows *how* to run an automation - schedule it, respect quiet hours,
  * claim a channel, call Infobip, record the result. A placement drive document
  * decides *what* that means for one campaign: which automations are on, when
  * they fire, which template they use, and what the OTP limits are.
@@ -108,7 +108,7 @@ export const driveAutomationSchema = z.object({
   /** Which bundled HTML email to render. Null = this automation sends no email. */
   emailTemplate: z.enum(["welcome", "reminder_day_before"]).nullable(),
 
-  /** Hard stop — never send at or after this IST moment. */
+  /** Hard stop - never send at or after this IST moment. */
   cutoffIst: istDateTimeSchema.nullable(),
   /** Shorter delay once inside the drive's late window (day before / event day). */
   lateWindowDelayMinutes: z.number().int().min(0).max(60 * 24).nullable(),
@@ -168,7 +168,7 @@ export interface PlacementDrive extends PlacementDriveConfig {
 
 /**
  * Slim shape for the dashboard. Carries each automation's enabled flag and
- * channels so the UI never has to assume which kinds send email — that is the
+ * channels so the UI never has to assume which kinds send email - that is the
  * drive's decision, and it differs between campaigns.
  */
 export interface PlacementDriveSummary {

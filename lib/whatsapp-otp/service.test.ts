@@ -123,7 +123,7 @@ describe("confirmOtp", () => {
     for (let i = 0; i < 5; i++) last = await confirmOtp(DRIVE, PHONE, wrong);
     expect(last!.code).toBe("TOO_MANY_ATTEMPTS");
 
-    // Even the correct OTP no longer works — record was destroyed.
+    // Even the correct OTP no longer works - record was destroyed.
     const after = await confirmOtp(DRIVE, PHONE, cap.otp);
     expect(after.code).toBe("NO_OTP");
   });
@@ -140,7 +140,7 @@ describe("confirmOtp", () => {
     const cap = mockInfobip();
     await requestOtp(DRIVE, PHONE, null);
     expect((await confirmOtp(DRIVE, PHONE, cap.otp)).ok).toBe(true);
-    // Second use of the same code fails — it was single-use.
+    // Second use of the same code fails - it was single-use.
     expect((await confirmOtp(DRIVE, PHONE, cap.otp)).code).toBe("NO_OTP");
   });
 

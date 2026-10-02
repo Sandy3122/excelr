@@ -11,7 +11,7 @@ const config: Config = {
       colors: {
         // ExcelR Placement Drive palette (from Figma spec)
         brand: {
-          blue: "#3B82F6", // Dodger Blue — primary accent / gradient start
+          blue: "#3B82F6", // Dodger Blue - primary accent / gradient start
           bright: "#2B7FFF", // Blue (bright)
           cerulean: "#0EA5E9", // secondary accent
           indigo: "#6366F1", // gradient end / glow

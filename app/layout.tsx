@@ -29,9 +29,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ExcelR's Placement Drive — Java Full Stack",
+  title: "ExcelR's Placement Drive - Java Full Stack",
   description:
-    "Register for ExcelR's Java Full Stack Placement Drive at the BTM Campus, Bengaluru. Connect with top tech companies — absolutely free.",
+    "Register for ExcelR's Java Full Stack Placement Drive at the BTM Campus, Bengaluru. Connect with top tech companies - absolutely free.",
 };
 
 export default function RootLayout({
@@ -42,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${poppins.variable} ${inter.variable} ${greatVibes.variable}`}>
       <head>
-        {/* Google Tag Manager — as high as possible in <head> */}
+        {/* Google Tag Manager - as high as possible in <head> */}
         <Script id="gtm" strategy="beforeInteractive">
           {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -63,7 +63,7 @@ gtag('config', '${GA_ID}');`}
         </Script>
       </head>
       <body className="font-body antialiased">
-        {/* Google Tag Manager (noscript) — immediately after <body> */}
+        {/* Google Tag Manager (noscript) - immediately after <body> */}
         <noscript>
           <iframe
             src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}

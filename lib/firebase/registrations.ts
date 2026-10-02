@@ -3,7 +3,7 @@
  *
  * Every read and write goes through `placementDrives/{driveId}/registrations`,
  * so a query cannot reach another drive's leads without being handed a
- * different drive id. Phone and email uniqueness are enforced per drive — the
+ * different drive id. Phone and email uniqueness are enforced per drive - the
  * same person may register for two different drives.
  */
 
@@ -123,7 +123,7 @@ function buildRetryPatch(
     new Date(submittedIso),
   );
   // The lead already exists without delivery tracking, so the welcome must not
-  // fire again — mark it as historical rather than pending.
+  // fire again - mark it as historical rather than pending.
   if (messages.welcome?.whatsapp) messages.welcome.whatsapp.status = "legacy";
   if (messages.welcome?.email) messages.welcome.email.status = "legacy";
   patch.messages = messages;

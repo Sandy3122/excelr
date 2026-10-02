@@ -81,7 +81,7 @@ export async function GET(req: Request) {
     );
   }
 
-  // Reads are always scoped to one drive — there is no cross-campaign listing.
+  // Reads are always scoped to one drive - there is no cross-campaign listing.
   const drive = parsed.data.driveId
     ? await getDriveById(parsed.data.driveId)
     : parsed.data.driveSlug
@@ -261,9 +261,9 @@ export async function POST(req: Request) {
     );
   }
 
-  // Emails delivered — burn the one-time verification marker so it can't be
+  // Emails delivered - burn the one-time verification marker so it can't be
   // reused for another registration. Send the WhatsApp welcome in parallel so
-  // we still await it (required on serverless — a bare `void` is killed when
+  // we still await it (required on serverless - a bare `void` is killed when
   // the response returns) without stacking the latency.
   const consumePromise = (async () => {
     try {
@@ -392,7 +392,7 @@ async function sendEmails(
     from,
     to: notifyTo,
     replyTo: data.email,
-    subject: `New registration — ${drive.name} — ${data.fullName}`,
+    subject: `New registration - ${drive.name} - ${data.fullName}`,
     text: [
       `New registration for ${drive.name}:`,
       "",
@@ -443,7 +443,7 @@ async function sendEmails(
       applicantResult.reason instanceof Error
         ? applicantResult.reason.message
         : "Applicant confirmation email failed.";
-    // Admin mail already went out — also send an explicit failure alert.
+    // Admin mail already went out - also send an explicit failure alert.
     await notifyAdminOfFailure({
       step: "applicant_confirmation_email",
       reason,
@@ -469,7 +469,7 @@ function adminHtml(
     `<td style="padding:6px 12px;color:#0F172B;font:14px Arial;word-break:break-all">${escapeHtml(v)}</td></tr>`;
   return `
   <div style="font-family:Arial,sans-serif;color:#0F172B">
-    <h2 style="margin:0 0 12px">New registration — ${escapeHtml(drive.name)}</h2>
+    <h2 style="margin:0 0 12px">New registration - ${escapeHtml(drive.name)}</h2>
     <table style="border-collapse:collapse">
       ${row("Drive", `${drive.name} (/${drive.slug})`)}
       ${row("Name", data.fullName)}

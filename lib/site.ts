@@ -3,7 +3,7 @@
  *
  * One file decides which drive the bare domain lands on and where retired
  * paths forward to. Pointing the site at a different campaign is a one-line
- * change here — no route files, redirects or middleware to hunt down.
+ * change here - no route files, redirects or middleware to hunt down.
  *
  * Safe to import from middleware, server components and client components:
  * it holds nothing but strings.
@@ -26,7 +26,7 @@ export const LEGACY_PATH_REDIRECTS: Record<string, string> = {
  * Slugs a drive used to be published under, keyed by its current slug.
  *
  * A drive document in Firestore is matched by slug, so renaming a page in code
- * would otherwise point it at a drive that does not exist — and a landing page
+ * would otherwise point it at a drive that does not exist - and a landing page
  * with no drive fails safe to "registrations closed", i.e. renaming a slug
  * would silently take the live page down. Listing the old slug here keeps the
  * page resolving to the same drive until an admin renames it in the dashboard,

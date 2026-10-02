@@ -331,7 +331,7 @@ export default function DriveConfigPage({
                 />
                 <Text
                   label="Template language"
-                  help="Locale of the approved template. Must match Infobip exactly — a template approved as en but sent as en_IN is accepted and then never delivered. Example: en_IN."
+                  help="Locale of the approved template. Must match Infobip exactly - a template approved as en but sent as en_IN is accepted and then never delivered. Example: en_IN."
                   value={config.whatsapp.language}
                   onChange={(language) =>
                     patch({ whatsapp: { ...config.whatsapp, language } })
@@ -349,7 +349,7 @@ export default function DriveConfigPage({
                   <p className="col-span-full mb-1 font-semibold text-navy-900">
                     What this drive will actually send with
                     <span className="ml-2 font-normal text-muted">
-                      — updates as you type; press Save to apply
+                      - updates as you type; press Save to apply
                     </span>
                   </p>
                   <Effective
@@ -424,7 +424,7 @@ export default function DriveConfigPage({
                 />
                 <Num
                   label="Max sends per IP / hour"
-                  help="Cap on send requests from one IP address in a rolling hour — blunts scripted abuse from a single source. Example: 20."
+                  help="Cap on send requests from one IP address in a rolling hour - blunts scripted abuse from a single source. Example: 20."
                   value={config.whatsapp.limits.maxSendsPerIpPerHour}
                   onChange={(v) =>
                     patchLimit(config, patch, "maxSendsPerIpPerHour", v)
@@ -486,11 +486,11 @@ export default function DriveConfigPage({
                 <Card key={kind} title={AUTOMATION_META[kind].title}>
                   <Toggle
                     label="Enabled"
-                    help="Turns this automation on or off for this drive. When off nothing sends — not on the schedule, and not from a manual send on the Automations page."
+                    help="Turns this automation on or off for this drive. When off nothing sends - not on the schedule, and not from a manual send on the Automations page."
                     hint={
                       automation.enabled
                         ? "The cron and admin sends will run this automation."
-                        : "Turned off — nothing will send, however it is triggered."
+                        : "Turned off - nothing will send, however it is triggered."
                     }
                     checked={automation.enabled}
                     onChange={(enabled) => patchAutomation(kind, { enabled })}
@@ -528,8 +528,8 @@ export default function DriveConfigPage({
                     }
                     hint={
                       automation.whatsappTemplateName.trim()
-                        ? "Exact name as approved in Infobip. Templates are matched by name and language — the numeric template ID is not used."
-                        : "Required — this automation will fail to send until it is set."
+                        ? "Exact name as approved in Infobip. Templates are matched by name and language - the numeric template ID is not used."
+                        : "Required - this automation will fail to send until it is set."
                     }
                   />
 
@@ -541,7 +541,7 @@ export default function DriveConfigPage({
                   {automation.channels.includes("email") ? (
                     <Text
                       label="Email subject"
-                      help="Subject line of the email this automation sends. Example: You're confirmed: Full Stack Placement Drive — BTM"
+                      help="Subject line of the email this automation sends. Example: You're confirmed: Full Stack Placement Drive - BTM"
                       value={automation.emailSubject ?? ""}
                       onChange={(v) =>
                         patchAutomation(kind, { emailSubject: v || null })
@@ -551,7 +551,7 @@ export default function DriveConfigPage({
 
                   <Text
                     label="Schedule summary (shown in the dashboard)"
-                    help="Free text shown on the Automations dashboard and nowhere else. Purely descriptive — editing it does not change when the message sends."
+                    help="Free text shown on the Automations dashboard and nowhere else. Purely descriptive - editing it does not change when the message sends."
                     value={automation.scheduleLabel}
                     onChange={(scheduleLabel) =>
                       patchAutomation(kind, { scheduleLabel })
@@ -623,9 +623,9 @@ function ScheduleFields({
         <FieldLabel
           label="When it sends"
           help={
-            "Immediately on registration — sent the moment the form is submitted. " +
-            "A delay after registering — each lead gets it N minutes after they sign up. " +
-            "At a fixed IST date and time — the same moment for everyone, e.g. 8 Oct 2026, 12:00 PM."
+            "Immediately on registration - sent the moment the form is submitted. " +
+            "A delay after registering - each lead gets it N minutes after they sign up. " +
+            "At a fixed IST date and time - the same moment for everyone, e.g. 8 Oct 2026, 12:00 PM."
           }
         />
         <select
@@ -690,7 +690,7 @@ function ScheduleFields({
         <Text
           label="Hard cutoff (IST)"
           help={
-            "Never send at or after this moment, even if the message is still due — it is marked skipped instead. " +
+            "Never send at or after this moment, even if the message is still due - it is marked skipped instead. " +
             "Example: 10/10/2026 08:30 PM stops all sends once the drive has ended. Leave empty for no cutoff."
           }
           type="datetime-local"
@@ -745,7 +745,7 @@ function ScheduleFields({
             })
           }
         >
-          <option value="">Nothing — send as soon as it is due</option>
+          <option value="">Nothing - send as soon as it is due</option>
           {AUTOMATION_KINDS.map((k) => (
             <option key={k} value={k}>
               {AUTOMATION_META[k].title} has finished
@@ -783,14 +783,14 @@ function inherited(
   return undefined;
 }
 
-/** Drive value if set, otherwise the account default — the same rule the server applies. */
+/** Drive value if set, otherwise the account default - the same rule the server applies. */
 function resolve(driveValue: string, accountValue: string): string {
   return (driveValue || accountValue).trim();
 }
 
 /**
  * One resolved setting. `value` follows the form as you type; `saved` is what
- * is currently stored. Showing the difference matters — otherwise this panel
+ * is currently stored. Showing the difference matters - otherwise this panel
  * still reads the old template while you are looking at a cleared field,
  * which is exactly when you need to trust it.
  */

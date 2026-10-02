@@ -46,7 +46,7 @@ export type DriveAutomationView = Record<
   { enabled: boolean; channels: Channel[] }
 >;
 
-/** Fallback when no drive is loaded yet — WhatsApp only, nothing disabled. */
+/** Fallback when no drive is loaded yet - WhatsApp only, nothing disabled. */
 export const DEFAULT_AUTOMATION_VIEW: DriveAutomationView = Object.fromEntries(
   AUTOMATION_KINDS.map((kind) => [
     kind,
@@ -204,7 +204,7 @@ export function idsMatching(
 /**
  * How one automation's delivery should be shown for a lead.
  *
- * `single` when every channel reads the same — two identical "Sent" pills carry
+ * `single` when every channel reads the same - two identical "Sent" pills carry
  * no more information than one. `split` when they genuinely differ, in which
  * case each badge needs its channel named, because "Sent / Failed" alone gives
  * no clue which channel failed.

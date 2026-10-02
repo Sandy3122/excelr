@@ -17,7 +17,7 @@ const CHANNEL_SHORT: Record<Channel, string> = {
  * Delivery for one automation on one lead.
  *
  * Channels collapse to a single badge whenever they read the same, which is the
- * common case — two identical "Sent" pills stacked on top of each other carry no
+ * common case - two identical "Sent" pills stacked on top of each other carry no
  * more information than one and make the table hard to scan. When they genuinely
  * differ, each badge names its channel, because "Sent / Failed" alone gives no
  * clue which one failed.
@@ -54,7 +54,7 @@ export function DeliveryBadge({
     return (
       <StatusBadge
         status={summary.status}
-        title={`${channels} — ${statusLabel(summary.status).toLowerCase()}`}
+        title={`${channels} - ${statusLabel(summary.status).toLowerCase()}`}
       />
     );
   }
@@ -66,7 +66,7 @@ export function DeliveryBadge({
           key={entry.channel}
           status={entry.status}
           prefix={CHANNEL_SHORT[entry.channel]}
-          title={`${CHANNEL_LABELS[entry.channel]} — ${statusLabel(
+          title={`${CHANNEL_LABELS[entry.channel]} - ${statusLabel(
             entry.status,
           ).toLowerCase()}`}
         />

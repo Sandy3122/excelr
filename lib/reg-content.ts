@@ -9,7 +9,7 @@ export const EVENT = {
   title: "ExcelR's Placement Drive",
   role: "For Java Full Stack",
   tagline:
-    "Connect with top tech companies, ace your interviews, and launch your career — all in one day at ExcelR's BTM Campus.",
+    "Connect with top tech companies, ace your interviews, and launch your career - all in one day at ExcelR's BTM Campus.",
   laptopNote:
     "Note: Candidates are requested to bring their own laptops to complete the technical round.",
   date: "22nd August 2026",
@@ -33,13 +33,13 @@ export type EventDetail = {
   value: string;
   /**
    * How the value line reads:
-   * - `strong` (default) — bold ink, for short facts.
-   * - `link`   — blue + underlined, for the tappable Venue address.
-   * - `muted`  — regular weight grey, for long supporting copy.
+   * - `strong` (default) - bold ink, for short facts.
+   * - `link`   - blue + underlined, for the tappable Venue address.
+   * - `muted`  - regular weight grey, for long supporting copy.
    */
   valueStyle?: "strong" | "link" | "muted";
   /**
-   * Makes the value a link — used by Venue to open the map. Opens in a new tab
+   * Makes the value a link - used by Venue to open the map. Opens in a new tab
    * so a candidate mid-registration does not lose the form.
    */
   href?: string;
@@ -96,12 +96,12 @@ export const QUALIFICATION_OPTIONS = [
 export type FaqItem = { q: string; a: string };
 
 /**
- * FAQ copy — matches the Figma FAQ frame (6 items; first expanded by default).
+ * FAQ copy - matches the Figma FAQ frame (6 items; first expanded by default).
  */
 export const FAQS: FaqItem[] = [
   {
     q: "Who is eligible to attend this placement drive?",
-    a: "The drive is open to all — freshers who have recently graduated and experienced professionals looking to switch roles in Java Full Stack development. Any educational background is welcome as long as you have the relevant skills.",
+    a: "The drive is open to all - freshers who have recently graduated and experienced professionals looking to switch roles in Java Full Stack development. Any educational background is welcome as long as you have the relevant skills.",
   },
   {
     q: "Is there any registration fee?",
@@ -109,7 +109,7 @@ export const FAQS: FaqItem[] = [
   },
   {
     q: "What technologies will the interviews focus on?",
-    a: "Interviews focus on the Java Full Stack ecosystem — core Java and OOP, Spring / Spring Boot, REST APIs, SQL databases, and front-end fundamentals (HTML, CSS, JavaScript, and a modern framework).",
+    a: "Interviews focus on the Java Full Stack ecosystem - core Java and OOP, Spring / Spring Boot, REST APIs, SQL databases, and front-end fundamentals (HTML, CSS, JavaScript, and a modern framework).",
   },
   {
     q: "How many companies will be participating?",
@@ -127,5 +127,5 @@ export const FAQS: FaqItem[] = [
 
 export const FOOTER = {
   copyright: "© 2026 PlaceDrive. All rights reserved.",
-  location: "BTM Campus, Bangalore — 22 Aug 2026",
+  location: "BTM Campus, Bangalore - 22 Aug 2026",
 } as const;

@@ -10,7 +10,7 @@ const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
  * All placement drives. Creating one here is what makes a landing page's slug
- * live — the page itself stays in code and only names the drive it belongs to.
+ * live - the page itself stays in code and only names the drive it belongs to.
  */
 export default function DrivesPage() {
   const router = useRouter();
@@ -97,7 +97,7 @@ export default function DrivesPage() {
               className="field-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Full Stack Placement Drive — BTM, Oct 2026"
+              placeholder="Full Stack Placement Drive - BTM, Oct 2026"
               required
               minLength={2}
             />

@@ -42,7 +42,7 @@ export function buildInitialMessages(
         delivery[channel] = emptyChannelDelivery("pending");
         continue;
       }
-      // Null due date means this lead can never receive it — record why now.
+      // Null due date means this lead can never receive it - record why now.
       const reason = automation.cutoffIst ? "cutoff" : "not_applicable";
       delivery[channel] = {
         ...emptyChannelDelivery("skipped"),

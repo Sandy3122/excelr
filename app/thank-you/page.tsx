@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import RegThankYou from "@/components/reg/reg-thank-you";
 
 export const metadata: Metadata = {
-  title: "Thank You — ExcelR Placement Drive",
+  title: "Thank You - ExcelR Placement Drive",
   description:
     "Your registration has been received. Check your inbox for confirmation details.",
 };

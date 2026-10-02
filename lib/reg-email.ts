@@ -16,8 +16,8 @@ import type { PlacementDrive } from "@/lib/drives/types";
  * does not provide falls back to the shared copies in public/reg, which is
  * what /reg still uses.
  *
- * Campaign-specific details inside the HTML — first name, calendar link,
- * unsubscribe — are merged in at send time.
+ * Campaign-specific details inside the HTML - first name, calendar link,
+ * unsubscribe - are merged in at send time.
  */
 
 export type EmailTemplateKey = "welcome" | "reminder_day_before";
@@ -143,7 +143,7 @@ function applyEmailMergeFields(
   return (
     template
       .replaceAll("we_wk_unsubscribe_link", unsubscribe)
-      // Unknown keys collapse to their fallback, or to nothing — a candidate
+      // Unknown keys collapse to their fallback, or to nothing - a candidate
       // must never receive a raw {{ … }} in their email.
       .replace(MERGE_EXPRESSION, (_match, expression: string) =>
         resolveMergeExpression(expression, values),
@@ -154,8 +154,8 @@ function applyEmailMergeFields(
 /**
  * Render a bundled applicant email.
  *
- * Keys: first_name, full_name, calendar_link, drive_name, event_date — in
- * either mustache or WebEngage form — plus the we_wk_unsubscribe_link token.
+ * Keys: first_name, full_name, calendar_link, drive_name, event_date - in
+ * either mustache or WebEngage form - plus the we_wk_unsubscribe_link token.
  */
 export async function renderAutomationEmailHtml(
   key: EmailTemplateKey,
@@ -195,7 +195,7 @@ export function automationEmailText(
           "",
           "Please bring your laptop, resume copies, and a valid photo ID.",
         ];
-  return [...lines, "", "— Team ExcelR, Placement & Career Services"]
+  return [...lines, "", "- Team ExcelR, Placement & Career Services"]
     .filter((line, i, all) => !(line === "" && all[i - 1] === ""))
     .join("\n");
 }

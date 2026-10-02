@@ -91,7 +91,7 @@ async function withRetry(label, fn) {
       if (!TRANSIENT.has(err?.code) || attempt === MAX_ATTEMPTS) throw err;
       const wait = Math.min(15000, 500 * 2 ** (attempt - 1));
       log(
-        `    ${label} failed (${err.code}) — retry ${attempt}/${MAX_ATTEMPTS - 1} ` +
+        `    ${label} failed (${err.code}) - retry ${attempt}/${MAX_ATTEMPTS - 1} ` +
           `in ${(wait / 1000).toFixed(1)}s`,
       );
       await sleep(wait);
@@ -179,7 +179,7 @@ async function verify(source, target, drives) {
   }
 
   log(
-    `  checked ${n(checked)} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s — ` +
+    `  checked ${n(checked)} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s - ` +
       `${n(found)} copied, ${n(missing.length)} missing`,
   );
   return { total: checked, found, missing };
@@ -234,13 +234,13 @@ async function main() {
     APPLY
       ? "REMOVE MODE (--apply). Legacy collections will be deleted, but only\n" +
         "after every document is proven to exist in the new layout."
-      : "VERIFY ONLY — nothing will be deleted.\n" +
+      : "VERIFY ONLY - nothing will be deleted.\n" +
         "Re-run with --apply once the verification below is clean.",
   );
 
   const drives = await driveIds();
   if (drives.length === 0) {
-    log("\nNo placement drives found. Run the migration first — aborting.");
+    log("\nNo placement drives found. Run the migration first - aborting.");
     process.exit(1);
   }
   log(`\nChecking against ${drives.length} drive(s): ${drives.join(", ")}`);
@@ -258,7 +258,7 @@ async function main() {
     log(
       `  ${ok ? "OK  " : "FAIL"}  ${r.source.padEnd(20)} ` +
         `${n(r.found)}/${n(r.total)} copied` +
-        (ok ? "" : ` — ${n(r.missing.length)} missing`),
+        (ok ? "" : ` - ${n(r.missing.length)} missing`),
     );
     if (!ok) {
       log(`        first missing ids: ${r.missing.slice(0, 10).join(", ")}`);
@@ -288,7 +288,7 @@ async function main() {
 
   step("Done");
   log(`  removed ${n(removed)} legacy documents`);
-  log("  meta/ was left untouched — meta/cronState still holds the cron lock.");
+  log("  meta/ was left untouched - meta/cronState still holds the cron lock.");
 }
 
 main().then(

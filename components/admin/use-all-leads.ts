@@ -11,7 +11,7 @@ interface LeadsResponse {
   total?: number;
 }
 
-/** Cached per drive — one campaign's leads must never be served for another. */
+/** Cached per drive - one campaign's leads must never be served for another. */
 let memoryCache: { driveId: string; leads: StoredRegistration[]; at: number } | null =
   null;
 const CACHE_MS = 15_000;

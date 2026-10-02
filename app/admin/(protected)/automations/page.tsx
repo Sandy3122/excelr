@@ -106,7 +106,7 @@ export default function AutomationsIndexPage() {
 
 /**
  * This page runs automations and shows delivery; it does not configure them.
- * Two places are called "Automations" — the sidebar (this, operational) and a
+ * Two places are called "Automations" - the sidebar (this, operational) and a
  * tab on the drive (setup). Point plainly at the other one.
  */
 function ConfigPointer({

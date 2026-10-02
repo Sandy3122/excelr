@@ -37,7 +37,7 @@ curl -sS "https://excelr-placement-drive.vercel.app/api/reg?limit=50&cursor=NEXT
   -H "Authorization: Bearer $REG_ADMIN_API_KEY"
 ```
 
-Repeat until `nextCursor` is `null` — that means there are no more records.
+Repeat until `nextCursor` is `null` - that means there are no more records.
 
 ---
 

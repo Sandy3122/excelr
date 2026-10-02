@@ -4,17 +4,17 @@
  * This project has no database or Redis of its own, so we expose a small
  * interface with two backends:
  *
- *  - InMemoryStore  (default) — a module-level Map with TTL. Fine for local
+ *  - InMemoryStore  (default) - a module-level Map with TTL. Fine for local
  *    dev and single-instance runs. NOT reliable on serverless/multi-instance
  *    hosting (each instance has its own memory), so OTPs may appear "not found"
  *    across cold starts. It is a safe default that never loses data locally.
  *
- *  - UpstashRedisStore (recommended for Vercel) — used automatically when
+ *  - UpstashRedisStore (recommended for Vercel) - used automatically when
  *    UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are set. Talks to
  *    Upstash's REST API with plain fetch, so it adds NO npm dependency and
  *    introduces no new local database.
  *
- * All values are namespaced and short-lived. We never store raw OTPs — only
+ * All values are namespaced and short-lived. We never store raw OTPs - only
  * the record produced by lib/whatsapp-otp/otp.ts (which holds an HMAC hash).
  */
 
@@ -239,7 +239,7 @@ let warnedBadUpstashUrl = false;
 
 /**
  * Upstash's REST backend needs the HTTPS *REST* URL + REST token (from the
- * console's "REST API" section) — NOT the native `rediss://…:6379` connection
+ * console's "REST API" section) - NOT the native `rediss://…:6379` connection
  * string, whose password is a different secret and which `fetch` cannot use.
  * When the URL isn't http(s) we ignore it and fall back to in-memory so a
  * misconfigured value never crashes the OTP endpoints.
@@ -264,7 +264,7 @@ function upstashRestConfigured(): boolean {
 
 let announced = false;
 
-/** Say once which backend is live — a silent in-memory fallback on serverless
+/** Say once which backend is live - a silent in-memory fallback on serverless
  *  is the difference between "OTP not found" and a real bug. */
 function announce(kind: string) {
   if (announced) return;
@@ -275,7 +275,7 @@ function announce(kind: string) {
 export function getOtpStore(): OtpStore {
   if (store) return store;
 
-  // 1) Native Redis via REDIS_URL (rediss://… or redis://…) — the primary
+  // 1) Native Redis via REDIS_URL (rediss://… or redis://…) - the primary
   //    durable backend.
   const redisUrl = process.env.REDIS_URL;
   if (redisUrl && /^rediss?:\/\//i.test(redisUrl)) {
@@ -284,7 +284,7 @@ export function getOtpStore(): OtpStore {
     return store;
   }
 
-  // 2) Upstash REST (https:// URL + REST token) — optional alternative.
+  // 2) Upstash REST (https:// URL + REST token) - optional alternative.
   if (upstashRestConfigured()) {
     announce("Upstash REST");
     store = new UpstashRedisStore(
@@ -294,7 +294,7 @@ export function getOtpStore(): OtpStore {
     return store;
   }
 
-  // 3) In-memory — local dev / single instance only.
+  // 3) In-memory - local dev / single instance only.
   announce("in-memory (not durable across instances)");
   store = new InMemoryStore();
   return store;

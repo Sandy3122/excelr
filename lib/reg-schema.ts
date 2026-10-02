@@ -2,7 +2,7 @@ import { z } from "zod";
 import { QUALIFICATION_OPTIONS } from "./reg-content";
 
 /**
- * Client form fields — used by react-hook-form.
+ * Client form fields - used by react-hook-form.
  */
 export const registrationFormSchema = z.object({
   fullName: z
@@ -34,7 +34,7 @@ export const registrationFormSchema = z.object({
 export type RegistrationFormInput = z.infer<typeof registrationFormSchema>;
 
 /**
- * Full registration payload — form fields, the placement drive the page belongs
+ * Full registration payload - form fields, the placement drive the page belongs
  * to, and the page URL (with query params). Re-validated on the server, which
  * resolves the drive itself rather than trusting anything else in the body.
  */

@@ -1,7 +1,7 @@
 /**
  * Firestore access for placement drives.
  *
- * Layout — everything a drive owns lives underneath it, so a query can only
+ * Layout - everything a drive owns lives underneath it, so a query can only
  * reach another drive's data by explicitly changing the drive id:
  *
  *   placementDrives/{driveId}
@@ -180,7 +180,7 @@ export async function getDriveBySlug(slug: string): Promise<PlacementDrive | nul
   return cache(null, key);
 }
 
-/** Throws rather than returning null — use where a missing drive is a bug. */
+/** Throws rather than returning null - use where a missing drive is a bug. */
 export async function requireDriveById(driveId: string): Promise<PlacementDrive> {
   const drive = await getDriveById(driveId);
   if (!drive) throw new DriveNotFoundError(driveId);

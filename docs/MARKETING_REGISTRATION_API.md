@@ -1,10 +1,10 @@
-# Placement Drive — Registration API Guide
+# Placement Drive - Registration API Guide
 
 **Audience:** Marketing / ops team  
 **Live registration page:** https://excelr-placement-drive.vercel.app/reg  
 **API base URL:** https://excelr-placement-drive.vercel.app
 
-This document explains how to **read registration leads** from the live API (and briefly how new submissions work). Ask the engineering team for the **Admin API key** — do not share it publicly or put it in emails/Slack channels that are widely visible.
+This document explains how to **read registration leads** from the live API (and briefly how new submissions work). Ask the engineering team for the **Admin API key** - do not share it publicly or put it in emails/Slack channels that are widely visible.
 
 ---
 
@@ -70,8 +70,8 @@ curl -sS "https://excelr-placement-drive.vercel.app/api/reg?limit=50" \
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
 | `limit` | No | `50` | How many records per page (min `1`, max `100`) |
-| `cursor` | No | — | Pass `nextCursor` from the previous response to get the next page |
-| `id` | No | — | If set, returns a **single** registration instead of a list (see below) |
+| `cursor` | No | - | Pass `nextCursor` from the previous response to get the next page |
+| `id` | No | - | If set, returns a **single** registration instead of a list (see below) |
 
 ### Success response (list)
 
@@ -119,7 +119,7 @@ If there are no more pages, `nextCursor` is `null`.
 
 ---
 
-## Pagination — more than 50 records
+## Pagination - more than 50 records
 
 The API returns at most **100** records per request (`limit` max = 100). Default is **50**.
 
@@ -204,7 +204,7 @@ HTTP status: `404`
 
 ---
 
-## 3. Submit a registration (POST) — for reference
+## 3. Submit a registration (POST) - for reference
 
 Candidates normally register on the **website form**. Marketing usually does **not** need to call this API.
 
@@ -262,7 +262,7 @@ curl -sS -X POST "https://excelr-placement-drive.vercel.app/api/reg" \
 | `400` | Invalid / incomplete form data |
 | `403` | WhatsApp number not verified via OTP |
 | `409` | Email or phone already registered (with a different pairing) |
-| `500` | Temporary server / email / storage issue — user can retry |
+| `500` | Temporary server / email / storage issue - user can retry |
 
 ---
 

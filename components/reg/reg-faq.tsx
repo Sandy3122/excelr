@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useRegEvent } from "./reg-event-context";
 
-/** FAQ accordion — matches Figma FAQ frame (first item open by default). */
+/** FAQ accordion - matches Figma FAQ frame (first item open by default). */
 export default function RegFaq() {
   const [open, setOpen] = useState<number | null>(0);
   const { faqs } = useRegEvent();

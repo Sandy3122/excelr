@@ -89,7 +89,7 @@ const blank = {
 };
 
 const AUG = {
-  name: "Java Full Stack Placement Drive — BTM, Aug 2026",
+  name: "Java Full Stack Placement Drive - BTM, Aug 2026",
   slug: "reg",
   enabled: true,
   archived: false,
@@ -115,7 +115,7 @@ const AUG = {
       scheduleLabel: "Immediately on registration",
       whatsappTemplateName: T.confirmation,
       emailSubject:
-        "You're confirmed: Java Full Stack Placement Drive — 22 Aug, BTM",
+        "You're confirmed: Java Full Stack Placement Drive - 22 Aug, BTM",
       emailTemplate: "welcome",
     },
     things_to_carry: {
@@ -137,7 +137,7 @@ const AUG = {
       scheduleLabel:
         "Friday, 21 August 2026 · 12:00 PM IST (15 min later if they register after noon)",
       whatsappTemplateName: T.reminderDayBefore,
-      emailSubject: "Tomorrow, 9:00 AM — your Java Full Stack Placement Drive",
+      emailSubject: "Tomorrow, 9:00 AM - your Java Full Stack Placement Drive",
       emailTemplate: "reminder_day_before",
       skipOnOrAfterIstDate: "2026-08-22",
       waitForKind: "things_to_carry",
@@ -155,7 +155,7 @@ const AUG = {
 };
 
 const OCT = {
-  name: "Full Stack Placement Drive — BTM, Oct 2026",
+  name: "Full Stack Placement Drive - BTM, Oct 2026",
   slug: "fsd-oct-2026",
   enabled: true,
   archived: false,
@@ -202,7 +202,7 @@ const OCT = {
       schedule: { type: "at", atIst: "2026-10-08T12:00:00", lateDelayMinutes: 15 },
       scheduleLabel: "Thursday, 8 October 2026 · 12:00 PM IST",
       whatsappTemplateName: T.reminderDayBefore,
-      emailSubject: "Tomorrow — your Full Stack Placement Drive",
+      emailSubject: "Tomorrow - your Full Stack Placement Drive",
       emailTemplate: "reminder_day_before",
       skipOnOrAfterIstDate: "2026-10-09",
       waitForKind: "things_to_carry",
@@ -255,8 +255,8 @@ const TRANSIENT = new Set([4, 8, 10, 13, 14]);
 /**
  * Retry a Firestore call through transient network failures.
  *
- * Every operation here is idempotent — queries and getAll() are reads, and the
- * writes are `set(..., { merge: true })` to a fixed document id — so repeating
+ * Every operation here is idempotent - queries and getAll() are reads, and the
+ * writes are `set(..., { merge: true })` to a fixed document id - so repeating
  * one can never duplicate or corrupt data.
  */
 async function withRetry(label, fn) {
@@ -269,7 +269,7 @@ async function withRetry(label, fn) {
       if (!TRANSIENT.has(err?.code) || attempt === MAX_ATTEMPTS) throw err;
       const wait = Math.min(15000, 500 * 2 ** (attempt - 1));
       log(
-        `    ${label} failed (${err.code} ${err.details?.split(",")[0] || ""}) — ` +
+        `    ${label} failed (${err.code} ${err.details?.split(",")[0] || ""}) - ` +
           `retry ${attempt}/${MAX_ATTEMPTS - 1} in ${(wait / 1000).toFixed(1)}s`,
       );
       await sleep(wait);
@@ -284,7 +284,7 @@ function driveSlugForPageUrl(pageUrl) {
   try {
     path = new URL(path).pathname;
   } catch {
-    /* not an absolute URL — treat the raw value as a path */
+    /* not an absolute URL - treat the raw value as a path */
   }
   return path.startsWith("/fsd-oct-2026") ? OCT.slug : AUG.slug;
 }
@@ -325,7 +325,7 @@ function bar(done, total, width = 24) {
  * Copy documents from a top-level collection into per-drive subcollections.
  * `route` maps a source document to a target drive id (null = skip).
  *
- * Copy only — the source collection is never written to or deleted from.
+ * Copy only - the source collection is never written to or deleted from.
  * Progress is reported after every committed batch so a long run is visible.
  */
 async function copyCollection(sourceName, targetName, route, decorate) {
@@ -336,7 +336,7 @@ async function copyCollection(sourceName, targetName, route, decorate) {
   try {
     total = (await withRetry("count", () => source.count().get())).data().count;
   } catch {
-    /* count() unavailable — progress falls back to a running tally */
+    /* count() unavailable - progress falls back to a running tally */
   }
   log(`  ${n(total)} document${total === 1 ? "" : "s"} to process`);
   if (total === 0) {
@@ -403,7 +403,7 @@ async function copyCollection(sourceName, targetName, route, decorate) {
 
     // Commit in small chunks. One big batch of registration documents is a
     // heavy payload, and a slow link hits the 60s gRPC deadline before it
-    // lands — which fails the whole page rather than a slice of it.
+    // lands - which fails the whole page rather than a slice of it.
     for (let i = 0; i < pending.length; i += WRITE_CHUNK) {
       const chunk = pending.slice(i, i + WRITE_CHUNK);
       if (APPLY) {
@@ -443,7 +443,7 @@ async function copyCollection(sourceName, targetName, route, decorate) {
 
   const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
   log(
-    `  done in ${elapsed}s — scanned ${n(stats.scanned)}, ` +
+    `  done in ${elapsed}s - scanned ${n(stats.scanned)}, ` +
       `${APPLY ? "copied" : "would copy"} ${n(stats.copied)}, ` +
       `already present ${n(stats.existing)}, skipped ${n(stats.skipped)}`,
   );
@@ -457,9 +457,9 @@ async function main() {
   log(
     APPLY
       ? "COPY MODE (--apply). Documents are copied into the new layout.\n" +
-        "Nothing is deleted — the original collections stay exactly as they are.\n" +
+        "Nothing is deleted - the original collections stay exactly as they are.\n" +
         "Safe to interrupt: batches commit as they go and a re-run resumes."
-      : "DRY RUN — no writes. Re-run with --apply to perform the copy.",
+      : "DRY RUN - no writes. Re-run with --apply to perform the copy.",
   );
 
   step("Placement drives");
@@ -556,7 +556,7 @@ main().then(
   (err) => {
     console.error(`\nMigration stopped: ${err?.message || err}`);
     console.error(
-      "\nNothing was lost — every committed batch is already copied and the\n" +
+      "\nNothing was lost - every committed batch is already copied and the\n" +
         "source collections are untouched. Re-run to resume from where it got to:\n" +
         "  node scripts/migrate-placement-drives.mjs --apply\n\n" +
         "On a slow or flaky connection, use smaller commits:\n" +

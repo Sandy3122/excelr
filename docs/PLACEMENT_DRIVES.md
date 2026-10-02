@@ -48,7 +48,7 @@ placementDriveSlugs/{slug} → { driveId }
 
 Everything a drive owns lives underneath it, so a query can only reach another
 campaign's data by explicitly naming a different drive id. Phone and email
-uniqueness are per drive — the same person can register for two drives.
+uniqueness are per drive - the same person can register for two drives.
 
 `placementDriveSlugs` is a uniqueness index: claiming a slug is a transactional
 document write, so two admins cannot save the same path.
@@ -78,7 +78,7 @@ Tokens merged at send time:
 | `{{calendar_link}}` | Google Calendar link built from the drive's event day |
 | `we_wk_unsubscribe_link` | `mailto:` to the reply-to address |
 
-A template without a token simply renders without it — nothing fails.
+A template without a token simply renders without it - nothing fails.
 
 These files are read at runtime through a computed path, which Next.js cannot
 infer, so `next.config.mjs` lists them under `outputFileTracingIncludes`. Adding
@@ -87,7 +87,7 @@ a page needs no change there; the glob `./app/**/*.html` already covers it.
 ## Renaming a slug
 
 A drive is matched by slug, so renaming a page in code would point it at a
-drive that does not exist — and a page with no drive fails safe to
+drive that does not exist - and a page with no drive fails safe to
 "registrations closed". Renaming would therefore take the live page down.
 
 To avoid that, list the old slug in `DRIVE_SLUG_ALIASES` in `lib/site.ts`:
@@ -107,7 +107,7 @@ the alias is never consulted and can be deleted.
 Registrations stop when **either** is true:
 
 - an admin scheduled a close time (`registrationClosesAtIso`), or
-- the drive's **event day has passed** — the end of `eventDayIstDate` in IST.
+- the drive's **event day has passed** - the end of `eventDayIstDate` in IST.
 
 The second rule means a finished campaign stops collecting leads even if nobody
 remembered to close it. Same-day signups still work, since the cutoff is the
@@ -131,7 +131,7 @@ taking signups on day two, say) sets an explicit close time, which always wins.
 ## Automations
 
 The four kinds (`welcome`, `things_to_carry`, `reminder_day_before`,
-`reminder_event_day`) are fixed in code — this is configuration-driven
+`reminder_event_day`) are fixed in code - this is configuration-driven
 automation, not a workflow builder. Per drive, each one carries:
 
 | Field | Meaning |
@@ -141,7 +141,7 @@ automation, not a workflow builder. Per drive, each one carries:
 | `schedule` | `immediate`, `delay_after_register`, or `at` a fixed IST time |
 | `whatsappTemplateName` | Approved Infobip template |
 | `emailSubject` / `emailTemplate` | Only when the email channel is on |
-| `cutoffIst` | Hard stop — never send at or after this moment |
+| `cutoffIst` | Hard stop - never send at or after this moment |
 | `lateWindowDelayMinutes` | Shorter delay on the day before / day of the event |
 | `lastChanceDelayMinutes` | Shortest delay for event-day signups racing the cutoff |
 | `skipOnOrAfterIstDate` | Skip leads who registered on or after this date |
@@ -162,7 +162,7 @@ default sender) still come from the environment.
 
 Two layers, on purpose:
 
-**Account-level — environment.** Belongs to the Infobip account, not to any one
+**Account-level - environment.** Belongs to the Infobip account, not to any one
 campaign, so swapping accounts is an env change and nothing else:
 
 ```
@@ -179,7 +179,7 @@ shows what each blank field is inheriting and a "What this drive will actually
 send with" read-out, plus a **Clear overrides** button to drop back to the
 account values.
 
-**Campaign-level — admin panel.** Owned by the drive: which automations run,
+**Campaign-level - admin panel.** Owned by the drive: which automations run,
 when each fires, the template and email subject each uses, expiry, cooldowns,
 attempt caps, rate limits and quiet hours.
 
@@ -188,7 +188,7 @@ Per-automation templates are **seeded** from the account defaults
 `INFOBIP_REMINDER_DAY_BEFORE_TEMPLATE_NAME`,
 `INFOBIP_REMINDER_EVENT_DAY_TEMPLATE_NAME`) when a drive is created, so a new
 campaign starts with real values. After that the drive is authoritative and
-there is no fallback at send time — quietly sending another campaign's template
+there is no fallback at send time - quietly sending another campaign's template
 is worse than failing loudly.
 
 ## Environment variables no longer read
@@ -242,5 +242,5 @@ node scripts/remove-legacy-collections.mjs --apply   # verify, then delete
 
 It checks every source document against its counterpart under
 `placementDrives/*` and **aborts without deleting anything** if a single row is
-missing. `meta/` is left alone — `meta/cronState` still holds the live cron
+missing. `meta/` is left alone - `meta/cronState` still holds the live cron
 lock.

@@ -5,7 +5,7 @@ import { AdminShell } from "@/components/admin/admin-shell";
 import { ADMIN_COOKIE, verifyAdminSessionToken } from "@/lib/admin/session";
 
 export const metadata: Metadata = {
-  title: "Admin — ExcelR Placement Drive",
+  title: "Admin - ExcelR Placement Drive",
   robots: { index: false, follow: false },
 };
 

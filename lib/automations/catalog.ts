@@ -28,12 +28,12 @@ export const AUTOMATION_META: Record<AutomationKind, AutomationMeta> = {
   },
   reminder_day_before: {
     kind: "reminder_day_before",
-    title: "Reminder — day before",
+    title: "Reminder - day before",
     description: "The day before the drive",
   },
   reminder_event_day: {
     kind: "reminder_event_day",
-    title: "Reminder — event day",
+    title: "Reminder - event day",
     description: "On the morning of the drive",
   },
 };
@@ -85,7 +85,7 @@ export function channelsForAutomationRun(
 
 /**
  * Template a drive will send for one automation. Empty means the drive has not
- * been configured — callers must fail loudly rather than guess a template.
+ * been configured - callers must fail loudly rather than guess a template.
  */
 export function whatsappTemplateFor(
   automations: DriveAutomations,

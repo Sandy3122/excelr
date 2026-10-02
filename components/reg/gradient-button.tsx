@@ -25,7 +25,7 @@ const VARIANTS: Record<Variant, string> = {
   orange:
     "text-white bg-gradient-to-r from-[#FF8A3D] to-[#F97316] shadow-[0_10px_24px_rgba(249,115,22,0.35)]",
   white: "text-navy-900 bg-white shadow-card",
-  /* Mobile hero CTA — light blue → white ice gradient, dark text */
+  /* Mobile hero CTA - light blue → white ice gradient, dark text */
   ice: "text-navy-900 bg-gradient-to-r from-[#C7E0FF] via-white to-[#E8EDFF] shadow-[0_8px_24px_rgba(59,130,246,0.25)]",
 };
 

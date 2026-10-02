@@ -1,4 +1,4 @@
-# ExcelR Placement Drive — Registration Page (Figma → Implementation Spec)
+# ExcelR Placement Drive - Registration Page (Figma → Implementation Spec)
 
 Complete, self-contained handoff spec extracted from Figma via the Figma MCP.
 Everything needed to build the page lives in this document + `public/reg/`.
@@ -7,13 +7,13 @@ Everything needed to build the page lives in this document + `public/reg/`.
 
 ## 0. Source & decisions
 
-- **Figma file:** `Reg Page` — fileKey `rK65fxnztDnrX2IIDmk2oM` (owner: Vishal Aravind B)
-- **Desktop frame:** node `8:527` "Desktop Version" — 1920 × 2725
-- **Mobile frame:** node `1:697` "Mobile Version" — 390 × 3035
-- **Pages in file:** `Mobile`, `Desktop` (same page, two breakpoints — ONE responsive page)
+- **Figma file:** `Reg Page` - fileKey `rK65fxnztDnrX2IIDmk2oM` (owner: Vishal Aravind B)
+- **Desktop frame:** node `8:527` "Desktop Version" - 1920 × 2725
+- **Mobile frame:** node `1:697` "Mobile Version" - 390 × 3035
+- **Pages in file:** `Mobile`, `Desktop` (same page, two breakpoints - ONE responsive page)
 
 **Confirmed build decisions:**
-1. **Pixel-match** the ExcelR design (blue/indigo palette, Poppins + Inter, navy hero). Standalone — does not reuse any other product's theme.
+1. **Pixel-match** the ExcelR design (blue/indigo palette, Poppins + Inter, navy hero). Standalone - does not reuse any other product's theme.
 2. Route **`/reg`**, **public** and **no app chrome** (no nav/sidebar, no auth gate).
 3. Form submit → **WhatsApp OTP verify** + **send email via Nodemailer** (server-side route handler).
 4. **Mobile hides the inline form card** and shows a "Register Now" CTA instead (per Figma). Desktop shows the inline 2-column form.
@@ -35,8 +35,8 @@ Everything needed to build the page lives in this document + `public/reg/`.
 ## 2. Design tokens
 
 ### Fonts
-- **Poppins** — all headings & buttons. Weights: 700 (Bold), 600 (SemiBold), 500 (Medium).
-- **Inter** — body text, form labels/values. Weights: 400 (Regular), 600 (SemiBold).
+- **Poppins** - all headings & buttons. Weights: 700 (Bold), 600 (SemiBold), 500 (Medium).
+- **Inter** - body text, form labels/values. Weights: 400 (Regular), 600 (SemiBold).
 - Load via `next/font/google` (Poppins + Inter).
 
 ### Type scale (desktop → mobile)
@@ -70,13 +70,13 @@ Everything needed to build the page lives in this document + `public/reg/`.
 | Bg tint 3 | `#E8EDFF` | icon chip bg / borders |
 | White | `#FFFFFF` | cards, nav, form |
 
-Decorative glow blobs use low-alpha versions of the blues/indigos, e.g. `#3B82F61A` (10%), `#6366F138` (22%), `#3B82F62E` (18%) — rendered as large `blur`-ed absolutely-positioned rounded rects behind content.
+Decorative glow blobs use low-alpha versions of the blues/indigos, e.g. `#3B82F61A` (10%), `#6366F138` (22%), `#3B82F62E` (18%) - rendered as large `blur`-ed absolutely-positioned rounded rects behind content.
 
 ### Radii
 - Base `16px`, plus `20px`, `24px`. Form card = `rounded-3xl` (~24px). Buttons & 48×48 icon chips = fully rounded (pill/circle).
 
 ### Shadows
-- Soft elevation on the white form card and FAQ items (e.g. `0 10px 30px rgba(2,6,23,0.08)` — tune to match).
+- Soft elevation on the white form card and FAQ items (e.g. `0 10px 30px rgba(2,6,23,0.08)` - tune to match).
 
 ### Spacing
 - 8px-based. Section vertical padding ≈ 80px desktop / 40–60px mobile. Content max-width: hero/details grid ≈ 1152–1280px; FAQ ≈ 768px.
@@ -95,44 +95,44 @@ Decorative glow blobs use low-alpha versions of the blues/indigos, e.g. `#3B82F6
   - H1 "ExcelR's Placement Drive" (72px Poppins 700, white)
   - "For Java Full Stack" (48px) inside a highlighted pill/badge
   - **Accent underline bar** 260×4, blue gradient (`8:903`)
-  - Paragraph (`8:905`): *"Connect with top tech companies, ace your interviews, and launch your career — all in one day at ExcelR's BTM Campus."* (18px Inter, light slate)
+  - Paragraph (`8:905`): *"Connect with top tech companies, ace your interviews, and launch your career - all in one day at ExcelR's BTM Campus."* (18px Inter, light slate)
   - **"Register Now" gradient pill button** with arrow icon (`47:1423`, ~228×84)
-  - RIGHT (`8:910`): hero **photo** of student w/ laptop (540×580) — `public/reg/hero-student.png` (transparent). A soft blue glow circle sits behind it. **"Absolutely FREE for All" badge** overlaps near the image — `public/reg/free-badge.png`.
+  - RIGHT (`8:910`): hero **photo** of student w/ laptop (540×580) - `public/reg/hero-student.png` (transparent). A soft blue glow circle sits behind it. **"Absolutely FREE for All" badge** overlaps near the image - `public/reg/free-badge.png`.
 - **Mobile:** same content stacked; H1 smaller; button full-width-ish (260×56); "Note: Candidates are requested to bring their own laptops…" appears under the button; FREE badge below.
 
 ### 3.3 Event Details + Register  (desktop `8:590`, 1920×874 · mobile `1:412`, 390×989)
 Two-column grid on desktop (1152 wide), single column on mobile.
 
-**LEFT — Event Details (`8:594`)**
+**LEFT - Event Details (`8:594`)**
 - H2 "Event Details" (36px)
 - Sub: *"An intensive placement drive designed to connect Java Full Stack talent with the Industry."*
-- **5 detail rows** — each = 48×48 rounded icon chip (light-blue bg `#E8EDFF`, colored icon) + xs uppercase label + value:
+- **5 detail rows** - each = 48×48 rounded icon chip (light-blue bg `#E8EDFF`, colored icon) + xs uppercase label + value:
   | Icon (lucide) | Label | Value |
   |---|---|---|
   | `Calendar` | DATE | 22nd August 2026 |
   | `Clock` | TIME | 9:00 AM Onwards |
-  | `MapPin` | VENUE | ExcelR BTM Campus — T-2 4th Floor, Raja Ikon Sy, No.89/1 Munnekolala, Village, BTM – Sarjapur Outer Ring Rd, above Yes Bank, BTM, Bengaluru, Karnataka 560037 |
+  | `MapPin` | VENUE | ExcelR BTM Campus - T-2 4th Floor, Raja Ikon Sy, No.89/1 Munnekolala, Village, BTM – Sarjapur Outer Ring Rd, above Yes Bank, BTM, Bengaluru, Karnataka 560037 |
   | `₹` (text glyph) | SALARY RANGE | Salary upto 10 LPA |
   | `Users` | WHO CAN APPLY | Freshers With Java Full Stack Knowledge |
-- **Mobile only:** a "Register Now" CTA button appears at the bottom of this column (`39:1315`, 260×56) — because the form card is hidden on mobile.
+- **Mobile only:** a "Register Now" CTA button appears at the bottom of this column (`39:1315`, 260×56) - because the form card is hidden on mobile.
 
-**RIGHT — Registration form card (`8:641`, desktop only; mobile node `1:464` is `hidden`)**
+**RIGHT - Registration form card (`8:641`, desktop only; mobile node `1:464` is `hidden`)**
 - White `rounded-3xl` card, padding ~41px, soft shadow.
 - Header: H2 "Register Now" (24px) + sub "To Secure Your Career" (slate).
 - **Form fields** (label + input, each ~46px tall, rounded, 1px slate border, placeholder slate):
-  1. **Full Name** — text — placeholder "Name" (mobile "Arjun Sharma")
-  2. **Email Address** — email — placeholder "xyz@example.com"
-  3. **Phone Number** — tel — placeholder "+91 12345 67890"
-  4. **College / University** — text — placeholder "College Name"
-  5. **Highest Qualification** — **select** — placeholder "Select qualification"
+  1. **Full Name** - text - placeholder "Name" (mobile "Arjun Sharma")
+  2. **Email Address** - email - placeholder "xyz@example.com"
+  3. **Phone Number** - tel - placeholder "+91 12345 67890"
+  4. **College / University** - text - placeholder "College Name"
+  5. **Highest Qualification** - **select** - placeholder "Select qualification"
 - **Submit:** full-width gradient pill button "Register for Free" + arrow icon (56px tall).
 - Footer note: *"Note: Candidates are requested to bring their own laptops to complete the technical round."*
 
-> Suggested qualification options (not explicit in Figma — confirm): B.E/B.Tech, B.Sc, BCA, M.E/M.Tech, M.Sc, MCA, Other.
+> Suggested qualification options (not explicit in Figma - confirm): B.E/B.Tech, B.Sc, BCA, M.E/M.Tech, M.Sc, MCA, Other.
 
 ### 3.4 FAQ  (desktop `8:685` · mobile `1:403`)
 - Centered H2 "Frequently Asked Questions" (36px) + sub "Everything you need to know before you register."
-- **Accordion** component (desktop 768 wide). The Figma uses an instance ("FAQ DESKTOP" / "FAq") — the individual Q/A text is inside that component; recommended questions (from the mobile render):
+- **Accordion** component (desktop 768 wide). The Figma uses an instance ("FAQ DESKTOP" / "FAq") - the individual Q/A text is inside that component; recommended questions (from the mobile render):
   1. Who is eligible to attend this placement drive?
   2. Is there any registration fee?
   3. What technologies will the interviews focus on?
@@ -141,10 +141,10 @@ Two-column grid on desktop (1152 wide), single column on mobile.
   6. What should I bring on the day?
   7. How will I receive the confirmation after registering?
   8. Can I attend if I am currently employed?
-  - First item expanded by default; answer sample: *"The drive is open to all — freshers who have recently graduated and experienced professionals looking to switch into a Java Full Stack development role. …"* (confirm real copy with owner).
+  - First item expanded by default; answer sample: *"The drive is open to all - freshers who have recently graduated and experienced professionals looking to switch into a Java Full Stack development role. …"* (confirm real copy with owner).
 
 ### 3.5 Footer  (desktop `8:694`, 1920×66 · mobile `1:686`)
-- Thin top border. Left: "© 2026 PlaceDrive. All rights reserved." Right (desktop): "BTM Campus, Bangalore — 22 Aug 2026". Mobile: copyright centered.
+- Thin top border. Left: "© 2026 PlaceDrive. All rights reserved." Right (desktop): "BTM Campus, Bangalore - 22 Aug 2026". Mobile: copyright centered.
 
 ---
 
@@ -176,7 +176,7 @@ Responsive: `md` (768px) breakpoint. Details+form is 2-col on desktop, 1-col on 
 |---|---|---|---|
 | `excelr-logo.png` | Figma raw (522×135) | crisp | navbar logo (both breakpoints) |
 | `free-badge.png` | Figma raw (2481×834) | high-res | "Absolutely FREE for All" hero badge |
-| `hero-student.png` | Figma raw (360×512, **transparent**) | small | hero photo — composites over navy |
+| `hero-student.png` | Figma raw (360×512, **transparent**) | small | hero photo - composites over navy |
 | `hero-student-hires-blackbg.png` | Figma raw (2878×4096) | 12 MB | backup hi-res, **black bg** (needs bg removal if used) |
 
 Glow blobs, underline bar, icon chips = pure CSS (no assets). Icons = lucide-react.
@@ -185,7 +185,7 @@ Glow blobs, underline bar, icon chips = pure CSS (no assets). Icons = lucide-rea
 
 ---
 
-## 6. Form backend — `app/api/reg/route.ts`
+## 6. Form backend - `app/api/reg/route.ts`
 
 POST handler (Node runtime), server-only:
 1. Validate body with the same zod schema as the client.
@@ -210,7 +210,7 @@ Plus Infobip / WhatsApp OTP vars (see `.env.example`). Never import these on the
 ## 7. To confirm with the design owner
 - Real FAQ question/answer copy (only partial text was readable from the render).
 - Exact "Highest Qualification" dropdown options.
-- Where the mobile "Register Now" CTA leads (scroll to a form section? open a modal? separate page?) — Figma hides the inline card but the target isn't defined.
+- Where the mobile "Register Now" CTA leads (scroll to a form section? open a modal? separate page?) - Figma hides the inline card but the target isn't defined.
 - Confirmation-email content/branding.
 
 ---

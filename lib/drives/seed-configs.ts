@@ -7,7 +7,7 @@
  * scheduling tests assert against them, so "the August drive still behaves the
  * way it did" is a property the suite actually checks.
  *
- * Nothing at runtime reads this file — once migrated, Firestore is the source
+ * Nothing at runtime reads this file - once migrated, Firestore is the source
  * of truth. It exists for seeding and for tests.
  */
 
@@ -24,7 +24,7 @@ const TEMPLATES = {
 } as const;
 
 /**
- * `/reg` — Java Full Stack Placement Drive, 22 August 2026.
+ * `/reg` - Java Full Stack Placement Drive, 22 August 2026.
  *
  * Reproduces the previous hard-coded behaviour one for one: the 1-hour
  * things-to-carry delay with its 10/5 minute late windows and 08:45 cutoff, the
@@ -32,7 +32,7 @@ const TEMPLATES = {
  * signups and waits on things-to-carry, and the 08:50 event-day reminder.
  */
 export const REG_AUG_2026_SEED: PlacementDriveConfig = {
-  name: "Java Full Stack Placement Drive — BTM, Aug 2026",
+  name: "Java Full Stack Placement Drive - BTM, Aug 2026",
   slug: "reg",
   enabled: true,
   archived: false,
@@ -53,7 +53,7 @@ export const REG_AUG_2026_SEED: PlacementDriveConfig = {
       scheduleLabel: "Immediately on registration",
       whatsappTemplateName: TEMPLATES.confirmation,
       emailSubject:
-        "You're confirmed: Java Full Stack Placement Drive — 22 Aug, BTM",
+        "You're confirmed: Java Full Stack Placement Drive - 22 Aug, BTM",
       emailTemplate: "welcome",
       cutoffIst: null,
       lateWindowDelayMinutes: null,
@@ -86,7 +86,7 @@ export const REG_AUG_2026_SEED: PlacementDriveConfig = {
       scheduleLabel:
         "Friday, 21 August 2026 · 12:00 PM IST (15 min later if they register after noon)",
       whatsappTemplateName: TEMPLATES.reminderDayBefore,
-      emailSubject: "Tomorrow, 9:00 AM — your Java Full Stack Placement Drive",
+      emailSubject: "Tomorrow, 9:00 AM - your Java Full Stack Placement Drive",
       emailTemplate: "reminder_day_before",
       cutoffIst: null,
       lateWindowDelayMinutes: null,
@@ -117,7 +117,7 @@ export const REG_AUG_2026_SEED: PlacementDriveConfig = {
 };
 
 /**
- * `/fsd-oct-2026` — Full Stack (Java & Python), BTM campus, 9–10 October 2026.
+ * `/fsd-oct-2026` - Full Stack (Java & Python), BTM campus, 9–10 October 2026.
  *
  * Two deliberate differences from a pure copy of the old behaviour:
  *
@@ -130,7 +130,7 @@ export const REG_AUG_2026_SEED: PlacementDriveConfig = {
  *    still says August. Enable each one after its October template is live.
  */
 export const MARATHAHALLI_OCT_2026_SEED: PlacementDriveConfig = {
-  name: "Full Stack Placement Drive — BTM, Oct 2026",
+  name: "Full Stack Placement Drive - BTM, Oct 2026",
   slug: "fsd-oct-2026",
   enabled: true,
   archived: false,
@@ -182,7 +182,7 @@ export const MARATHAHALLI_OCT_2026_SEED: PlacementDriveConfig = {
       },
       scheduleLabel: "Thursday, 8 October 2026 · 12:00 PM IST",
       whatsappTemplateName: TEMPLATES.reminderDayBefore,
-      emailSubject: "Tomorrow — your Full Stack Placement Drive",
+      emailSubject: "Tomorrow - your Full Stack Placement Drive",
       emailTemplate: "reminder_day_before",
       cutoffIst: null,
       lateWindowDelayMinutes: null,

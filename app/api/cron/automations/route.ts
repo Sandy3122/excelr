@@ -72,7 +72,7 @@ export async function GET(req: Request) {
         if (deadline - Date.now() < 5_000) break;
 
         const ctx = driveScheduleContext(drive);
-        // A closed drive keeps running its automations — the window only stops
+        // A closed drive keeps running its automations - the window only stops
         // new registrations, not messages to people already signed up.
         void driveWindowStatus(drive, now);
         drivesTicked.push(drive.slug);

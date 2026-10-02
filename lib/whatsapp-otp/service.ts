@@ -65,7 +65,7 @@ export type VerifyOtpResult = {
 /**
  * OTP state lives in Redis. When that is unreachable the request used to throw
  * out of here and surface as a bare 500 with nothing but driver noise in the
- * log — indistinguishable from "the OTP just never arrived". Failures are now
+ * log - indistinguishable from "the OTP just never arrived". Failures are now
  * named, logged once with the cause, and reported to the caller.
  */
 class OtpStoreError extends Error {
@@ -283,7 +283,7 @@ export async function confirmOtp(
     return { ok: false, code: "INCORRECT", attemptsRemaining: remaining };
   }
 
-  // Success — single-use: destroy the OTP and mark the phone verified.
+  // Success - single-use: destroy the OTP and mark the phone verified.
   await store.deleteRecord(k.otp);
   await store.setVerified(k.verified, limits.verifiedTtlSeconds);
   return { ok: true, code: "VERIFIED" };

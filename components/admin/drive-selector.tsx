@@ -7,10 +7,10 @@ import { useAdminDrive } from "./drive-context";
 
 /**
  * Active placement drive for the whole dashboard. Changing it re-scopes every
- * page — leads, automations, analytics and logs all follow the selection.
+ * page - leads, automations, analytics and logs all follow the selection.
  *
  * This is a popover rather than a native <select> on purpose: drive names are
- * long ("Java Full Stack Placement Drive — BTM, Aug 2026"), and the
+ * long ("Java Full Stack Placement Drive - BTM, Aug 2026"), and the
  * OS menu a native select opens is drawn outside the page, sized to the longest
  * option and anchored over the selected row. Sitting this high in the layout,
  * that menu covered the header and ran off the top of the window. A popover

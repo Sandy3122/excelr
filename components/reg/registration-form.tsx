@@ -25,7 +25,7 @@ export default function RegistrationForm({
   closed = false,
 }: {
   className?: string;
-  /** Render without the card chrome (bg/rounded/shadow/padding) — e.g. inside the mobile modal, which supplies its own card. */
+  /** Render without the card chrome (bg/rounded/shadow/padding) - e.g. inside the mobile modal, which supplies its own card. */
   bare?: boolean;
   closed?: boolean;
 }) {
@@ -140,7 +140,7 @@ export default function RegistrationForm({
         phone: verifiedPhone,
       };
       setPendingValues(values);
-      // Keep the OTP modal open with a registering state — do not flash the form.
+      // Keep the OTP modal open with a registering state - do not flash the form.
       await registerUser(values, { keepModal: true });
     },
     [pendingValues, getValues, setValue, registerUser],

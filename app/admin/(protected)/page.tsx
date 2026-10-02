@@ -130,7 +130,7 @@ export default function AdminOverviewPage() {
         <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">Overview</h1>
         <p className="mt-1 text-sm text-muted sm:text-base">
           {drive
-            ? `${drive.name}${drive.eventDayIstDate ? ` — ${drive.eventDayIstDate}` : ""}`
+            ? `${drive.name}${drive.eventDayIstDate ? ` - ${drive.eventDayIstDate}` : ""}`
             : "Select a placement drive"}
         </p>
       </div>
@@ -215,7 +215,7 @@ function RunsByDay({ days, driveId }: { days: string[]; driveId: string }) {
   const [loading, setLoading] = useState(days.length > 0);
   const [loadError, setLoadError] = useState("");
   const [runSort, setRunSort] = useState<TableSortState<RunSortKey>>(emptyTableSort());
-  // Keyed by drive as well as day — otherwise switching campaigns would serve
+  // Keyed by drive as well as day - otherwise switching campaigns would serve
   // the previous drive's runs out of cache.
   const cacheRef = useRef<Record<string, AutomationRun[]>>({});
   const requestRef = useRef(0);

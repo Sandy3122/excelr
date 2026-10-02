@@ -6,7 +6,7 @@ export const SEND_CHUNK_SIZE = 40;
 export type SendAction = "run" | "retry_failed" | "resend";
 
 interface SendBatchesOptions {
-  /** Drive the send belongs to — the API refuses an unscoped request. */
+  /** Drive the send belongs to - the API refuses an unscoped request. */
   driveId: string;
   kind: string;
   ids: string[];

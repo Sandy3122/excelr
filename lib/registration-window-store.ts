@@ -37,7 +37,7 @@ export function driveWindowStatus(
 
 /**
  * Window for the drive a landing page belongs to. An unknown or disabled drive
- * reads as closed — a page whose campaign is not configured must not take
+ * reads as closed - a page whose campaign is not configured must not take
  * registrations.
  */
 export async function getRegistrationWindowStatusForSlug(

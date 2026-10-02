@@ -8,7 +8,7 @@ import { useRegEvent } from "./reg-event-context";
 import type { HeroAnnounce, HeroBadge, HeroHeadingLine } from "@/lib/reg-event";
 
 /**
- * Hero — white nav above, deep-blue backdrop with thin circle décor,
+ * Hero - white nav above, deep-blue backdrop with thin circle décor,
  * left copy (heading, role badge, glow underline, FREE badge) and a right-hand
  * cutout. Mobile keeps the ice CTA + laptop note. All copy comes from the
  * event config so each drive can supply its own.
@@ -44,7 +44,7 @@ export default function RegHero({ closed = false }: { closed?: boolean }) {
         className={`relative mx-auto px-4 pb-0 ${hero.containerClassName} ${hero.paddingTopClassName}`}
       >
         <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-8 lg:gap-12">
-          {/* LEFT — copy */}
+          {/* LEFT - copy */}
           <div className="relative z-10 animate-fade-up">
             {hero.announce ? (
               <AnnounceCopy announce={hero.announce} />
@@ -58,7 +58,7 @@ export default function RegHero({ closed = false }: { closed?: boolean }) {
 
                 {hero.badge ? <RoleBadge badge={hero.badge} /> : null}
 
-                {/* Accent underline — bright left → fade right, with glow */}
+                {/* Accent underline - bright left → fade right, with glow */}
                 <div className="mt-4 h-[3px] w-[180px] rounded-full bg-gradient-to-r from-[#7DD3FC] via-[#3B82F6] to-[#7DD3FC] md:mt-5 md:w-[220px]" />
               </>
             )}
@@ -89,7 +89,7 @@ export default function RegHero({ closed = false }: { closed?: boolean }) {
             </div>
           </div>
 
-          {/* RIGHT — cutout (desktop only). The bleed layout draws it above,
+          {/* RIGHT - cutout (desktop only). The bleed layout draws it above,
               outside the grid; the column here just reserves its half. */}
           {hero.imageLayout === "column" ? (
             <div

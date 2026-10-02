@@ -1,7 +1,7 @@
 /**
  * When an automation is allowed to send, for one placement drive.
  *
- * Every timing decision reads from the drive's configuration — event dates,
+ * Every timing decision reads from the drive's configuration - event dates,
  * per-automation schedule, cutoffs, quiet hours. Nothing here knows about a
  * specific campaign.
  */
@@ -115,8 +115,8 @@ export function automationCutoff(
 }
 
 /**
- * Whether a registration falls inside the drive's "late" window — the day
- * before or the day of the event — which shortens relative delays.
+ * Whether a registration falls inside the drive's "late" window - the day
+ * before or the day of the event - which shortens relative delays.
  */
 function lateWindow(
   ctx: DriveScheduleContext,
@@ -337,7 +337,7 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     computeAutomationDueAt(input.ctx, input.kind, input.registeredAt ?? null);
 
   if (!due) {
-    // An immediate automation has no due date of its own — for a lead whose
+    // An immediate automation has no due date of its own - for a lead whose
     // registration time was never recorded it is simply due now.
     if (automation.schedule.type !== "immediate") {
       // A cutoff produces a permanent skip; a skip-date is "not applicable".

@@ -151,12 +151,12 @@ async function writeFirestoreCache(
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown";
     // Cache is optional. A hung gRPC commit can burn ~80s of retries and is not
-    // a billing/quota failure — skip it rather than blocking the dashboard.
+    // a billing/quota failure - skip it rather than blocking the dashboard.
     console.warn("[overview] Stats cache not persisted:", message);
   }
 }
 
-/** Scan only the `messages` field in large pages — used when the cache is cold. */
+/** Scan only the `messages` field in large pages - used when the cache is cold. */
 async function scanCounts(drive: PlacementDrive): Promise<CachedPayload> {
   const totals = emptyTotals();
   const col = driveRegistrationsCol(drive.id);

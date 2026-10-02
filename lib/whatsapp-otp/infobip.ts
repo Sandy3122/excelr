@@ -26,7 +26,7 @@ export type SendResult =
   | { ok: true; providerMessageId?: string }
   | { ok: false; error: string };
 
-/** OTP template — body placeholder plus a URL button carrying the code. */
+/** OTP template - body placeholder plus a URL button carrying the code. */
 export function buildTemplatePayload(
   cfg: InfobipSendConfig,
   toInfobip: string,
@@ -244,7 +244,7 @@ async function postTemplateRaw(
       const status = data?.messages?.[0]?.status;
       providerDetail =
         (ex &&
-          [ex.messageId, ex.text || ex.message].filter(Boolean).join(" — ")) ||
+          [ex.messageId, ex.text || ex.message].filter(Boolean).join(" - ")) ||
         (status &&
           [status.groupName, status.name, status.description]
             .filter(Boolean)
@@ -279,7 +279,7 @@ async function postTemplate(
   const status = msg?.status;
   if (status && (status.groupId === 2 || status.groupId === 5)) {
     console.error(
-      `[whatsapp-${kind}] Infobip rejected message: ${status.groupName}/${status.name} — ${status.description}`,
+      `[whatsapp-${kind}] Infobip rejected message: ${status.groupName}/${status.name} - ${status.description}`,
     );
     return { ok: false, error: "WHATSAPP_SEND_FAILED" };
   }

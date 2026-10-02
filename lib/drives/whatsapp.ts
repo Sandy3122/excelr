@@ -8,7 +8,7 @@
  *    from the environment. Swapping Infobip accounts is then an env change.
  *  - **Campaign-level** (each automation's template) is owned by the drive. It
  *    is seeded from the account defaults when the drive is created, and after
- *    that the drive is authoritative — no silent fallback at send time, since
+ *    that the drive is authoritative - no silent fallback at send time, since
  *    quietly sending another campaign's template is worse than failing.
  */
 
@@ -123,10 +123,10 @@ export function driveWhatsAppIssues(drive: PlacementDrive): string[] {
   const effective = effectiveWhatsAppSettings(drive);
   // Blank on the drive is fine when the account supplies a default.
   if (!effective.otpTemplateName) {
-    issues.push("No OTP template — set one here or in INFOBIP_TEMPLATE_NAME.");
+    issues.push("No OTP template - set one here or in INFOBIP_TEMPLATE_NAME.");
   }
   if (!effective.sender) {
-    issues.push("No WhatsApp sender — set one here or in INFOBIP_WHATSAPP_SENDER.");
+    issues.push("No WhatsApp sender - set one here or in INFOBIP_WHATSAPP_SENDER.");
   }
   for (const [kind, automation] of Object.entries(drive.automations)) {
     if (!automation.enabled) continue;

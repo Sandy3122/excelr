@@ -56,7 +56,7 @@ export type AdminFailureAlert = {
 
 /**
  * Notify the admin inbox that a registration-pipeline step failed.
- * Never throws — failures are logged so the main request path stays stable.
+ * Never throws - failures are logged so the main request path stays stable.
  */
 export async function notifyAdminOfFailure(
   alert: AdminFailureAlert,
@@ -64,7 +64,7 @@ export async function notifyAdminOfFailure(
   const to = adminInbox();
   if (!to) {
     console.error(
-      "[admin-alert] Skipped — REG_NOTIFY_TO / SMTP_USER not configured.",
+      "[admin-alert] Skipped - REG_NOTIFY_TO / SMTP_USER not configured.",
       alert,
     );
     return;
@@ -76,7 +76,7 @@ export async function notifyAdminOfFailure(
     .map(([k, v]) => `${k}: ${v}`);
 
   const text = [
-    "Placement Drive — registration pipeline failure",
+    "Placement Drive - registration pipeline failure",
     "",
     `Step:      ${alert.step}`,
     `Reason:    ${alert.reason}`,
@@ -126,7 +126,7 @@ export async function notifyAdminOfFailure(
     await transporter.sendMail({
       from: fromAddress(),
       to,
-      subject: `[Alert] Placement Drive failure — ${alert.step}`,
+      subject: `[Alert] Placement Drive failure - ${alert.step}`,
       text,
       html,
     });

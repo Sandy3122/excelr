@@ -2,7 +2,7 @@
  * Every admin section, in one place.
  *
  * Flip a section's `enabled` to false and it disappears from the sidebar and
- * the mobile nav *and* its URLs stop resolving — the page and the APIs it owns
+ * the mobile nav *and* its URLs stop resolving - the page and the APIs it owns
  * return 404, so typing the path directly gets you nothing. Nothing else in the
  * codebase needs editing: middleware.ts, the admin shell and the guarded route
  * handlers all read this list.
@@ -29,14 +29,14 @@ export interface AdminSection {
    * The switch. false → hidden from the nav and 404 on every path it owns.
    */
   enabled: boolean;
-  /** Match `href` exactly — for "/admin", which is a prefix of every section. */
+  /** Match `href` exactly - for "/admin", which is a prefix of every section. */
   exact?: boolean;
   /**
    * API paths this section *exclusively* owns, blocked alongside its page.
    *
    * Only APIs no other section calls belong here. `/api/admin/automations` is
    * shared with Overview and `/api/admin/drives` feeds the drive selector in
-   * the header of every page, so neither is listed — turning those sections off
+   * the header of every page, so neither is listed - turning those sections off
    * hides their pages without breaking the rest of the dashboard.
    */
   ownsApi?: string[];

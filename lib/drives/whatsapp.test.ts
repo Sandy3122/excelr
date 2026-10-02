@@ -97,7 +97,7 @@ describe("account defaults", () => {
 describe("per-automation templates stay campaign-owned", () => {
   it("never silently falls back to the account template", () => {
     process.env.INFOBIP_CONFIRMATION_TEMPLATE_NAME = "account_welcome";
-    // Drive created without seeding — the send must fail rather than guess.
+    // Drive created without seeding - the send must fail rather than guess.
     expect(() => driveAutomationTemplate(drive(), "welcome")).toThrow(
       DriveConfigurationError,
     );

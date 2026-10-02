@@ -174,7 +174,7 @@ export default function OtpVerificationModal({
           setTimeout(() => boxRefs.current[0]?.focus(), 0);
           return;
         }
-        // Stay on the completing screen immediately — never flash the form.
+        // Stay on the completing screen immediately - never flash the form.
         setCompleting(true);
         await Promise.resolve(onVerified(phone));
       } catch {

@@ -1,9 +1,9 @@
 /**
- * Decorative hero atmosphere — faint thin circle outlines, optionally over a
+ * Decorative hero atmosphere - faint thin circle outlines, optionally over a
  * soft blue glow.
  *
- * `glow`    — coloured blobs + circles (the original /reg hero).
- * `outline` — circles only, for heroes whose background is already a flat,
+ * `glow`    - coloured blobs + circles (the original /reg hero).
+ * `outline` - circles only, for heroes whose background is already a flat,
  *             saturated blue and would wash out under the blobs.
  */
 export default function GlowBlobs({
@@ -22,7 +22,7 @@ export default function GlowBlobs({
         </>
       )}
 
-      {/* Faint thin circle outlines — one top-right near the student, one bottom-left */}
+      {/* Faint thin circle outlines - one top-right near the student, one bottom-left */}
       <div className="absolute right-[10%] top-[10%] h-[360px] w-[360px] rounded-full border border-white/[0.07] md:h-[440px] md:w-[440px]" />
       <div className="absolute bottom-[-140px] left-[6%] h-[360px] w-[360px] rounded-full border border-white/[0.06]" />
     </div>

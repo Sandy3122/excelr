@@ -3,7 +3,7 @@
  *
  * Admin routes take a `driveId` and every query is scoped to it. The id is
  * validated against Firestore on each request rather than trusted, so a client
- * cannot widen its own scope by editing the parameter — it can only ever name a
+ * cannot widen its own scope by editing the parameter - it can only ever name a
  * drive that exists, and an authenticated admin is allowed to see any of them.
  */
 

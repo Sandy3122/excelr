@@ -5,7 +5,7 @@ import { getHashSecret } from "./config";
  * Secure OTP primitives. All functions here run server-side only.
  *
  * - OTP is generated with crypto.randomInt (CSPRNG), never Math.random.
- * - OTP is never stored in plain text — only an HMAC-SHA256 hash is persisted.
+ * - OTP is never stored in plain text - only an HMAC-SHA256 hash is persisted.
  * - Comparison is constant-time to avoid timing side channels.
  */
 

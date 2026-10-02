@@ -5,8 +5,8 @@
  * base URL, the WhatsApp sender, the template language, and the OTP template.
  * Swapping Infobip accounts is an environment change, not a data migration.
  *
- * Campaign-shaped values — which automations run, when they fire, which
- * template each one sends, expiry, cooldowns and rate limits — live on the
+ * Campaign-shaped values - which automations run, when they fire, which
+ * template each one sends, expiry, cooldowns and rate limits - live on the
  * placement drive and are edited in the admin panel.
  *
  * Where the two overlap, a drive that leaves a field blank inherits the

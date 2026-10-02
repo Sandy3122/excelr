@@ -30,7 +30,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   // Next requires literal values here, so this cannot be derived from the
-  // section list — it is deliberately broad, and the per-section decision is
+  // section list - it is deliberately broad, and the per-section decision is
   // made above.
   matcher: ["/", "/admin/:path*", "/api/admin/:path*", "/marathahalli-fsd-oct-2026"],
 };

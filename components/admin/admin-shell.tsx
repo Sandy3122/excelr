@@ -91,7 +91,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   // Middleware already 404s these on request; this catches the client-side
-  // case — a stale <Link> or a router.push to a section switched off since.
+  // case - a stale <Link> or a router.push to a section switched off since.
   // After every hook, so the hook order never changes between renders.
   if (isAdminPathDisabled(pathname)) notFound();
 

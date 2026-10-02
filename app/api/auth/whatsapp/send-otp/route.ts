@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
   const fields = (body ?? {}) as { phoneNumber?: unknown; driveSlug?: unknown };
 
-  // Resolve the campaign before anything else — limits, templates and store
+  // Resolve the campaign before anything else - limits, templates and store
   // keys all belong to it.
   const resolved = await resolvePublicDrive(fields.driveSlug);
   if (!resolved.ok) {

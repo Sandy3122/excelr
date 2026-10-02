@@ -60,7 +60,7 @@ export async function GET(req: Request) {
 }
 
 /**
- * Create a drive. Only name, slug and event day are taken here — everything
+ * Create a drive. Only name, slug and event day are taken here - everything
  * else starts from the shared defaults and is edited on the drive page.
  */
 export async function POST(req: Request) {

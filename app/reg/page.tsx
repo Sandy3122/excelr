@@ -7,7 +7,7 @@ export const metadata: Metadata = CONFIG.meta;
 
 export const dynamic = "force-dynamic";
 
-// Public, standalone page — no app chrome (no nav / sidebar / auth gate).
+// Public, standalone page - no app chrome (no nav / sidebar / auth gate).
 export default async function RegPage() {
   // The drive document owns the close time; the page only names its drive.
   const status = await getRegistrationWindowStatusForSlug(CONFIG.driveSlug);

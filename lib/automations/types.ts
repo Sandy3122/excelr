@@ -51,7 +51,7 @@ export interface AutomationRunStats {
 
 export interface AutomationRun {
   id: string;
-  /** Drive this run belongs to — every run is campaign-scoped. */
+  /** Drive this run belongs to - every run is campaign-scoped. */
   placementDriveId: string;
   kind: AutomationKind;
   status: "running" | "completed" | "idle";

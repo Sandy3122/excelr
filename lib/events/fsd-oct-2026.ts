@@ -1,5 +1,5 @@
 /**
- * ExcelR Placement Drive — BTM Campus, 9th & 10th October 2026.
+ * ExcelR Placement Drive - BTM Campus, 9th & 10th October 2026.
  * Full Stack roles (Java & Python only). Mounted at /fsd-oct-2026.
  *
  * The hero follows the approved announcement banner and the FAQ copy is the
@@ -78,7 +78,7 @@ const FAQS: FaqItem[] = [
   },
   {
     q: "Can I attend the placement drive on both days?",
-    a: "Once you register, you will receive your call letter by October 8th. You will be assigned one of the two days — October 9th or 10th along with a specific reporting time. All details will be shared with you via email or WhatsApp by October 8th.\nPlease note: Candidates can attend the drive only once and cannot appear on both days.",
+    a: "Once you register, you will receive your call letter by October 8th. You will be assigned one of the two days - October 9th or 10th along with a specific reporting time. All details will be shared with you via email or WhatsApp by October 8th.\nPlease note: Candidates can attend the drive only once and cannot appear on both days.",
   },
   {
     q: "Will different companies be present on October 9th and 10th?",
@@ -94,7 +94,7 @@ export const FSD_OCT_2026: RegEventConfig = {
 
   meta: {
     title:
-      "Register — ExcelR's Full Stack Placement Drive, BTM (Java & Python)",
+      "Register - ExcelR's Full Stack Placement Drive, BTM (Java & Python)",
     description:
       "Secure your spot at ExcelR's Full Stack Placement Drive on 9th and 10th October 2026, BTM Campus, Bengaluru. Java & Python roles, salary up to 10 LPA. Absolutely free for all.",
   },
@@ -121,11 +121,11 @@ export const FSD_OCT_2026: RegEventConfig = {
       src: `${ASSETS}/hero-student.png`,
       width: 924,
       height: 742,
-      alt: "Student announcing the placement drive — bigger and better",
+      alt: "Student announcing the placement drive - bigger and better",
     },
     // Landscape artwork, so half the 1152px container leaves it looking small.
     // Spanning the section's full height top-aligns it with the copy and lets
-    // it run into the page gutter. The box is anchored off 50% — the container
+    // it run into the page gutter. The box is anchored off 50% - the container
     // is centred, so that is always where the two grid columns meet. At md it
     // starts on the column boundary; from xl it crosses into the column's
     // unused space, which the copy never reaches (the widest line, the h1, ends
@@ -150,7 +150,7 @@ export const FSD_OCT_2026: RegEventConfig = {
 
   footer: {
     copyright: "© 2026 PlaceDrive. All rights reserved.",
-    location: "BTM Campus, Bangalore — 9 & 10 Oct 2026",
+    location: "BTM Campus, Bangalore - 9 & 10 Oct 2026",
   },
 
   laptopNote: LAPTOP_NOTE,
@@ -160,7 +160,7 @@ export const FSD_OCT_2026: RegEventConfig = {
 
   thankYou: {
     meta: {
-      title: "Thank You — ExcelR's Full Stack Placement Drive, BTM",
+      title: "Thank You - ExcelR's Full Stack Placement Drive, BTM",
       description:
         "You're registered for ExcelR's Full Stack Placement Drive on 9th and 10th October 2026. Check your inbox for confirmation details.",
     },

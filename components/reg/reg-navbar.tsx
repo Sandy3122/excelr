@@ -7,7 +7,7 @@ export default function RegNavbar() {
       <div className="mx-auto flex h-[60px] max-w-content items-center justify-center px-6 md:h-[88px]">
         <Image
           src="/reg/excelr-logo.png"
-          alt="ExcelR — Raising Excellence"
+          alt="ExcelR - Raising Excellence"
           width={522}
           height={135}
           priority
