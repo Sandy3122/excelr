@@ -8,7 +8,8 @@ import { LeadsPageSkeleton, TableRowSkeleton } from "@/components/admin/skeleton
 import { LeadFilterBar } from "@/components/admin/lead-filter-bar";
 import { SortableTh, TableSortSelect } from "@/components/admin/sortable-th";
 import { clearAdminFetchCache } from "@/components/admin/fetch-json";
-import { invalidateLeadsCache, useAllLeads } from "@/components/admin/use-all-leads";
+import { invalidateLeadsCache } from "@/components/admin/use-all-leads";
+import { useLeadBatches } from "@/components/admin/use-lead-batches";
 import { useAdminDrive, withDrive } from "@/components/admin/drive-context";
 import {
   EMPTY_LEAD_FILTERS,
@@ -99,7 +100,16 @@ function registeredLabel(reg: StoredRegistration) {
 
 export default function AdminLeadsPage() {
   const { driveId, drive } = useAdminDrive();
-  const { leads: rawLeads, loading, error, reload } = useAllLeads();
+  const {
+    leads: rawLeads,
+    total,
+    hasMore,
+    loading,
+    loadingMore,
+    error,
+    reload,
+    loadMore,
+  } = useLeadBatches();
   const canDelete = drive?.allowLeadDeletion ?? false;
   const [toDelete, setToDelete] = useState<LeadRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -123,7 +133,7 @@ export default function AdminLeadsPage() {
       invalidateLeadsCache();
       // Overview counts are cached in the browser too.
       clearAdminFetchCache();
-      await reload(true).catch(() => {});
+      await reload();
     } catch {
       setDeleteError("Could not delete the lead.");
     } finally {
@@ -171,6 +181,8 @@ export default function AdminLeadsPage() {
 
   function handlePageChange(n: number) {
     setPage(n);
+    // Reaching the end of what is loaded fetches the next batch from the server.
+    if (hasMore && n >= totalPages) void loadMore();
     document.querySelector("main")?.scrollTo({ top: 0 });
   }
 
@@ -184,7 +196,8 @@ export default function AdminLeadsPage() {
         <div>
           <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">Leads</h1>
           <p className="mt-1 text-sm text-muted sm:text-base">
-            {leads.length} registered candidate{leads.length === 1 ? "" : "s"}
+            {total} registered candidate{total === 1 ? "" : "s"}
+            {hasMore ? ` · ${leads.length} loaded` : ""}
           </p>
         </div>
         <a
@@ -222,6 +235,14 @@ export default function AdminLeadsPage() {
         }
       />
 
+      {hasMore ? (
+        <p className="rounded-xl bg-slate-50 px-4 py-2 text-xs text-muted">
+          Showing the {leads.length} most recent of {total} leads. Search, filters and
+          sorting apply to the loaded leads; more load automatically as you go to the
+          last page.
+        </p>
+      ) : null}
+
       {error ? (
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
       ) : null}
@@ -250,8 +271,8 @@ export default function AdminLeadsPage() {
             page={safePage}
             pageSize={pageSize}
             total={filtered.length}
-            hasNext={safePage < totalPages}
-            disabled={loading}
+            hasNext={safePage < totalPages || hasMore}
+            disabled={loading || loadingMore}
             onPageChange={handlePageChange}
             onPageSizeChange={setPageSize}
           />
@@ -343,8 +364,8 @@ export default function AdminLeadsPage() {
           page={safePage}
           pageSize={pageSize}
           total={filtered.length}
-          hasNext={safePage < totalPages}
-          disabled={loading}
+          hasNext={safePage < totalPages || hasMore}
+          disabled={loading || loadingMore}
           onPageChange={handlePageChange}
           onPageSizeChange={setPageSize}
         />

@@ -21,6 +21,9 @@ export default function AdminSettingsPage() {
   const [allowDelete, setAllowDelete] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [fetchSize, setFetchSize] = useState("200");
+  const [fetchBusy, setFetchBusy] = useState(false);
+  const [fetchMsg, setFetchMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("18:00");
   const [status, setStatus] = useState<WindowResponse | null>(null);
@@ -56,11 +59,18 @@ export default function AdminSettingsPage() {
   async function loadDeletion() {
     if (!driveId) return;
     try {
-      const json = await fetchAdminJson<{ ok: boolean; allowLeadDeletion?: boolean }>(
-        withDrive("/api/admin/lead-deletion", driveId),
+      const json = await fetchAdminJson<{
+        ok: boolean;
+        allowLeadDeletion?: boolean;
+        leadFetchSize?: number;
+      }>(
+        withDrive("/api/admin/lead-settings", driveId),
         { fresh: true },
       );
-      if (json.ok) setAllowDelete(Boolean(json.allowLeadDeletion));
+      if (json.ok) {
+        setAllowDelete(Boolean(json.allowLeadDeletion));
+        if (json.leadFetchSize) setFetchSize(String(json.leadFetchSize));
+      }
     } catch {
       /* the toggle stays off */
     }
@@ -78,10 +88,10 @@ export default function AdminSettingsPage() {
     setDeleteBusy(true);
     setDeleteError("");
     try {
-      const res = await fetch(withDrive("/api/admin/lead-deletion", driveId), {
+      const res = await fetch(withDrive("/api/admin/lead-settings", driveId), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ allow }),
+        body: JSON.stringify({ allowLeadDeletion: allow }),
       });
       const json = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !json.ok) {
@@ -94,6 +104,34 @@ export default function AdminSettingsPage() {
       setDeleteError("Could not save the setting.");
     } finally {
       setDeleteBusy(false);
+    }
+  }
+
+  async function saveFetchSize() {
+    const n = Number(fetchSize);
+    if (!Number.isInteger(n) || n < 25 || n > 1000) {
+      setFetchMsg({ ok: false, text: "Enter a whole number from 25 to 1000." });
+      return;
+    }
+    setFetchBusy(true);
+    setFetchMsg(null);
+    try {
+      const res = await fetch(withDrive("/api/admin/lead-settings", driveId), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadFetchSize: n }),
+      });
+      const json = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        setFetchMsg({ ok: false, text: json.error || "Could not save the setting." });
+        return;
+      }
+      setFetchMsg({ ok: true, text: "Saved." });
+      await reloadDrives();
+    } catch {
+      setFetchMsg({ ok: false, text: "Could not save the setting." });
+    } finally {
+      setFetchBusy(false);
     }
   }
 
@@ -304,6 +342,40 @@ export default function AdminSettingsPage() {
         {deleteError ? (
           <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
             {deleteError}
+          </p>
+        ) : null}
+      </section>
+      <section className="rounded-2xl bg-white p-5 shadow-card sm:p-6">
+        <h2 className="font-heading text-lg font-bold">Leads loaded per batch</h2>
+        <p className="mt-1 text-sm text-muted">
+          The Leads page loads this many leads first, then fetches the next batch
+          as you move to later pages. Smaller loads open faster; larger ones make
+          search and sorting cover more leads at once (25 to 1000).
+        </p>
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <label className="block text-sm font-medium text-navy-900">
+            Leads per batch
+            <input
+              type="number"
+              min={25}
+              max={1000}
+              value={fetchSize}
+              onChange={(e) => setFetchSize(e.target.value)}
+              className="mt-1.5 w-40 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-ink focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={fetchBusy || !driveId}
+            onClick={() => void saveFetchSize()}
+            className="rounded-full bg-navy-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {fetchBusy ? "Saving…" : "Save"}
+          </button>
+        </div>
+        {fetchMsg ? (
+          <p className={`mt-3 text-sm ${fetchMsg.ok ? "text-emerald-700" : "text-red-700"}`}>
+            {fetchMsg.text}
           </p>
         ) : null}
       </section>

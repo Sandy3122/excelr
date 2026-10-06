@@ -21,6 +21,7 @@ export interface DriveSummary {
   venueLatitude: number | null;
   venueLongitude: number | null;
   allowLeadDeletion: boolean;
+  leadFetchSize: number;
   /** Per-automation channels, so the UI never guesses which kinds send email. */
   automations: Record<AutomationKind, { enabled: boolean; channels: Channel[] }>;
   issues?: string[];

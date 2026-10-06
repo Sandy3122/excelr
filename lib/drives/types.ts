@@ -161,6 +161,8 @@ export const driveConfigSchema = z.object({
    * Off by default and meant to be enabled only for testing or clean-ups.
    */
   allowLeadDeletion: z.boolean().default(false),
+  /** How many leads the dashboard fetches per batch (initial load and each "next" load). */
+  leadFetchSize: z.number().int().min(25).max(1000).default(200),
   venueLatitude: z.number().min(-90).max(90).nullable().default(null),
   venueLongitude: z.number().min(-180).max(180).nullable().default(null),
   /** Per-drive n8n webhook. Empty string disables it. */
@@ -192,6 +194,7 @@ export interface PlacementDriveSummary {
   venueLatitude: number | null;
   venueLongitude: number | null;
   allowLeadDeletion: boolean;
+  leadFetchSize: number;
   automations: Record<AutomationKind, { enabled: boolean; channels: Channel[] }>;
 }
 
@@ -206,6 +209,7 @@ export function toDriveSummary(drive: PlacementDrive): PlacementDriveSummary {
     venueLatitude: drive.venueLatitude,
     venueLongitude: drive.venueLongitude,
     allowLeadDeletion: drive.allowLeadDeletion,
+    leadFetchSize: drive.leadFetchSize,
     automations: Object.fromEntries(
       AUTOMATION_KINDS.map((kind) => [
         kind,
@@ -337,6 +341,7 @@ export function defaultDriveConfig(input: {
     registrationClosesAtIso: null,
     eventKey: input.slug,
     allowLeadDeletion: false,
+    leadFetchSize: 200,
     venueLatitude: null,
     venueLongitude: null,
     webhookUrl: "",

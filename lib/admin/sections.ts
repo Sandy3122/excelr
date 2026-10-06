@@ -77,7 +77,7 @@ export const ADMIN_SECTIONS: AdminSection[] = [
     key: "settings",
     label: "Settings",
     href: "/admin/settings",
-    ownsApi: ["/api/admin/registration-window", "/api/admin/lead-deletion"],
+    ownsApi: ["/api/admin/registration-window", "/api/admin/lead-settings"],
     enabled: true,
   },
 ];

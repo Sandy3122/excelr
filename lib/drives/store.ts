@@ -294,12 +294,12 @@ export async function setDriveRegistrationWindow(
   invalidateDriveCache();
 }
 
-export async function setDriveLeadDeletion(
+export async function setDriveLeadSettings(
   driveId: string,
-  allow: boolean,
+  patch: { allowLeadDeletion?: boolean; leadFetchSize?: number },
 ): Promise<void> {
   await driveRef(driveId).set(
-    { allowLeadDeletion: allow, updatedAt: new Date().toISOString() },
+    { ...patch, updatedAt: new Date().toISOString() },
     { merge: true },
   );
   invalidateDriveCache();

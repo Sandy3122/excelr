@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const querySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
   cursor: z.string().trim().min(1).max(256).optional(),
   id: z.string().trim().min(1).max(256).optional(),
   all: z.enum(["0", "1"]).optional(),
@@ -64,7 +64,7 @@ export async function GET(req: Request) {
     }
 
     const result = await listRegistrations(driveId, {
-      limit: parsed.data.limit ?? 50,
+      limit: parsed.data.limit ?? ctx.drive.leadFetchSize,
       cursor: parsed.data.cursor,
     });
     const total = parsed.data.cursor
