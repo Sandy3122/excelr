@@ -14,6 +14,7 @@ import {
 } from "firebase-admin/firestore";
 import type { RegistrationInput } from "@/lib/reg-schema";
 import { firstNameFrom } from "@/lib/first-name";
+import { hasGeoLocation, parseGeo, type RegistrationGeo } from "@/lib/geo";
 import {
   buildInitialMessages,
   parseRegistrationMessages,
@@ -58,6 +59,7 @@ export function toRegistrationRecord(
   data: RegistrationInput,
   timestamp: string,
   drive: { id: string; slug: string; eventKey: string },
+  geo?: RegistrationGeo | null,
 ): RegistrationRecord {
   return {
     fullName: data.fullName,
@@ -72,6 +74,9 @@ export function toRegistrationRecord(
     event: drive.eventKey,
     placementDriveId: drive.id,
     placementDriveSlug: drive.slug,
+    // Only stored when the lookup found something, so a retry from a network
+    // with no geo data never wipes a location captured earlier.
+    ...(geo && hasGeoLocation(geo) ? { geo } : {}),
   };
 }
 
@@ -143,10 +148,11 @@ export async function saveRegistration(
   ctx: DriveScheduleContext,
   data: RegistrationInput,
   timestamp: string,
+  geo?: RegistrationGeo | null,
 ): Promise<{ id: string; created: boolean }> {
   const col = driveRegistrationsCol(drive.id);
   const id = phoneToDocId(data.phone);
-  const record = toRegistrationRecord(data, timestamp, drive);
+  const record = toRegistrationRecord(data, timestamp, drive, geo);
   const phoneRef = col.doc(id);
   const emailRef = emailLookupRef(drive.id, record.emailLower);
 
@@ -349,6 +355,7 @@ function serializeRegistration(
       timestampToIso(d.thingsToCarryDueAt) ??
       (typeof d.thingsToCarryDueAt === "string" ? d.thingsToCarryDueAt : null),
     messages: parseRegistrationMessages(d.messages),
+    geo: parseGeo(d.geo),
   };
 }
 

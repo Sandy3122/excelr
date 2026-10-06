@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminDrive } from "@/lib/admin/drive-context";
 import { listAllRegistrations } from "@/lib/firebase/registrations";
+import { distanceFromVenueKm } from "@/lib/geo";
 import { toCsv } from "@/lib/csv";
 import { AUTOMATION_KINDS } from "@/lib/automations/types";
 
@@ -31,6 +32,11 @@ export async function GET(req: Request) {
       "college",
       "qualification",
       "pageUrl",
+      "city",
+      "region",
+      "country",
+      "distanceFromVenueKm",
+      "ip",
       "submittedAt",
       ...extraHeaders,
     ];
@@ -45,6 +51,11 @@ export async function GET(req: Request) {
         r.college,
         r.qualification,
         r.pageUrl,
+        r.geo?.city ?? "",
+        r.geo?.region ?? "",
+        r.geo?.country ?? "",
+        String(distanceFromVenueKm(r.geo ?? null, drive) ?? ""),
+        r.geo?.ip ?? "",
         r.submittedAt || r.submittedAtIso || "",
       ];
       const statuses: string[] = [];

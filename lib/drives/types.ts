@@ -152,6 +152,12 @@ export const driveConfigSchema = z.object({
   registrationClosesAtIso: z.string().trim().datetime().nullable(),
   /** `event` value sent to the n8n webhook and stored on each registration. */
   eventKey: z.string().trim().min(1).max(120),
+  /**
+   * Venue coordinates. Used to show how far each registrant's IP location is
+   * from the venue. Null until an admin sets them; existing drives default to null.
+   */
+  venueLatitude: z.number().min(-90).max(90).nullable().default(null),
+  venueLongitude: z.number().min(-180).max(180).nullable().default(null),
   /** Per-drive n8n webhook. Empty string disables it. */
   webhookUrl: z.string().trim().max(500),
   whatsapp: driveWhatsAppSchema,
@@ -178,6 +184,8 @@ export interface PlacementDriveSummary {
   enabled: boolean;
   archived: boolean;
   eventDayIstDate: string | null;
+  venueLatitude: number | null;
+  venueLongitude: number | null;
   automations: Record<AutomationKind, { enabled: boolean; channels: Channel[] }>;
 }
 
@@ -189,6 +197,8 @@ export function toDriveSummary(drive: PlacementDrive): PlacementDriveSummary {
     enabled: drive.enabled,
     archived: drive.archived,
     eventDayIstDate: drive.eventDayIstDate,
+    venueLatitude: drive.venueLatitude,
+    venueLongitude: drive.venueLongitude,
     automations: Object.fromEntries(
       AUTOMATION_KINDS.map((kind) => [
         kind,
@@ -319,6 +329,8 @@ export function defaultDriveConfig(input: {
     dayBeforeIstDate,
     registrationClosesAtIso: null,
     eventKey: input.slug,
+    venueLatitude: null,
+    venueLongitude: null,
     webhookUrl: "",
     whatsapp: defaultWhatsAppConfig(),
     automations: withTemplates(

@@ -71,7 +71,7 @@ export const ADMIN_SECTIONS: AdminSection[] = [
     key: "drives",
     label: "Placement Drives",
     href: "/admin/drives",
-    enabled: false,
+    enabled: true,
   },
   {
     key: "settings",

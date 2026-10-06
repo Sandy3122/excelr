@@ -1,4 +1,5 @@
 import type { RegistrationMessages } from "@/lib/automations/types";
+import type { RegistrationGeo } from "@/lib/geo";
 
 export interface RegistrationRecord {
   fullName: string;
@@ -15,6 +16,8 @@ export interface RegistrationRecord {
   /** Owning placement drive. Stored on the document as well as implied by path. */
   placementDriveId: string;
   placementDriveSlug: string;
+  /** Approximate submitter location from the request IP. Absent on older leads. */
+  geo?: RegistrationGeo | null;
 }
 
 export interface StoredRegistration extends RegistrationRecord {

@@ -40,6 +40,8 @@ export const REG_AUG_2026_SEED: PlacementDriveConfig = {
   dayBeforeIstDate: "2026-08-21",
   registrationClosesAtIso: null,
   eventKey: "java-fullstack-placement-drive",
+  venueLatitude: null,
+  venueLongitude: null,
   webhookUrl: "https://excelr.app.n8n.cloud/webhook/java-fsd-registration",
   whatsapp: {
     ...defaultWhatsAppConfig(),
@@ -138,6 +140,8 @@ export const MARATHAHALLI_OCT_2026_SEED: PlacementDriveConfig = {
   dayBeforeIstDate: "2026-10-08",
   registrationClosesAtIso: null,
   eventKey: "fsd-oct-2026",
+  venueLatitude: null,
+  venueLongitude: null,
   webhookUrl: "https://excelr.app.n8n.cloud/webhook/java-fsd-registration",
   whatsapp: {
     ...defaultWhatsAppConfig(),

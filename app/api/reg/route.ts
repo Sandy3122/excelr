@@ -34,6 +34,8 @@ import { firstNameFrom } from "@/lib/first-name";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/registration-window";
 import { driveWindowStatus } from "@/lib/registration-window-store";
 import { notifyRegistrationWebhook } from "@/lib/reg-webhook";
+import { getClientIp } from "@/lib/whatsapp-otp/http";
+import { formatGeoLocation, readRequestGeo } from "@/lib/geo";
 import { resolvePublicDrive } from "@/lib/drives/request";
 import { getDriveById, getDriveBySlug } from "@/lib/drives/store";
 import type { PlacementDrive } from "@/lib/drives/types";
@@ -169,6 +171,7 @@ export async function POST(req: Request) {
   // Use the normalized E.164 number everywhere downstream.
   if (phone) data.phone = phone.e164;
 
+  const geo = readRequestGeo(req, getClientIp(req));
   const ctx = driveScheduleContext(drive);
   const alertDetails = {
     Drive: drive.slug,
@@ -181,7 +184,7 @@ export async function POST(req: Request) {
   let savedId = "";
   let created = false;
   try {
-    const saved = await saveRegistration(drive, ctx, data, timestamp);
+    const saved = await saveRegistration(drive, ctx, data, timestamp, geo);
     savedId = saved.id;
     created = saved.created;
   } catch (err) {
@@ -234,7 +237,9 @@ export async function POST(req: Request) {
 
   // Email is required on every successful registration.
   try {
-    await sendEmails(drive, data, timestamp, { sendApplicant: sendWelcomeEmail });
+    await sendEmails(drive, data, timestamp, geo, {
+      sendApplicant: sendWelcomeEmail,
+    });
     if (savedId && sendWelcomeEmail) {
       await persistChannelDelivery(drive.id, savedId, "welcome", "email", {
         ...emptyChannelDelivery("sent"),
@@ -378,6 +383,7 @@ async function sendEmails(
   drive: PlacementDrive,
   data: RegistrationInput,
   timestamp: string,
+  geo: ReturnType<typeof readRequestGeo>,
   opts: { sendApplicant: boolean },
 ) {
   const from = registrationMailFrom();
@@ -403,9 +409,10 @@ async function sendEmails(
       `College:       ${data.college}`,
       `Qualification: ${data.qualification}`,
       `Page URL:      ${data.pageUrl}`,
+      `Location:      ${formatGeoLocation(geo) || "Unknown"}`,
       `Submitted:     ${timestamp}`,
     ].join("\n"),
-    html: adminHtml(drive, data, timestamp),
+    html: adminHtml(drive, data, timestamp, geo),
   });
 
   const applicantSend =
@@ -463,6 +470,7 @@ function adminHtml(
   drive: PlacementDrive,
   data: RegistrationInput,
   timestamp: string,
+  geo: ReturnType<typeof readRequestGeo>,
 ) {
   const row = (k: string, v: string) =>
     `<tr><td style="padding:6px 12px;color:#62748E;font:600 13px Arial;vertical-align:top">${k}</td>` +
@@ -478,6 +486,7 @@ function adminHtml(
       ${row("College", data.college)}
       ${row("Qualification", data.qualification)}
       ${row("Page URL", data.pageUrl)}
+      ${row("Location", formatGeoLocation(geo) || "Unknown")}
       ${row("Submitted", timestamp)}
     </table>
   </div>`;

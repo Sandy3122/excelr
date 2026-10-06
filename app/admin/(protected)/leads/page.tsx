@@ -29,6 +29,7 @@ import {
   type TableSortState,
 } from "@/lib/admin/table-sort";
 import { AUTOMATION_KINDS } from "@/lib/automations/types";
+import { distanceFromVenueKm, formatGeoLocation } from "@/lib/geo";
 import type { StoredRegistration } from "@/lib/firebase/registration-types";
 
 type LeadSortKey =
@@ -37,6 +38,8 @@ type LeadSortKey =
   | "phone"
   | "college"
   | "qualification"
+  | "location"
+  | "distance"
   | "registered"
   | "welcome"
   | "carry"
@@ -49,6 +52,8 @@ const LEAD_SORT_OPTIONS: { key: LeadSortKey; label: string }[] = [
   { key: "phone", label: "Phone" },
   { key: "college", label: "College" },
   { key: "qualification", label: "Qualification" },
+  { key: "location", label: "Location" },
+  { key: "distance", label: "Distance (km)" },
   { key: "registered", label: "Registered" },
   { key: "welcome", label: "Welcome" },
   { key: "carry", label: "Carry" },
@@ -64,12 +69,16 @@ const KIND_SHORT = {
   reminder_event_day: "Event day",
 } as const;
 
-function leadSortValue(reg: StoredRegistration, key: LeadSortKey): unknown {
+type LeadRow = StoredRegistration & { distanceKm: number | null };
+
+function leadSortValue(reg: LeadRow, key: LeadSortKey): unknown {
   if (key === "name") return reg.fullName;
   if (key === "email") return reg.email;
   if (key === "phone") return reg.phone;
   if (key === "college") return reg.college;
   if (key === "qualification") return reg.qualification;
+  if (key === "location") return formatGeoLocation(reg.geo ?? null) || null;
+  if (key === "distance") return reg.distanceKm;
   if (key === "registered") return dateSortValue(reg.submittedAt || reg.submittedAtIso);
   if (key === "welcome") return statusSortValue(leadChannelStatus(reg, "welcome", "whatsapp"));
   if (key === "carry") {
@@ -89,7 +98,7 @@ function registeredLabel(reg: StoredRegistration) {
 
 export default function AdminLeadsPage() {
   const { driveId, drive } = useAdminDrive();
-  const { leads, loading, error } = useAllLeads();
+  const { leads: rawLeads, loading, error } = useAllLeads();
   const [filters, setFilters] = useState<LeadFilters>(EMPTY_LEAD_FILTERS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -98,6 +107,17 @@ export default function AdminLeadsPage() {
   // Which channels each automation uses comes from the selected drive, so a
   // campaign with email switched off never renders an email badge.
   const automationView = drive?.automations ?? DEFAULT_AUTOMATION_VIEW;
+
+  // Distance depends on the selected drive's venue, so it is derived here
+  // rather than stored on each lead.
+  const leads: LeadRow[] = useMemo(
+    () =>
+      rawLeads.map((l) => ({
+        ...l,
+        distanceKm: distanceFromVenueKm(l.geo ?? null, drive),
+      })),
+    [rawLeads, drive],
+  );
 
   const colleges = useMemo(() => uniqueColleges(leads), [leads]);
   const qualifications = useMemo(() => uniqueQualifications(leads), [leads]);
@@ -208,7 +228,7 @@ export default function AdminLeadsPage() {
 
       <div className="hidden min-w-0 overflow-hidden rounded-2xl bg-white shadow-card lg:block">
         <div className="overflow-x-auto">
-          <table className="min-w-[1280px] w-full text-left text-sm">
+          <table className="min-w-[1500px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="whitespace-nowrap px-4 py-3">S.No</th>
@@ -226,7 +246,7 @@ export default function AdminLeadsPage() {
             <tbody>
               {loading
                 ? Array.from({ length: Math.min(pageSize, 25) }).map((_, i) => (
-                    <TableRowSkeleton key={i} cols={11} />
+                    <TableRowSkeleton key={i} cols={13} />
                   ))
                 : pageItems.map((r, i) => (
                     <tr key={r.id} className="border-t border-slate-100">
@@ -238,6 +258,10 @@ export default function AdminLeadsPage() {
                       <td className="whitespace-nowrap px-4 py-3">{r.phone}</td>
                       <td className="px-4 py-3">{r.college}</td>
                       <td className="whitespace-nowrap px-4 py-3">{r.qualification || "—"}</td>
+                      <td className="px-4 py-3">{formatGeoLocation(r.geo ?? null) || "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 tabular-nums">
+                        {r.distanceKm != null ? `${r.distanceKm} km` : "—"}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-muted">
                         {registeredLabel(r)}
                       </td>
@@ -278,7 +302,7 @@ function LeadMobileCard({
   serial,
   automationView,
 }: {
-  lead: StoredRegistration;
+  lead: LeadRow;
   serial: number;
   automationView: DriveAutomationView;
 }) {
@@ -306,6 +330,13 @@ function LeadMobileCard({
         <div>
           <dt className="text-xs uppercase tracking-wide text-faint">College</dt>
           <dd>{lead.college || "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-faint">Location</dt>
+          <dd>
+            {formatGeoLocation(lead.geo ?? null) || "—"}
+            {lead.distanceKm != null ? ` · ~${lead.distanceKm} km from venue` : ""}
+          </dd>
         </div>
         <div>
           <dt className="text-xs uppercase tracking-wide text-faint">Registered</dt>

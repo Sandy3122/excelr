@@ -228,6 +228,26 @@ export default function DriveConfigPage({
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <Text
+                label="Venue latitude"
+                help="Used to show how far each registrant's IP location is from the venue. Right-click the venue in Google Maps and click the coordinates to copy them. Example: 12.9166."
+                type="number"
+                value={config.venueLatitude == null ? "" : String(config.venueLatitude)}
+                onChange={(v) =>
+                  patch({ venueLatitude: v.trim() === "" || isNaN(Number(v)) ? null : Number(v) })
+                }
+              />
+              <Text
+                label="Venue longitude"
+                help="Second half of the coordinates from Google Maps. Example: 77.6101."
+                type="number"
+                value={config.venueLongitude == null ? "" : String(config.venueLongitude)}
+                onChange={(v) =>
+                  patch({ venueLongitude: v.trim() === "" || isNaN(Number(v)) ? null : Number(v) })
+                }
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Text
                 label="Event day (IST)"
                   help="The day the drive runs. Drives the cutoffs, the quiet-hours exemption, and auto-closes registrations once it has passed. Example: 09/10/2026."
                 type="date"
