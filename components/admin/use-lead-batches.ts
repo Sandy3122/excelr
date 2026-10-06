@@ -12,10 +12,12 @@ interface LeadsResponse {
   total?: number;
 }
 
+const AUTO_LOAD_CAP = 10_000;
+
 /**
- * Leads for one drive, loaded in batches. The first batch loads on entry; the
- * next is fetched fresh from the server when the user reaches the end of what
- * is loaded. The batch size is the drive's `leadFetchSize` setting.
+ * Leads for one drive, loaded in batches. The first batch loads on entry so
+ * the page is usable immediately, then the rest stream in batch by batch in the
+ * background. The batch size is the drive's `leadFetchSize` setting.
  */
 export function useLeadBatches() {
   const { driveId, drive } = useAdminDrive();
@@ -75,6 +77,7 @@ export function useLeadBatches() {
     if (!cursor || busyMore.current) return;
     busyMore.current = true;
     setLoadingMore(true);
+    setError("");
     const gen = generation.current;
     try {
       const json = await fetchBatch(cursor);
@@ -96,6 +99,16 @@ export function useLeadBatches() {
       }
     }
   }, [fetchBatch]);
+
+  // Keep pulling batches in the background until everything is loaded, so
+  // search and filters end up covering every lead without the user waiting on
+  // one big request. Stops on error (shown on the page) and past a safety cap;
+  // beyond the cap the next batch loads when the user reaches the last page.
+  useEffect(() => {
+    if (nextCursor && !loading && !loadingMore && !error && leads.length < AUTO_LOAD_CAP) {
+      void loadMore();
+    }
+  }, [nextCursor, loading, loadingMore, error, leads.length, loadMore]);
 
   useEffect(() => {
     // Empty the list straight away so another drive's leads never linger.

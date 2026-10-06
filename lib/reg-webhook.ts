@@ -1,5 +1,11 @@
 import { firstNameFrom } from "@/lib/first-name";
 import type { RegistrationInput } from "@/lib/reg-schema";
+import {
+  distanceFromVenueKm,
+  formatGeoLocation,
+  geoMapsUrl,
+  type RegistrationGeo,
+} from "@/lib/geo";
 import type { PlacementDrive } from "@/lib/drives/types";
 
 const WEBHOOK_TIMEOUT_MS = 4_000;
@@ -13,11 +19,16 @@ export function registrationWebhookUrl(drive: PlacementDrive): string {
 }
 
 export function buildRegistrationWebhookPayload(input: {
-  drive: Pick<PlacementDrive, "id" | "slug" | "name" | "eventKey">;
+  drive: Pick<
+    PlacementDrive,
+    "id" | "slug" | "name" | "eventKey" | "venueLatitude" | "venueLongitude"
+  >;
   id: string;
   data: RegistrationInput;
   submittedAt: string;
+  geo?: RegistrationGeo | null;
 }) {
+  const geo = input.geo ?? null;
   return {
     source: "excelr-placement-drive",
     event: input.drive.eventKey,
@@ -33,6 +44,17 @@ export function buildRegistrationWebhookPayload(input: {
     qualification: input.data.qualification,
     pageUrl: input.data.pageUrl,
     submittedAt: input.submittedAt,
+    // Where the registrant was. "gps" is accurate; "ip" is a rough network guess.
+    location: formatGeoLocation(geo) || null,
+    city: geo?.city ?? null,
+    region: geo?.region ?? null,
+    country: geo?.country ?? null,
+    latitude: geo?.latitude ?? null,
+    longitude: geo?.longitude ?? null,
+    locationSource: geo ? (geo.source === "device" ? "gps" : "ip") : null,
+    locationAccuracyMeters: geo?.accuracyMeters ?? null,
+    mapUrl: geoMapsUrl(geo) || null,
+    distanceFromVenueKm: distanceFromVenueKm(geo, input.drive),
   };
 }
 
@@ -45,6 +67,7 @@ export async function notifyRegistrationWebhook(input: {
   id: string;
   data: RegistrationInput;
   submittedAt: string;
+  geo?: RegistrationGeo | null;
 }): Promise<void> {
   const url = registrationWebhookUrl(input.drive);
   if (!url) return;

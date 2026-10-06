@@ -35,7 +35,14 @@ import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/registration-window";
 import { driveWindowStatus } from "@/lib/registration-window-store";
 import { notifyRegistrationWebhook } from "@/lib/reg-webhook";
 import { getClientIp } from "@/lib/whatsapp-otp/http";
-import { applyDeviceLocation, formatGeoLocation, readRequestGeo } from "@/lib/geo";
+import {
+  applyDeviceLocation,
+  formatGeoCoordinates,
+  formatGeoLocation,
+  formatGeoSource,
+  geoMapsUrl,
+  readRequestGeo,
+} from "@/lib/geo";
 import { resolvePublicDrive } from "@/lib/drives/request";
 import { getDriveById, getDriveBySlug } from "@/lib/drives/store";
 import type { PlacementDrive } from "@/lib/drives/types";
@@ -219,6 +226,7 @@ export async function POST(req: Request) {
       id: savedId,
       data,
       submittedAt: timestamp,
+      geo,
     });
   }
 
@@ -414,6 +422,9 @@ async function sendEmails(
       `Qualification: ${data.qualification}`,
       `Page URL:      ${data.pageUrl}`,
       `Location:      ${formatGeoLocation(geo) || "Unknown"}`,
+      `Lat, Long:     ${formatGeoCoordinates(geo) || "Unknown"}`,
+      `Location from: ${formatGeoSource(geo)}`,
+      ...(geoMapsUrl(geo) ? [`Map:           ${geoMapsUrl(geo)}`] : []),
       `Submitted:     ${timestamp}`,
     ].join("\n"),
     html: adminHtml(drive, data, timestamp, geo),
@@ -491,6 +502,9 @@ function adminHtml(
       ${row("Qualification", data.qualification)}
       ${row("Page URL", data.pageUrl)}
       ${row("Location", formatGeoLocation(geo) || "Unknown")}
+      ${row("Lat, Long", formatGeoCoordinates(geo) || "Unknown")}
+      ${row("Location from", formatGeoSource(geo))}
+      ${geoMapsUrl(geo) ? row("Map", geoMapsUrl(geo)) : ""}
       ${row("Submitted", timestamp)}
     </table>
   </div>`;

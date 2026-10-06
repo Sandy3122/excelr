@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, Trash2 } from "lucide-react";
+import { Download, Loader2, Trash2 } from "lucide-react";
 import { DeliveryBadge } from "@/components/admin/delivery-badge";
 import { AdminPagination } from "@/components/admin/pagination";
 import { LeadsPageSkeleton, TableRowSkeleton } from "@/components/admin/skeleton";
@@ -171,6 +171,12 @@ export default function AdminLeadsPage() {
     [filtered, sort],
   );
 
+  // While batches are still arriving, an empty result may just mean "not
+  // loaded yet", so say so rather than claiming there are no matches.
+  const emptyMessage = hasMore
+    ? `No match yet in the ${leads.length} leads loaded so far. Still searching the remaining ${Math.max(0, total - leads.length)}…`
+    : "No leads match these filters.";
+
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize) || 1);
   const safePage = Math.min(page, totalPages);
   const pageItems = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
@@ -197,7 +203,15 @@ export default function AdminLeadsPage() {
           <h1 className="font-heading text-2xl font-bold text-navy-900 sm:text-3xl">Leads</h1>
           <p className="mt-1 text-sm text-muted sm:text-base">
             {total} registered candidate{total === 1 ? "" : "s"}
-            {hasMore ? ` · ${leads.length} loaded` : ""}
+            {hasMore ? (
+              <span className="inline-flex items-center gap-1.5">
+                {" · "}
+                {loadingMore || loading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : null}
+                {leads.length} loaded
+              </span>
+            ) : null}
           </p>
         </div>
         <a
@@ -236,11 +250,24 @@ export default function AdminLeadsPage() {
       />
 
       {hasMore ? (
-        <p className="rounded-xl bg-slate-50 px-4 py-2 text-xs text-muted">
-          Showing the {leads.length} most recent of {total} leads. Search, filters and
-          sorting apply to the loaded leads; more load automatically as you go to the
-          last page.
-        </p>
+        <div className="rounded-xl bg-slate-50 px-4 py-3" role="status" aria-live="polite">
+          <div className="flex items-center gap-2 text-xs text-muted">
+            {loadingMore || loading ? (
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+            ) : null}
+            <span>
+              {loadingMore || loading
+                ? `Loading leads… ${leads.length} of ${total}. Search and filters update as more arrive.`
+                : `Loaded ${leads.length} of ${total} leads. More load as you go to the last page.`}
+            </span>
+          </div>
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-brand-blue transition-all duration-300"
+              style={{ width: `${total ? Math.min(100, (leads.length / total) * 100) : 0}%` }}
+            />
+          </div>
+        </div>
       ) : null}
 
       {error ? (
@@ -263,7 +290,7 @@ export default function AdminLeadsPage() {
             ))}
         {!loading && filtered.length === 0 ? (
           <p className="rounded-2xl bg-white p-4 text-sm text-muted shadow-card">
-            No leads match these filters.
+            {emptyMessage}
           </p>
         ) : null}
         <div className="overflow-hidden rounded-2xl bg-white shadow-card">
@@ -272,7 +299,7 @@ export default function AdminLeadsPage() {
             pageSize={pageSize}
             total={filtered.length}
             hasNext={safePage < totalPages || hasMore}
-            disabled={loading || loadingMore}
+            disabled={loading}
             onPageChange={handlePageChange}
             onPageSizeChange={setPageSize}
           />
@@ -357,7 +384,7 @@ export default function AdminLeadsPage() {
         </div>
         {!loading && filtered.length === 0 ? (
           <p className="border-t border-slate-100 p-4 text-sm text-muted">
-            No leads match these filters.
+            {emptyMessage}
           </p>
         ) : null}
         <AdminPagination
@@ -365,7 +392,7 @@ export default function AdminLeadsPage() {
           pageSize={pageSize}
           total={filtered.length}
           hasNext={safePage < totalPages || hasMore}
-          disabled={loading || loadingMore}
+          disabled={loading}
           onPageChange={handlePageChange}
           onPageSizeChange={setPageSize}
         />

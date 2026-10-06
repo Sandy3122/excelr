@@ -183,3 +183,26 @@ export async function applyDeviceLocation(
     timezone: ipGeo.timezone,
   };
 }
+
+/** "16.98710, 82.24750" for emails and sheets; empty when unknown. */
+export function formatGeoCoordinates(geo: RegistrationGeo | null): string {
+  if (!geo || geo.latitude == null || geo.longitude == null) return "";
+  return `${geo.latitude.toFixed(5)}, ${geo.longitude.toFixed(5)}`;
+}
+
+/** Human label for where the location came from. */
+export function formatGeoSource(geo: RegistrationGeo | null): string {
+  if (!geo || !hasGeoLocation(geo)) return "Unknown";
+  if (geo.source === "device") {
+    return geo.accuracyMeters != null
+      ? `GPS (accurate to ~${geo.accuracyMeters} m)`
+      : "GPS";
+  }
+  return "IP address (approximate)";
+}
+
+/** Google Maps link for the coordinates, or empty when unknown. */
+export function geoMapsUrl(geo: RegistrationGeo | null): string {
+  if (!geo || geo.latitude == null || geo.longitude == null) return "";
+  return `https://www.google.com/maps?q=${geo.latitude},${geo.longitude}`;
+}
