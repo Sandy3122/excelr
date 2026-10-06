@@ -156,6 +156,11 @@ export const driveConfigSchema = z.object({
    * Venue coordinates. Used to show how far each registrant's IP location is
    * from the venue. Null until an admin sets them; existing drives default to null.
    */
+  /**
+   * Safety switch: lead deletion is hidden and rejected unless this is on.
+   * Off by default and meant to be enabled only for testing or clean-ups.
+   */
+  allowLeadDeletion: z.boolean().default(false),
   venueLatitude: z.number().min(-90).max(90).nullable().default(null),
   venueLongitude: z.number().min(-180).max(180).nullable().default(null),
   /** Per-drive n8n webhook. Empty string disables it. */
@@ -186,6 +191,7 @@ export interface PlacementDriveSummary {
   eventDayIstDate: string | null;
   venueLatitude: number | null;
   venueLongitude: number | null;
+  allowLeadDeletion: boolean;
   automations: Record<AutomationKind, { enabled: boolean; channels: Channel[] }>;
 }
 
@@ -199,6 +205,7 @@ export function toDriveSummary(drive: PlacementDrive): PlacementDriveSummary {
     eventDayIstDate: drive.eventDayIstDate,
     venueLatitude: drive.venueLatitude,
     venueLongitude: drive.venueLongitude,
+    allowLeadDeletion: drive.allowLeadDeletion,
     automations: Object.fromEntries(
       AUTOMATION_KINDS.map((kind) => [
         kind,
@@ -329,6 +336,7 @@ export function defaultDriveConfig(input: {
     dayBeforeIstDate,
     registrationClosesAtIso: null,
     eventKey: input.slug,
+    allowLeadDeletion: false,
     venueLatitude: null,
     venueLongitude: null,
     webhookUrl: "",

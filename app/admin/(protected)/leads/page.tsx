@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Trash2 } from "lucide-react";
 import { DeliveryBadge } from "@/components/admin/delivery-badge";
 import { AdminPagination } from "@/components/admin/pagination";
 import { LeadsPageSkeleton, TableRowSkeleton } from "@/components/admin/skeleton";
 import { LeadFilterBar } from "@/components/admin/lead-filter-bar";
 import { SortableTh, TableSortSelect } from "@/components/admin/sortable-th";
-import { useAllLeads } from "@/components/admin/use-all-leads";
+import { clearAdminFetchCache } from "@/components/admin/fetch-json";
+import { invalidateLeadsCache, useAllLeads } from "@/components/admin/use-all-leads";
 import { useAdminDrive, withDrive } from "@/components/admin/drive-context";
 import {
   EMPTY_LEAD_FILTERS,
@@ -98,7 +99,37 @@ function registeredLabel(reg: StoredRegistration) {
 
 export default function AdminLeadsPage() {
   const { driveId, drive } = useAdminDrive();
-  const { leads: rawLeads, loading, error } = useAllLeads();
+  const { leads: rawLeads, loading, error, reload } = useAllLeads();
+  const canDelete = drive?.allowLeadDeletion ?? false;
+  const [toDelete, setToDelete] = useState<LeadRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function confirmDelete() {
+    if (!toDelete) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const res = await fetch(
+        withDrive(`/api/admin/leads?id=${encodeURIComponent(toDelete.id)}`, driveId),
+        { method: "DELETE" },
+      );
+      const json = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        setDeleteError(json.error || "Could not delete the lead.");
+        return;
+      }
+      setToDelete(null);
+      invalidateLeadsCache();
+      // Overview counts are cached in the browser too.
+      clearAdminFetchCache();
+      await reload(true).catch(() => {});
+    } catch {
+      setDeleteError("Could not delete the lead.");
+    } finally {
+      setDeleting(false);
+    }
+  }
   const [filters, setFilters] = useState<LeadFilters>(EMPTY_LEAD_FILTERS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -206,6 +237,7 @@ export default function AdminLeadsPage() {
                 lead={r}
                 serial={(safePage - 1) * pageSize + i + 1}
                 automationView={automationView}
+                onDelete={canDelete ? () => setToDelete(r) : undefined}
               />
             ))}
         {!loading && filtered.length === 0 ? (
@@ -241,12 +273,13 @@ export default function AdminLeadsPage() {
                     onSort={(column) => setSort((prev) => nextTableSort(prev, column))}
                   />
                 ))}
+                {canDelete ? <th className="px-4 py-3">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading
                 ? Array.from({ length: Math.min(pageSize, 25) }).map((_, i) => (
-                    <TableRowSkeleton key={i} cols={13} />
+                    <TableRowSkeleton key={i} cols={canDelete ? 14 : 13} />
                   ))
                 : pageItems.map((r, i) => (
                     <tr key={r.id} className="border-t border-slate-100">
@@ -258,7 +291,25 @@ export default function AdminLeadsPage() {
                       <td className="whitespace-nowrap px-4 py-3">{r.phone}</td>
                       <td className="px-4 py-3">{r.college}</td>
                       <td className="whitespace-nowrap px-4 py-3">{r.qualification || "—"}</td>
-                      <td className="px-4 py-3">{formatGeoLocation(r.geo ?? null) || "—"}</td>
+                      <td className="px-4 py-3">
+                        {formatGeoLocation(r.geo ?? null) || "—"}
+                        {r.geo ? (
+                          <span
+                            className={`ml-1.5 rounded px-1 py-0.5 text-[10px] font-semibold uppercase ${
+                              r.geo.source === "device"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-amber-50 text-amber-700"
+                            }`}
+                            title={
+                              r.geo.source === "device"
+                                ? "GPS location allowed by the user"
+                                : "Approximate, from IP address"
+                            }
+                          >
+                            {r.geo.source === "device" ? "GPS" : "IP"}
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 tabular-nums">
                         {r.distanceKm != null ? `${r.distanceKm} km` : "—"}
                       </td>
@@ -273,6 +324,11 @@ export default function AdminLeadsPage() {
                           />
                         </td>
                       ))}
+                      {canDelete ? (
+                        <td className="px-4 py-3">
+                          <DeleteLeadButton onClick={() => setToDelete(r)} />
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
             </tbody>
@@ -293,7 +349,72 @@ export default function AdminLeadsPage() {
           onPageSizeChange={setPageSize}
         />
       </div>
+
+      {toDelete ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-lead-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-card-lg sm:p-6">
+            <h2 id="delete-lead-title" className="font-heading text-lg font-bold text-red-700">
+              Delete this lead permanently?
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              This removes the registration from the database and cannot be undone.
+              The same phone number and email will be able to register again.
+            </p>
+            <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm">
+              <p className="font-semibold text-ink">{toDelete.fullName}</p>
+              <p className="break-all text-muted">{toDelete.email}</p>
+              <p className="text-muted">{toDelete.phone}</p>
+            </div>
+            {deleteError ? (
+              <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                {deleteError}
+              </p>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => {
+                  setToDelete(null);
+                  setDeleteError("");
+                }}
+                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-navy-900 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void confirmDelete()}
+                className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {deleting ? "Deleting…" : "Delete permanently"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function DeleteLeadButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Delete lead"
+      title="Delete lead"
+      className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+      Delete
+    </button>
   );
 }
 
@@ -301,16 +422,21 @@ function LeadMobileCard({
   lead,
   serial,
   automationView,
+  onDelete,
 }: {
   lead: LeadRow;
   serial: number;
   automationView: DriveAutomationView;
+  onDelete?: () => void;
 }) {
   return (
     <article className="rounded-2xl bg-white p-4 shadow-card">
       <div className="flex items-start gap-2">
         <span className="mt-0.5 text-sm tabular-nums text-muted">{serial}.</span>
-        <h2 className="font-heading text-base font-bold text-navy-900">{lead.fullName}</h2>
+        <h2 className="min-w-0 flex-1 font-heading text-base font-bold text-navy-900">
+          {lead.fullName}
+        </h2>
+        {onDelete ? <DeleteLeadButton onClick={onDelete} /> : null}
       </div>
       <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
         <div>
@@ -335,6 +461,7 @@ function LeadMobileCard({
           <dt className="text-xs uppercase tracking-wide text-faint">Location</dt>
           <dd>
             {formatGeoLocation(lead.geo ?? null) || "—"}
+            {lead.geo ? ` (${lead.geo.source === "device" ? "GPS" : "approx. IP"})` : ""}
             {lead.distanceKm != null ? ` · ~${lead.distanceKm} km from venue` : ""}
           </dd>
         </div>

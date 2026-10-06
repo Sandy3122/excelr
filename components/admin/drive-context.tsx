@@ -20,6 +20,7 @@ export interface DriveSummary {
   eventDayIstDate: string | null;
   venueLatitude: number | null;
   venueLongitude: number | null;
+  allowLeadDeletion: boolean;
   /** Per-automation channels, so the UI never guesses which kinds send email. */
   automations: Record<AutomationKind, { enabled: boolean; channels: Channel[] }>;
   issues?: string[];

@@ -120,6 +120,11 @@ function buildRetryPatch(
     ...record,
     updatedAt: FieldValue.serverTimestamp(),
   };
+  // A retry without GPS (permission denied this time) must not downgrade a
+  // location already captured from the device.
+  if (existing?.geo?.source === "device" && record.geo?.source !== "device") {
+    delete patch.geo;
+  }
   if (existing?.messages) return patch;
 
   const submittedIso = String(existing?.submittedAtIso || timestamp);
@@ -318,6 +323,32 @@ export async function getRegistrationsByIds(
     }
   }
   return out;
+}
+
+/**
+ * Permanently remove a lead and its email-uniqueness entry, so the same phone
+ * and email can register again. Returns false when the lead does not exist.
+ */
+export async function deleteRegistration(
+  driveId: string,
+  id: string,
+): Promise<boolean> {
+  const ref = driveRegistrationsCol(driveId).doc(id);
+  return getAdminFirestore().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+    const emailLower = String(snap.data()?.emailLower || "");
+    if (emailLower) {
+      const emailRef = emailLookupRef(driveId, emailLower);
+      const emailSnap = await tx.get(emailRef);
+      // Only drop the lookup if it points at this lead.
+      if (emailSnap.exists && emailSnap.data()?.registrationId === id) {
+        tx.delete(emailRef);
+      }
+    }
+    tx.delete(ref);
+    return true;
+  });
 }
 
 export async function updateRegistrationFields(

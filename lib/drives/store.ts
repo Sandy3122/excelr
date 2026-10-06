@@ -294,6 +294,17 @@ export async function setDriveRegistrationWindow(
   invalidateDriveCache();
 }
 
+export async function setDriveLeadDeletion(
+  driveId: string,
+  allow: boolean,
+): Promise<void> {
+  await driveRef(driveId).set(
+    { allowLeadDeletion: allow, updatedAt: new Date().toISOString() },
+    { merge: true },
+  );
+  invalidateDriveCache();
+}
+
 /** Used by the migration script to seed a drive at a known id. */
 export async function upsertDriveAtId(
   driveId: string,

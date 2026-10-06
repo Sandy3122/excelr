@@ -36,6 +36,7 @@ export async function GET(req: Request) {
       "region",
       "country",
       "distanceFromVenueKm",
+      "locationSource",
       "ip",
       "submittedAt",
       ...extraHeaders,
@@ -55,6 +56,7 @@ export async function GET(req: Request) {
         r.geo?.region ?? "",
         r.geo?.country ?? "",
         String(distanceFromVenueKm(r.geo ?? null, drive) ?? ""),
+        r.geo ? (r.geo.source === "device" ? "gps" : "ip") : "",
         r.geo?.ip ?? "",
         r.submittedAt || r.submittedAtIso || "",
       ];

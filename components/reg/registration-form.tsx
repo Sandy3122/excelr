@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,6 +11,35 @@ import WhatsAppPhoneField from "./whatsapp-phone-field";
 import OtpVerificationModal from "./otp-verification-modal";
 import { RegistrationClosedNotice } from "./registration-closed";
 import { useRegEvent } from "./reg-event-context";
+
+type DeviceLocation = { latitude: number; longitude: number; accuracy: number | null };
+
+/** Ask the browser for a GPS fix. Resolves null if denied, unsupported or slow. */
+function requestDeviceLocation(): Promise<DeviceLocation | null> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    // The browser's own timeout doesn't count time spent on the permission
+    // prompt, so cap the wait ourselves.
+    const giveUp = setTimeout(() => resolve(null), 8000);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        clearTimeout(giveUp);
+        resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy ?? null,
+        });
+      },
+      () => {
+        clearTimeout(giveUp);
+        resolve(null);
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
+    );
+  });
+}
 
 type Status = "idle" | "awaiting-otp" | "submitting" | "error";
 
@@ -61,15 +90,22 @@ export default function RegistrationForm({
 
   const phoneValue = watch("phone") || "";
 
+  // GPS fix requested on the submit click (a user gesture, so the browser will
+  // prompt). It resolves while the user completes the OTP step. Declined or
+  // unavailable → null, and the server falls back to the IP location.
+  const locationRef = useRef<Promise<DeviceLocation | null>>(Promise.resolve(null));
+
   const registerUser = useCallback(
     async (values: RegistrationFormInput, { keepModal = false } = {}) => {
       if (closed) return;
       setStatus("submitting");
       setServerError(null);
+      const deviceLocation = await locationRef.current;
       const payload: RegistrationInput = {
         ...values,
         driveSlug,
         pageUrl: currentPageUrl(),
+        ...(deviceLocation ? { deviceLocation } : {}),
       };
       try {
         const res = await fetch("/api/reg", {
@@ -116,6 +152,7 @@ export default function RegistrationForm({
   const onSubmit = async (values: RegistrationFormInput) => {
     if (closed) return;
     setServerError(null);
+    locationRef.current = requestDeviceLocation();
 
     // If this number was already verified (e.g. register failed after OTP),
     // skip the OTP step and submit directly.

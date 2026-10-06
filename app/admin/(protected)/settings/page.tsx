@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { useEffect, useState } from "react";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Trash2 } from "lucide-react";
 import { fetchAdminJson } from "@/components/admin/fetch-json";
 import { useAdminDrive, withDrive } from "@/components/admin/drive-context";
 import { utcIsoToIstDateTime } from "@/lib/registration-window";
@@ -17,7 +17,10 @@ interface WindowResponse {
 }
 
 export default function AdminSettingsPage() {
-  const { driveId } = useAdminDrive();
+  const { driveId, reload: reloadDrives } = useAdminDrive();
+  const [allowDelete, setAllowDelete] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("18:00");
   const [status, setStatus] = useState<WindowResponse | null>(null);
@@ -49,6 +52,55 @@ export default function AdminSettingsPage() {
       setBusy("");
     }
   }
+
+  async function loadDeletion() {
+    if (!driveId) return;
+    try {
+      const json = await fetchAdminJson<{ ok: boolean; allowLeadDeletion?: boolean }>(
+        withDrive("/api/admin/lead-deletion", driveId),
+        { fresh: true },
+      );
+      if (json.ok) setAllowDelete(Boolean(json.allowLeadDeletion));
+    } catch {
+      /* the toggle stays off */
+    }
+  }
+
+  async function saveDeletion(allow: boolean) {
+    if (
+      allow &&
+      !window.confirm(
+        "Allow deleting leads for this drive? Admins will see a Delete button on every lead. Deleted leads cannot be recovered.",
+      )
+    ) {
+      return;
+    }
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      const res = await fetch(withDrive("/api/admin/lead-deletion", driveId), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allow }),
+      });
+      const json = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        setDeleteError(json.error || "Could not save the setting.");
+        return;
+      }
+      setAllowDelete(allow);
+      await reloadDrives();
+    } catch {
+      setDeleteError("Could not save the setting.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadDeletion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driveId]);
 
   useEffect(() => {
     void load();
@@ -217,6 +269,43 @@ export default function AdminSettingsPage() {
             </div>
           </>
         )}
+      </section>
+      <section className="rounded-2xl bg-white p-5 shadow-card sm:p-6">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-700">
+            <Trash2 className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-heading text-lg font-bold">Allow deleting leads</h2>
+            <p className="mt-1 text-sm text-muted">
+              When on, a Delete button appears on every lead for this drive. Deleting
+              removes the lead permanently so the same phone and email can register
+              again. Keep this off unless you are testing or cleaning up.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={allowDelete}
+            aria-label="Allow deleting leads"
+            disabled={deleteBusy || !driveId}
+            onClick={() => void saveDeletion(!allowDelete)}
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+              allowDelete ? "bg-red-600" : "bg-slate-300"
+            }`}
+          >
+            <span
+              className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                allowDelete ? "translate-x-5" : ""
+              }`}
+            />
+          </button>
+        </div>
+        {deleteError ? (
+          <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+            {deleteError}
+          </p>
+        ) : null}
       </section>
     </div>
   );

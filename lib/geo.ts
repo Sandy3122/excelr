@@ -6,6 +6,10 @@
  */
 
 export interface RegistrationGeo {
+  /** "device" = browser GPS the user allowed; "ip" = approximate, from the IP. */
+  source: "device" | "ip";
+  /** GPS accuracy radius in metres (device only). */
+  accuracyMeters: number | null;
   ip: string | null;
   city: string | null;
   region: string | null;
@@ -37,6 +41,8 @@ function num(value: string | null): number | null {
 export function readRequestGeo(req: Request, ip: string | null): RegistrationGeo {
   const h = req.headers;
   return {
+    source: "ip",
+    accuracyMeters: null,
     ip,
     city: clean(h.get("x-vercel-ip-city")),
     region: clean(h.get("x-vercel-ip-country-region")),
@@ -55,6 +61,8 @@ export function parseGeo(raw: unknown): RegistrationGeo | null {
   const str = (v: unknown) => (typeof v === "string" && v ? v : null);
   const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
   return {
+    source: d.source === "device" ? "device" : "ip",
+    accuracyMeters: n(d.accuracyMeters),
     ip: str(d.ip),
     city: str(d.city),
     region: str(d.region),
@@ -68,12 +76,20 @@ export function parseGeo(raw: unknown): RegistrationGeo | null {
 
 /** True when the lookup produced nothing useful (local dev, private IPs). */
 export function hasGeoLocation(geo: RegistrationGeo | null): boolean {
-  return !!geo && !!(geo.city || geo.region || geo.country);
+  return (
+    !!geo &&
+    !!(geo.city || geo.region || geo.country || geo.latitude != null)
+  );
 }
 
 export function formatGeoLocation(geo: RegistrationGeo | null): string {
   if (!geo) return "";
-  return [geo.city, geo.region, geo.country].filter(Boolean).join(", ");
+  const named = [geo.city, geo.region, geo.country].filter(Boolean).join(", ");
+  if (named) return named;
+  if (geo.latitude != null && geo.longitude != null) {
+    return `${geo.latitude.toFixed(3)}, ${geo.longitude.toFixed(3)}`;
+  }
+  return "";
 }
 
 /** Straight-line distance in km between two points (haversine). */
@@ -108,4 +124,62 @@ export function distanceFromVenueKm(
       { lat: geo.latitude, lng: geo.longitude },
     ),
   );
+}
+
+export interface DeviceLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+}
+
+/**
+ * Name a GPS fix via OpenStreetMap Nominatim. Best effort: any failure or
+ * timeout returns blanks and the coordinates alone still drive the distance.
+ */
+export async function reverseGeocode(
+  lat: number,
+  lng: number,
+): Promise<Pick<RegistrationGeo, "city" | "region" | "country" | "postalCode">> {
+  const blank = { city: null, region: null, country: null, postalCode: null };
+  try {
+    const url =
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&addressdetails=1` +
+      `&lat=${lat}&lon=${lng}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "excelr-placement-drive/1.0 (registration geo)" },
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!res.ok) return blank;
+    const a = ((await res.json()) as { address?: Record<string, string> }).address;
+    if (!a) return blank;
+    return {
+      city:
+        a.city || a.town || a.village || a.suburb || a.county || a.state_district || null,
+      region: a.state || null,
+      country: a.country_code ? a.country_code.toUpperCase() : null,
+      postalCode: a.postcode || null,
+    };
+  } catch {
+    return blank;
+  }
+}
+
+/** Replace the IP guess with the user's allowed GPS fix. */
+export async function applyDeviceLocation(
+  ipGeo: RegistrationGeo,
+  device: DeviceLocation,
+): Promise<RegistrationGeo> {
+  const named = await reverseGeocode(device.latitude, device.longitude);
+  return {
+    source: "device",
+    accuracyMeters:
+      device.accuracy != null && Number.isFinite(device.accuracy)
+        ? Math.round(device.accuracy)
+        : null,
+    ip: ipGeo.ip,
+    ...named,
+    latitude: device.latitude,
+    longitude: device.longitude,
+    timezone: ipGeo.timezone,
+  };
 }

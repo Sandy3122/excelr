@@ -50,6 +50,14 @@ export const registrationSchema = registrationFormSchema.extend({
     .min(1, "Page URL is required")
     .max(2048, "Page URL is too long")
     .url("Invalid page URL"),
+  /** Browser GPS fix, only present when the user allowed location access. */
+  deviceLocation: z
+    .object({
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+      accuracy: z.number().min(0).max(1_000_000).nullish(),
+    })
+    .nullish(),
 });
 
 export type RegistrationInput = z.infer<typeof registrationSchema>;

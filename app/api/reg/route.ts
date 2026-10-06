@@ -35,7 +35,7 @@ import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/registration-window";
 import { driveWindowStatus } from "@/lib/registration-window-store";
 import { notifyRegistrationWebhook } from "@/lib/reg-webhook";
 import { getClientIp } from "@/lib/whatsapp-otp/http";
-import { formatGeoLocation, readRequestGeo } from "@/lib/geo";
+import { applyDeviceLocation, formatGeoLocation, readRequestGeo } from "@/lib/geo";
 import { resolvePublicDrive } from "@/lib/drives/request";
 import { getDriveById, getDriveBySlug } from "@/lib/drives/store";
 import type { PlacementDrive } from "@/lib/drives/types";
@@ -171,7 +171,11 @@ export async function POST(req: Request) {
   // Use the normalized E.164 number everywhere downstream.
   if (phone) data.phone = phone.e164;
 
-  const geo = readRequestGeo(req, getClientIp(req));
+  const ipGeo = readRequestGeo(req, getClientIp(req));
+  // Prefer the user's allowed GPS fix; IP location is only a rough fallback.
+  const geo = data.deviceLocation
+    ? await applyDeviceLocation(ipGeo, data.deviceLocation)
+    : ipGeo;
   const ctx = driveScheduleContext(drive);
   const alertDetails = {
     Drive: drive.slug,
