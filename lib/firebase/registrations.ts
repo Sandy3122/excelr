@@ -224,6 +224,7 @@ export async function saveRegistration(
         : null,
       submittedAt: FieldValue.serverTimestamp(),
       createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     return { id, created: true, conflict: null };
   });
@@ -298,6 +299,30 @@ export async function listAllRegistrations(
     cursor = result.nextCursor;
   }
   return all;
+}
+
+/**
+ * Leads that are new or changed since `since` (delivery status updates and
+ * retries bump `updatedAt`; new leads carry `submittedAt`). Two single-field
+ * range queries so no composite index is needed. `truncated` means the change
+ * set hit the cap and the caller should do a full reload instead.
+ */
+export async function listRegistrationsChangedSince(
+  driveId: string,
+  since: Date,
+  cap = 500,
+): Promise<{ registrations: StoredRegistration[]; truncated: boolean }> {
+  const col = driveRegistrationsCol(driveId);
+  const [byUpdate, bySubmit] = await Promise.all([
+    col.where("updatedAt", ">", since).orderBy("updatedAt").limit(cap + 1).get(),
+    col.where("submittedAt", ">", since).orderBy("submittedAt").limit(cap + 1).get(),
+  ]);
+  const truncated = byUpdate.size > cap || bySubmit.size > cap;
+  const byId = new Map<string, StoredRegistration>();
+  for (const doc of [...byUpdate.docs.slice(0, cap), ...bySubmit.docs.slice(0, cap)]) {
+    byId.set(doc.id, serializeRegistration(driveId, doc.id, doc.data()));
+  }
+  return { registrations: [...byId.values()], truncated };
 }
 
 export async function countRegistrations(driveId: string): Promise<number> {

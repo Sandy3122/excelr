@@ -25,7 +25,7 @@ export function useAllLeads() {
   const [leads, setLeads] = useState<StoredRegistration[]>(
     memoryCache?.driveId === driveId ? memoryCache.leads : [],
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!(memoryCache?.driveId === driveId));
   const [error, setError] = useState("");
 
   const load = useCallback(async (fresh = false) => {
@@ -34,21 +34,19 @@ export function useAllLeads() {
       setLoading(false);
       return [];
     }
-    // Never leave another drive's leads on screen while this one loads.
-    if (memoryCache?.driveId !== driveId) setLeads([]);
-    if (
-      !fresh &&
-      memoryCache &&
-      memoryCache.driveId === driveId &&
-      Date.now() - memoryCache.at < CACHE_MS
-    ) {
-      setLeads(memoryCache.leads);
+    const cached = memoryCache?.driveId === driveId ? memoryCache : null;
+    if (cached) {
+      // Show what we already have straight away; refresh quietly if it is old.
+      setLeads(cached.leads);
       setLoading(false);
       setError("");
-      return memoryCache.leads;
+      if (!fresh && Date.now() - cached.at < CACHE_MS) return cached.leads;
+    } else {
+      // Never leave another drive's leads on screen while this one loads.
+      setLeads([]);
+      setLoading(true);
+      setError("");
     }
-    setLoading(true);
-    setError("");
     try {
       const res = await fetch(withDrive("/api/admin/leads?all=1", driveId));
       const json = (await res.json()) as LeadsResponse;

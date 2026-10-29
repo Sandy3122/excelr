@@ -26,6 +26,11 @@ function writeCache<T>(key: string, data: T): void {
   }
 }
 
+/** Last cached payload for a URL regardless of age, for show-stale-then-refresh. */
+export function peekAdminJson<T>(url: string): T | null {
+  return readCache<T>(url, Number.POSITIVE_INFINITY);
+}
+
 export function clearAdminFetchCache(urlPrefix?: string): void {
   try {
     const keys: string[] = [];

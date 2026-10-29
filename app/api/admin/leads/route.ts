@@ -7,6 +7,7 @@ import {
   deleteRegistration,
   getRegistrationById,
   listAllRegistrations,
+  listRegistrationsChangedSince,
   listRegistrations,
 } from "@/lib/firebase/registrations";
 
@@ -19,6 +20,7 @@ const querySchema = z.object({
   cursor: z.string().trim().min(1).max(256).optional(),
   id: z.string().trim().min(1).max(256).optional(),
   all: z.enum(["0", "1"]).optional(),
+  since: z.string().datetime().optional(),
 });
 
 export async function GET(req: Request) {
@@ -32,6 +34,7 @@ export async function GET(req: Request) {
     cursor: url.searchParams.get("cursor") ?? undefined,
     id: url.searchParams.get("id") ?? undefined,
     all: url.searchParams.get("all") === "1" ? "1" : undefined,
+    since: url.searchParams.get("since") ?? undefined,
   });
   if (!parsed.success) {
     return NextResponse.json(
@@ -50,6 +53,24 @@ export async function GET(req: Request) {
         );
       }
       return NextResponse.json({ ok: true, registration });
+    }
+
+    // Incremental refresh: only leads that are new or changed since the last
+    // sync, plus the live total so the client can spot deletions made elsewhere.
+    if (parsed.data.since) {
+      const serverTime = new Date().toISOString();
+      const [changed, total] = await Promise.all([
+        listRegistrationsChangedSince(driveId, new Date(parsed.data.since)),
+        countRegistrations(driveId),
+      ]);
+      return NextResponse.json({
+        ok: true,
+        placementDriveId: driveId,
+        registrations: changed.registrations,
+        truncated: changed.truncated,
+        total,
+        serverTime,
+      });
     }
 
     if (parsed.data.all === "1") {
@@ -74,6 +95,7 @@ export async function GET(req: Request) {
       ok: true,
       placementDriveId: driveId,
       ...result,
+      serverTime: new Date().toISOString(),
       ...(typeof total === "number" ? { total } : {}),
     });
   } catch (err) {

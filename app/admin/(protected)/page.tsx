@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { OverviewSkeleton, Skeleton, TableRowSkeleton } from "@/components/admin/skeleton";
-import { fetchAdminJson } from "@/components/admin/fetch-json";
+import { fetchAdminJson, peekAdminJson } from "@/components/admin/fetch-json";
 import { useAdminDrive, withDrive } from "@/components/admin/drive-context";
 import { SortableTh, TableSortSelect } from "@/components/admin/sortable-th";
 import {
@@ -69,9 +69,10 @@ export default function AdminOverviewPage() {
     if (!driveId) return;
     let cancelled = false;
     setError("");
-    // Clear first: showing the previous drive's numbers under a new drive's
-    // name, even briefly, reads as real data for the wrong campaign.
-    setData(null);
+    // Show this drive's last-seen numbers instantly (cache is keyed by URL, which
+    // carries the drive id) and refresh them in the background. Never another
+    // drive's numbers: no cache for this drive means a skeleton instead.
+    setData(peekAdminJson<OverviewResponse>(withDrive("/api/admin/automations", driveId)));
     (async () => {
       try {
         const json = await fetchAdminJson<OverviewResponse>(

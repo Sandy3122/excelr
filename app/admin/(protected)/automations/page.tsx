@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AutomationOverview } from "@/lib/automations/types";
 import { AutomationsIndexSkeleton } from "@/components/admin/skeleton";
-import { fetchAdminJson } from "@/components/admin/fetch-json";
+import { fetchAdminJson, peekAdminJson } from "@/components/admin/fetch-json";
 import { useAdminDrive, withDrive } from "@/components/admin/drive-context";
 
 interface OverviewResponse {
@@ -22,13 +22,18 @@ export default function AutomationsIndexPage() {
   useEffect(() => {
     if (!driveId) return;
     let cancelled = false;
-    setLoading(true);
-    setItems([]);
+    const stale = peekAdminJson<OverviewResponse>(
+      withDrive("/api/admin/automations", driveId),
+    );
+    // Last-seen figures for this drive paint instantly; fresh ones replace them.
+    setLoading(!stale);
+    setItems(stale?.automations ?? []);
     setError("");
     (async () => {
       try {
         const json = await fetchAdminJson<OverviewResponse>(
           withDrive("/api/admin/automations", driveId),
+          { fresh: true },
         );
         if (!json.ok) {
           if (!cancelled) setError(json.error || "Could not load automations.");
